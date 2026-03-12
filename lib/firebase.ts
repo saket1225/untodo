@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { initializeFirestore, getFirestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -12,9 +12,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-let db;
+let db: Firestore;
 try {
-  db = initializeFirestore(app, { experimentalForceLongPolling: true, useFetchStreams: false });
+  db = initializeFirestore(app, { experimentalForceLongPolling: true } as any);
 } catch {
   db = getFirestore(app);
 }

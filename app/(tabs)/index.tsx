@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, Modal, TouchableOpacity, ScrollView, Animated as RNAnimated } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Modal, TouchableOpacity, ScrollView, Animated as RNAnimated, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
@@ -11,30 +11,51 @@ import PomodoroTimer from '../../engines/todo/components/PomodoroTimer';
 import QuickActions from '../../engines/todo/components/QuickActions';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { Todo, Category, CATEGORIES, Priority } from '../../engines/todo/types';
+import { onSyncStateChange } from '../../lib/firebase-sync';
 
-const GREETINGS = [
+const MORNING_MSGS = [
   'What will you conquer today?',
   'Make today count.',
-  'One task at a time.',
-  'Less planning, more doing.',
-  'Focus on what matters.',
-  'Small steps, big results.',
-  'Today is yours.',
-  'Build momentum.',
-  'Ship something today.',
-  'Stay locked in.',
-  'Discipline is freedom.',
   'Do the hard thing first.',
+  'Today is yours.',
+  'Build momentum early.',
+];
+const AFTERNOON_MSGS = [
+  'Stay locked in.',
+  'Focus on what matters.',
+  'One task at a time.',
+  'Keep the momentum.',
+  'Ship something today.',
+];
+const EVENING_MSGS = [
+  'Wrap up strong.',
+  'Small steps, big results.',
   'Progress over perfection.',
+  'Finish what you started.',
+  'Almost there.',
+];
+const NIGHT_MSGS = [
+  'Night owl mode.',
+  'Rest is productive too.',
   'Consistency beats intensity.',
+  'Discipline is freedom.',
+  'Tomorrow starts with tonight.',
 ];
 
-function getDailyGreeting(): string {
-  const today = new Date();
+function getTimeBasedGreeting(): { prefix: string; message: string } {
+  const hour = new Date().getHours();
   const dayOfYear = Math.floor(
-    (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000
+    (new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
   );
-  return GREETINGS[dayOfYear % GREETINGS.length];
+  if (hour < 12) {
+    return { prefix: 'Good morning', message: MORNING_MSGS[dayOfYear % MORNING_MSGS.length] };
+  } else if (hour < 17) {
+    return { prefix: 'Good afternoon', message: AFTERNOON_MSGS[dayOfYear % AFTERNOON_MSGS.length] };
+  } else if (hour < 21) {
+    return { prefix: 'Good evening', message: EVENING_MSGS[dayOfYear % EVENING_MSGS.length] };
+  } else {
+    return { prefix: 'Night owl mode', message: NIGHT_MSGS[dayOfYear % NIGHT_MSGS.length] };
+  }
 }
 
 function TodayScreenContent() {
@@ -72,6 +93,34 @@ function TodayScreenContent() {
   const [quickActionTodo, setQuickActionTodo] = useState<Todo | null>(null);
   const [showCarryOver, setShowCarryOver] = useState(false);
   const [checkedCarryOver, setCheckedCarryOver] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const syncFromFirestore = useTodoStore(s => s.syncFromFirestore);
+
+  // Sync indicator
+  const syncPulse = useRef(new RNAnimated.Value(1)).current;
+  useEffect(() => {
+    const unsub = onSyncStateChange((syncing) => {
+      setIsSyncing(syncing);
+      if (syncing) {
+        RNAnimated.loop(
+          RNAnimated.sequence([
+            RNAnimated.timing(syncPulse, { toValue: 0.3, duration: 600, useNativeDriver: true }),
+            RNAnimated.timing(syncPulse, { toValue: 1, duration: 600, useNativeDriver: true }),
+          ])
+        ).start();
+      } else {
+        syncPulse.stopAnimation();
+        syncPulse.setValue(1);
+      }
+    });
+    return unsub;
+  }, []);
+
+  // Sync on mount
+  useEffect(() => {
+    syncFromFirestore().catch(() => {});
+  }, []);
 
   // Progress bar animation
   const progressAnim = useRef(new RNAnimated.Value(0)).current;
@@ -121,7 +170,7 @@ function TodayScreenContent() {
     addTodo(title, priority ?? null, category ?? null);
   }, [addTodo]);
 
-  const greeting = useMemo(() => getDailyGreeting(), [logicalDate]);
+  const greeting = useMemo(() => getTimeBasedGreeting(), [logicalDate]);
 
   // Carry-over candidates count
   const yesterdayStr = useMemo(() => {
@@ -163,8 +212,11 @@ function TodayScreenContent() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerLeft}>
           <Text style={styles.dateText}>{formatDisplayDate(logicalDate)}</Text>
+          {isSyncing && (
+            <RNAnimated.Text style={[styles.syncIcon, { opacity: syncPulse }]}>☁</RNAnimated.Text>
+          )}
         </View>
         <View style={styles.headerRight}>
           {totalPomodoroMinutes > 0 && (
@@ -177,7 +229,8 @@ function TodayScreenContent() {
       </View>
 
       {/* Greeting */}
-      <Text style={styles.greeting}>{greeting}</Text>
+      <Text style={styles.greetingPrefix}>{greeting.prefix}</Text>
+      <Text style={styles.greeting}>{greeting.message}</Text>
 
       {/* Progress bar */}
       {total > 0 && (
@@ -232,6 +285,18 @@ function TodayScreenContent() {
         renderItem={renderItem}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              setCheckedCarryOver(false);
+              await syncFromFirestore().catch(() => {});
+              setRefreshing(false);
+            }}
+            tintColor={Colors.dark.textTertiary}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>+</Text>
@@ -243,7 +308,7 @@ function TodayScreenContent() {
 
       {/* Carry-over modal */}
       {showCarryOver && (
-        <Modal visible={showCarryOver} transparent animationType="fade">
+        <Modal visible={showCarryOver} transparent animationType="slide">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Unfinished Business</Text>
@@ -314,10 +379,19 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: Spacing.md,
+  },
+  syncIcon: {
+    fontSize: 14,
+    color: Colors.dark.textTertiary,
   },
   dateText: {
     color: Colors.dark.text,
@@ -333,6 +407,13 @@ const styles = StyleSheet.create({
     color: Colors.dark.timer,
     fontFamily: Fonts.body,
     fontSize: 13,
+  },
+  greetingPrefix: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 15,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: 2,
   },
   greeting: {
     color: Colors.dark.textTertiary,

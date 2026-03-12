@@ -42,6 +42,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: styles.tabBar,
         tabBarShowLabel: false,
+        animation: 'fade',
       }}
     >
       <Tabs.Screen

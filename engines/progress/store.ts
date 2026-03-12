@@ -3,6 +3,11 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DaySummary, WeeklyReview, HabitEntry } from './types';
 import { useTodoStore } from '../todo/store';
+import { useUserStore } from '../user/store';
+import {
+  syncDaySummaryToFirestore,
+  syncWeeklyReviewToFirestore,
+} from '../../lib/firebase-sync';
 
 interface ProgressStore {
   daySummaries: DaySummary[];
@@ -92,6 +97,8 @@ export const useProgressStore = create<ProgressStore>()(
             summary,
           ],
         }));
+        const username = useUserStore.getState().username;
+        if (username) syncDaySummaryToFirestore(username, summary).catch(() => {});
       },
 
       addWeeklyReview: (review: WeeklyReview) => {
@@ -101,6 +108,8 @@ export const useProgressStore = create<ProgressStore>()(
             review,
           ],
         }));
+        const username = useUserStore.getState().username;
+        if (username) syncWeeklyReviewToFirestore(username, review).catch(() => {});
       },
 
       addHabit: (name: string) => {

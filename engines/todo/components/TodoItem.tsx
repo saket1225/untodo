@@ -45,6 +45,9 @@ export default function TodoItem({ todo, onToggle, onDelete, onPress, onLongPres
   const priorityColor = todo.priority ? PRIORITY_CONFIG[todo.priority].color : null;
   const categoryInfo = todo.category ? CATEGORIES.find(c => c.key === todo.category) : null;
   const pomodoroMins = todo.pomodoroMinutesLogged || 0;
+  const subtasks = todo.subtasks || [];
+  const subtasksDone = subtasks.filter(s => s.completed).length;
+  const hasNotes = !!(todo.notes && todo.notes.trim());
 
   return (
     <View style={styles.wrapper}>
@@ -89,6 +92,14 @@ export default function TodoItem({ todo, onToggle, onDelete, onPress, onLongPres
                   {categoryInfo.label}
                 </Text>
               </View>
+            )}
+            {subtasks.length > 0 && (
+              <View style={styles.subtaskMeta}>
+                <Text style={styles.subtaskText}>{subtasksDone}/{subtasks.length}</Text>
+              </View>
+            )}
+            {hasNotes && (
+              <Text style={styles.noteIcon}>📝</Text>
             )}
             {pomodoroMins > 0 && (
               <View style={styles.pomodoroMeta}>
@@ -201,6 +212,22 @@ const styles = StyleSheet.create({
   },
   categoryChipText: {
     fontFamily: Fonts.body,
+    fontSize: 10,
+  },
+  subtaskMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.dark.background,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+  },
+  subtaskText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: 10,
+  },
+  noteIcon: {
     fontSize: 10,
   },
   pomodoroMeta: {

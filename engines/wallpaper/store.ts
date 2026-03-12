@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WallpaperConfig } from './types';
+import { useUserStore } from '../user/store';
+import { syncWallpaperConfigToFirestore } from '../../lib/firebase-sync';
 
 interface WallpaperStore {
   config: WallpaperConfig;
@@ -10,7 +12,7 @@ interface WallpaperStore {
 
 export const useWallpaperStore = create<WallpaperStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       config: {
         enabled: true,
         dotSize: 6,
@@ -26,7 +28,13 @@ export const useWallpaperStore = create<WallpaperStore>()(
         wallpaperEnabled: false,
         lastWallpaperDate: null,
       },
-      updateConfig: (updates) => set((s) => ({ config: { ...s.config, ...updates } })),
+      updateConfig: (updates) => {
+        set((s) => ({ config: { ...s.config, ...updates } }));
+        const username = useUserStore.getState().username;
+        if (username) {
+          syncWallpaperConfigToFirestore(username, get().config).catch(() => {});
+        }
+      },
     }),
     {
       name: 'untodo-wallpaper',

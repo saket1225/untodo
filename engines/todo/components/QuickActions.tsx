@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Todo, Priority, Category, CATEGORIES, PRIORITY_CONFIG } from '../types';
 import { getLogicalDate } from '../../../lib/date-utils';
+import { useTodoStore } from '../store';
 
 interface Props {
   todo: Todo;
@@ -18,6 +19,15 @@ export default function QuickActions({ todo, visible, onClose, onUpdate, onDelet
   const [title, setTitle] = useState(todo.title);
   const [editingEstimate, setEditingEstimate] = useState(false);
   const [estimate, setEstimate] = useState(String(todo.estimatedMinutes || ''));
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteText, setNoteText] = useState(todo.notes || '');
+  const [addingSubtask, setAddingSubtask] = useState(false);
+  const [subtaskTitle, setSubtaskTitle] = useState('');
+  const [showSubtasks, setShowSubtasks] = useState(false);
+
+  const addSubtask = useTodoStore(s => s.addSubtask);
+  const toggleSubtask = useTodoStore(s => s.toggleSubtask);
+  const deleteSubtask = useTodoStore(s => s.deleteSubtask);
 
   const handlePriority = (p: Priority) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -47,6 +57,23 @@ export default function QuickActions({ todo, visible, onClose, onUpdate, onDelet
     onClose();
   };
 
+  const handleSaveNote = () => {
+    onUpdate(todo.id, { notes: noteText });
+    setEditingNote(false);
+  };
+
+  const handleAddSubtask = () => {
+    const trimmed = subtaskTitle.trim();
+    if (trimmed) {
+      addSubtask(todo.id, trimmed);
+      setSubtaskTitle('');
+    }
+    setAddingSubtask(false);
+  };
+
+  const subtasks = todo.subtasks || [];
+  const subtasksDone = subtasks.filter(s => s.completed).length;
+
   const handleMoveToTomorrow = () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -63,7 +90,7 @@ export default function QuickActions({ todo, visible, onClose, onUpdate, onDelet
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
         <View style={styles.sheet} onStartShouldSetResponder={() => true}>
           <View style={styles.handle} />
@@ -159,6 +186,82 @@ export default function QuickActions({ todo, visible, onClose, onUpdate, onDelet
               </Text>
             </TouchableOpacity>
           )}
+
+          {/* Subtasks */}
+          {subtasks.length > 0 && !showSubtasks && (
+            <TouchableOpacity style={styles.actionRow} onPress={() => setShowSubtasks(true)}>
+              <Text style={styles.actionIcon}>☐</Text>
+              <Text style={styles.actionText}>Subtasks ({subtasksDone}/{subtasks.length})</Text>
+            </TouchableOpacity>
+          )}
+          {showSubtasks && subtasks.length > 0 && (
+            <View style={styles.subtaskList}>
+              <Text style={styles.sectionLabel}>Subtasks</Text>
+              {subtasks.map(s => (
+                <View key={s.id} style={styles.subtaskRow}>
+                  <TouchableOpacity onPress={() => toggleSubtask(todo.id, s.id)}>
+                    <View style={[styles.subtaskCheck, s.completed && styles.subtaskCheckDone]}>
+                      {s.completed && <Text style={styles.subtaskCheckmark}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+                  <Text style={[styles.subtaskText, s.completed && styles.subtaskTextDone]}>{s.title}</Text>
+                  <TouchableOpacity onPress={() => deleteSubtask(todo.id, s.id)}>
+                    <Text style={styles.subtaskDelete}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+          {addingSubtask ? (
+            <View style={styles.editRow}>
+              <TextInput
+                style={styles.editInput}
+                value={subtaskTitle}
+                onChangeText={setSubtaskTitle}
+                placeholder="Subtask title"
+                placeholderTextColor={Colors.dark.textTertiary}
+                autoFocus
+                onSubmitEditing={handleAddSubtask}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={styles.saveBtn} onPress={handleAddSubtask}>
+                <Text style={styles.saveBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.actionRow} onPress={() => setAddingSubtask(true)}>
+              <Text style={styles.actionIcon}>+</Text>
+              <Text style={styles.actionText}>Add subtask</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Notes */}
+          {editingNote ? (
+            <View style={styles.editRow}>
+              <TextInput
+                style={[styles.editInput, { minHeight: 60 }]}
+                value={noteText}
+                onChangeText={setNoteText}
+                placeholder="Add a note..."
+                placeholderTextColor={Colors.dark.textTertiary}
+                autoFocus
+                multiline
+              />
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveNote}>
+                <Text style={styles.saveBtnText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.actionRow} onPress={() => setEditingNote(true)}>
+              <Text style={styles.actionIcon}>📝</Text>
+              <Text style={styles.actionText}>
+                {todo.notes ? 'Edit note' : 'Add note'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {todo.notes && !editingNote ? (
+            <Text style={styles.notePreview} numberOfLines={2}>{todo.notes}</Text>
+          ) : null}
 
           {/* Move to tomorrow */}
           <TouchableOpacity style={styles.actionRow} onPress={handleMoveToTomorrow}>
@@ -308,5 +411,59 @@ const styles = StyleSheet.create({
     color: Colors.dark.background,
     fontFamily: Fonts.bodyMedium,
     fontSize: 14,
+  },
+  subtaskList: {
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.dark.border,
+  },
+  subtaskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: 6,
+    paddingLeft: 4,
+  },
+  subtaskCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: Colors.dark.textTertiary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  subtaskCheckDone: {
+    backgroundColor: Colors.dark.success,
+    borderColor: Colors.dark.success,
+  },
+  subtaskCheckmark: {
+    color: Colors.dark.background,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  subtaskText: {
+    flex: 1,
+    color: Colors.dark.text,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+  },
+  subtaskTextDone: {
+    textDecorationLine: 'line-through',
+    color: Colors.dark.textTertiary,
+  },
+  subtaskDelete: {
+    color: Colors.dark.textTertiary,
+    fontSize: 12,
+    padding: 4,
+  },
+  notePreview: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 13,
+    paddingHorizontal: 4,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.dark.border,
   },
 });

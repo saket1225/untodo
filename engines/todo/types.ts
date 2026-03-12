@@ -16,11 +16,20 @@ export const PRIORITY_CONFIG: Record<string, { label: string; color: string; sor
   low: { label: 'Low', color: '#555555', sort: 2 },
 };
 
+export interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export type SyncStatus = 'synced' | 'pending' | 'error';
+
 export interface Todo {
   id: string;
   title: string;
   completed: boolean;
   createdAt: string;
+  updatedAt: string;
   logicalDate: string;
   carriedOverFrom?: string;
   order: number;
@@ -34,4 +43,7 @@ export interface Todo {
   priority: Priority;
   category: Category;
   pomodoroMinutesLogged: number;
+  subtasks: Subtask[];
+  notes: string;
+  syncStatus: SyncStatus;
 }
