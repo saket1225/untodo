@@ -1,11 +1,13 @@
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, Redirect } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useUserStore } from '../engines/user/store';
 
 export default function RootLayout() {
+  const username = useUserStore(s => s.username);
+
   const [fontsLoaded] = useFonts({
     'ApfelGrotezk-Bold': require('../assets/fonts/ApfelGrotezk-Bold.ttf'),
     'ApfelGrotezk-Medium': require('../assets/fonts/ApfelGrotezk-Medium.ttf'),
@@ -29,8 +31,10 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
       </Stack>
+      {!username && <Redirect href="/onboarding" />}
     </GestureHandlerRootView>
   );
 }

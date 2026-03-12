@@ -1,6 +1,9 @@
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors, Fonts } from '../../lib/theme';
+import { useUserStore } from '../../engines/user/store';
+import { startSiliconListener } from '../../engines/silicon/bridge';
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   const icons: Record<string, string> = {
@@ -25,6 +28,14 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
 }
 
 export default function TabLayout() {
+  const username = useUserStore(s => s.username);
+
+  useEffect(() => {
+    if (!username) return;
+    const unsubscribe = startSiliconListener(username);
+    return () => unsubscribe();
+  }, [username]);
+
   return (
     <Tabs
       screenOptions={{

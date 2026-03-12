@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
@@ -10,26 +10,25 @@ import {
   disconnectSilicon,
 } from '../../engines/silicon/bridge';
 import { SiliconConnection } from '../../engines/silicon/types';
+import { useUserStore } from '../../engines/user/store';
 
 export default function SettingsScreen() {
   const [resetHour, setResetHour] = useState(5);
   const [silicon, setSilicon] = useState<SiliconConnection | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
-  const [serverUrl, setServerUrl] = useState('');
-  const [pollInterval, setPollInterval] = useState(5);
   const [copied, setCopied] = useState(false);
+  const username = useUserStore(s => s.username);
 
   useEffect(() => {
     getSiliconConnection().then(conn => {
       if (conn) {
         setSilicon(conn);
-        setPollInterval(conn.pollInterval || 5);
+        setPairingCode(conn.pairingCode);
       }
     });
   }, []);
 
   useEffect(() => {
-    // Auto-generate pairing code if not connected
     if (!silicon?.connected && !pairingCode) {
       setPairingCode(generatePairingCode());
     }
@@ -41,14 +40,12 @@ export default function SettingsScreen() {
       await Clipboard.setStringAsync(pairingCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard may not be available
-    }
+    } catch {}
   };
 
   const handleCopyMessage = async () => {
-    if (!pairingCode) return;
-    const msg = `Hey Silicon, connect to my untodo app. My pairing code is ${pairingCode}. Set up the bridge server and I'll enter the URL here.`;
+    if (!pairingCode || !username) return;
+    const msg = `Connect to my untodo app. Username: ${username}, Pairing code: ${pairingCode}. Docs: https://untodo.netlify.app/`;
     try {
       await Clipboard.setStringAsync(msg);
       setCopied(true);
@@ -57,24 +54,29 @@ export default function SettingsScreen() {
   };
 
   const handleConnect = async () => {
-    if (!serverUrl.trim()) return;
     const code = pairingCode || generatePairingCode();
-    await saveSiliconConnection(serverUrl.trim(), code);
+    await saveSiliconConnection(code);
     const conn = await getSiliconConnection();
     setSilicon(conn);
+    setPairingCode(code);
   };
 
   const handleDisconnect = async () => {
     await disconnectSilicon();
     setSilicon(null);
     setPairingCode(null);
-    setServerUrl('');
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.heading}>Settings</Text>
+
+        {/* Username */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={styles.usernameValue}>@{username}</Text>
+        </View>
 
         {/* Day Reset Time */}
         <View style={styles.section}>
@@ -113,35 +115,22 @@ export default function SettingsScreen() {
             <>
               <View style={styles.statusRow}>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusText}>Connected</Text>
+                <Text style={styles.statusText}>Connected (real-time)</Text>
               </View>
-              <Text style={styles.hint}>
-                {silicon.serverUrl}
-              </Text>
               {silicon.lastSync && (
                 <Text style={styles.hint}>
-                  Last sync: {new Date(silicon.lastSync).toLocaleString()}
+                  Last activity: {new Date(silicon.lastSync).toLocaleString()}
                 </Text>
               )}
 
-              <View style={[styles.row, { marginTop: Spacing.md }]}>
-                <Text style={styles.controlLabel}>Poll interval</Text>
-                <View style={styles.row}>
-                  <TouchableOpacity
-                    style={styles.ctrlBtn}
-                    onPress={() => setPollInterval(v => Math.max(1, v - 1))}
-                  >
-                    <Text style={styles.ctrlBtnText}>-</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.pollValue}>{pollInterval}m</Text>
-                  <TouchableOpacity
-                    style={styles.ctrlBtn}
-                    onPress={() => setPollInterval(v => Math.min(30, v + 1))}
-                  >
-                    <Text style={styles.ctrlBtnText}>+</Text>
+              {pairingCode && (
+                <View style={[styles.codeContainer, { marginTop: Spacing.md }]}>
+                  <Text style={styles.codeLabel}>Pairing Code</Text>
+                  <TouchableOpacity onPress={handleCopyCode} activeOpacity={0.7}>
+                    <Text style={styles.codeValue}>{pairingCode}</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
+              )}
 
               <TouchableOpacity style={styles.dangerBtn} onPress={handleDisconnect}>
                 <Text style={styles.dangerBtnText}>Disconnect</Text>
@@ -154,7 +143,6 @@ export default function SettingsScreen() {
                 <Text style={styles.statusText}>Not connected</Text>
               </View>
 
-              {/* Pairing Code - Prominent Display */}
               {pairingCode && (
                 <View style={styles.codeContainer}>
                   <Text style={styles.codeLabel}>Pairing Code</Text>
@@ -167,20 +155,18 @@ export default function SettingsScreen() {
                 </View>
               )}
 
-              {/* Instructional message */}
               <View style={styles.instructionBlock}>
                 <Text style={styles.instructionText}>
-                  Send this to your Silicon instance to connect:
+                  Send this to your Silicon instance:
                 </Text>
                 <TouchableOpacity style={styles.messageBlock} onPress={handleCopyMessage} activeOpacity={0.7}>
                   <Text style={styles.messageText}>
-                    Hey Silicon, connect to my untodo app. My pairing code is {pairingCode}. Set up the bridge server and I'll enter the URL here.
+                    Connect to my untodo app. Username: {username}, Pairing code: {pairingCode}. Docs: https://untodo.netlify.app/
                   </Text>
                   <Text style={styles.tapToCopy}>Tap to copy</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* What Silicon can do */}
               <View style={styles.capabilitiesBlock}>
                 <Text style={styles.capabilitiesTitle}>What Silicon can do</Text>
                 <Text style={styles.capabilityItem}>  Add and manage your tasks remotely</Text>
@@ -189,21 +175,9 @@ export default function SettingsScreen() {
                 <Text style={styles.capabilityItem}>  Control app settings</Text>
               </View>
 
-              {/* Server URL Input */}
-              <TextInput
-                style={styles.input}
-                value={serverUrl}
-                onChangeText={setServerUrl}
-                placeholder="Server URL (e.g. http://192.168.1.10:9876)"
-                placeholderTextColor={Colors.dark.textTertiary}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
               <TouchableOpacity
-                style={[styles.actionBtn, !serverUrl.trim() && { opacity: 0.4 }]}
+                style={styles.actionBtn}
                 onPress={handleConnect}
-                disabled={!serverUrl.trim()}
               >
                 <Text style={styles.actionBtnText}>Connect</Text>
               </TouchableOpacity>
@@ -269,6 +243,11 @@ const styles = StyleSheet.create({
     fontSize: 32,
     minWidth: 80,
     textAlign: 'center',
+  },
+  usernameValue: {
+    color: Colors.dark.accent,
+    fontFamily: Fonts.accent,
+    fontSize: 24,
   },
   hint: {
     color: Colors.dark.textTertiary,

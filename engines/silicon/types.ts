@@ -1,16 +1,20 @@
-export interface SiliconConnection {
-  connected: boolean;
-  pairingCode: string | null;
-  serverUrl: string | null;
-  lastSync: string | null;
-  pollInterval: number; // minutes, default 5
+export interface SiliconCommand {
+  id: string;
+  type: 'add_task' | 'complete_task' | 'delete_task' | 'get_tasks' | 'write_daily_summary' | 'write_weekly_review' | 'update_wallpaper_config' | 'nudge' | 'get_progress';
+  payload: Record<string, any>;
+  status: 'pending' | 'processing' | 'done';
+  createdAt: number;
 }
 
-export interface SiliconCommand {
-  action: 'add_todo' | 'complete_todo' | 'uncomplete_todo' | 'delete_todo' | 'add_habit' | 'complete_habit' | 'list_todos' | 'set_daily_summary' | 'refresh_wallpaper';
-  text?: string;
-  date?: string;
-  name?: string;
-  emoji?: string;
-  summary?: string;
+export interface SiliconResponse {
+  commandId: string;
+  result: Record<string, any>;
+  status: 'success' | 'error';
+  completedAt: number;
+}
+
+export interface SiliconConnection {
+  pairingCode: string;
+  connected: boolean;
+  lastSync: number | null;
 }
