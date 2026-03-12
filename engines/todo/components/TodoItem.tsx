@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, memo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Animated, PanResponder,
 } from 'react-native';
@@ -13,7 +13,7 @@ interface Props {
   onLongPress?: () => void;
 }
 
-export default function TodoItem({ todo, onToggle, onDelete, onPress, onLongPress }: Props) {
+function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props) {
   const translateX = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -34,7 +34,6 @@ export default function TodoItem({ todo, onToggle, onDelete, onPress, onLongPres
   ).current;
 
   const handleToggle = () => {
-    // Scale animation on toggle
     Animated.sequence([
       Animated.timing(scaleAnim, { toValue: 0.95, duration: 80, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4 }),
@@ -78,7 +77,11 @@ export default function TodoItem({ todo, onToggle, onDelete, onPress, onLongPres
             {todo.carriedOverFrom && (
               <Text style={styles.carriedOverArrow}>↩ </Text>
             )}
-            <Text style={[styles.title, todo.completed && styles.titleCompleted]} numberOfLines={2}>
+            <Text
+              style={[styles.title, todo.completed && styles.titleCompleted]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
               {todo.title}
             </Text>
           </View>
@@ -116,6 +119,23 @@ export default function TodoItem({ todo, onToggle, onDelete, onPress, onLongPres
     </View>
   );
 }
+
+const TodoItem = memo(TodoItemInner, (prev, next) => {
+  return (
+    prev.todo.id === next.todo.id &&
+    prev.todo.title === next.todo.title &&
+    prev.todo.completed === next.todo.completed &&
+    prev.todo.priority === next.todo.priority &&
+    prev.todo.category === next.todo.category &&
+    prev.todo.estimatedMinutes === next.todo.estimatedMinutes &&
+    prev.todo.pomodoroMinutesLogged === next.todo.pomodoroMinutesLogged &&
+    prev.todo.notes === next.todo.notes &&
+    prev.todo.subtasks?.length === next.todo.subtasks?.length &&
+    prev.todo.carriedOverFrom === next.todo.carriedOverFrom
+  );
+});
+
+export default TodoItem;
 
 const styles = StyleSheet.create({
   wrapper: {

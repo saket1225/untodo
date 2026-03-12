@@ -1,9 +1,12 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, Modal, TouchableOpacity, ScrollView, Animated as RNAnimated, RefreshControl } from 'react-native';
+import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
+import {
+  View, Text, FlatList, StyleSheet, Modal, TouchableOpacity, ScrollView,
+  Animated as RNAnimated, RefreshControl, TextInput, Dimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
-import { getLogicalDate, formatDisplayDate } from '../../lib/date-utils';
+import { getLogicalDate, formatDisplayDate, shiftDate } from '../../lib/date-utils';
 import { useTodoStore } from '../../engines/todo/store';
 import TodoInput from '../../engines/todo/components/TodoInput';
 import TodoItem from '../../engines/todo/components/TodoItem';
@@ -12,6 +15,9 @@ import QuickActions from '../../engines/todo/components/QuickActions';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { Todo, Category, CATEGORIES, Priority } from '../../engines/todo/types';
 import { onSyncStateChange } from '../../lib/firebase-sync';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const ITEM_HEIGHT = 72; // Approximate fixed height for getItemLayout
 
 const MORNING_MSGS = [
   'What will you conquer today?',
@@ -58,6 +64,128 @@ function getTimeBasedGreeting(): { prefix: string; message: string } {
   }
 }
 
+function formatEstimatedTime(minutes: number): string {
+  if (minutes < 60) return `${minutes}m remaining`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}h ${m}m remaining` : `${h}h remaining`;
+}
+
+// --- Confetti Celebration Component ---
+function ConfettiCelebration({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+  const opacity = useRef(new RNAnimated.Value(0)).current;
+  const particles = useRef(
+    Array.from({ length: 24 }, (_, i) => ({
+      x: new RNAnimated.Value(SCREEN_WIDTH / 2),
+      y: new RNAnimated.Value(400),
+      opacity: new RNAnimated.Value(1),
+      color: ['#4ADE80', '#60A5FA', '#FBBF24', '#F472B6', '#A78BFA', '#F5F5F5'][i % 6],
+      targetX: Math.random() * SCREEN_WIDTH,
+      targetY: Math.random() * -200 + 100,
+    }))
+  ).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    // Fade in
+    RNAnimated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    // Animate particles
+    particles.forEach((p) => {
+      p.x.setValue(SCREEN_WIDTH / 2);
+      p.y.setValue(400);
+      p.opacity.setValue(1);
+      RNAnimated.parallel([
+        RNAnimated.timing(p.x, { toValue: p.targetX, duration: 1200, useNativeDriver: true }),
+        RNAnimated.sequence([
+          RNAnimated.timing(p.y, { toValue: p.targetY, duration: 600, useNativeDriver: true }),
+          RNAnimated.timing(p.y, { toValue: 800, duration: 600, useNativeDriver: true }),
+        ]),
+        RNAnimated.timing(p.opacity, { toValue: 0, duration: 1200, useNativeDriver: true }),
+      ]).start();
+    });
+    // Auto-dismiss after 3 seconds
+    const timer = setTimeout(onDismiss, 3000);
+    return () => clearTimeout(timer);
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <RNAnimated.View style={[styles.confettiOverlay, { opacity }]} pointerEvents="none">
+      {particles.map((p, i) => (
+        <RNAnimated.View
+          key={i}
+          style={[
+            styles.confettiParticle,
+            {
+              backgroundColor: p.color,
+              width: i % 3 === 0 ? 8 : 6,
+              height: i % 3 === 0 ? 8 : 6,
+              borderRadius: i % 2 === 0 ? 4 : 1,
+              transform: [{ translateX: p.x }, { translateY: p.y }],
+              opacity: p.opacity,
+            },
+          ]}
+        />
+      ))}
+      <View style={styles.celebrationTextContainer}>
+        <Text style={styles.celebrationText}>All done! You crushed it.</Text>
+      </View>
+    </RNAnimated.View>
+  );
+}
+
+// --- Search Results Component ---
+function SearchResults({
+  query,
+  results,
+  onSelect,
+  onClose,
+}: {
+  query: string;
+  results: Todo[];
+  onSelect: (todo: Todo) => void;
+  onClose: () => void;
+}) {
+  if (!query.trim() || results.length === 0) {
+    if (query.trim()) {
+      return (
+        <View style={styles.searchResults}>
+          <Text style={styles.searchNoResults}>No tasks found</Text>
+        </View>
+      );
+    }
+    return null;
+  }
+
+  return (
+    <View style={styles.searchResults}>
+      <ScrollView style={styles.searchScroll} keyboardShouldPersistTaps="handled">
+        {results.slice(0, 15).map((todo) => (
+          <TouchableOpacity
+            key={todo.id}
+            style={styles.searchResultItem}
+            onPress={() => onSelect(todo)}
+          >
+            <View style={styles.searchResultContent}>
+              <Text
+                style={[styles.searchResultTitle, todo.completed && styles.searchResultTitleDone]}
+                numberOfLines={1}
+              >
+                {todo.title}
+              </Text>
+              <Text style={styles.searchResultDate}>
+                {formatDisplayDate(todo.logicalDate)}
+              </Text>
+            </View>
+            {todo.completed && <Text style={styles.searchResultCheck}>✓</Text>}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 function TodayScreenContent() {
   const logicalDate = getLogicalDate();
   const allTodos = useTodoStore(s => s.todos);
@@ -65,29 +193,48 @@ function TodayScreenContent() {
   const toggleTodo = useTodoStore(s => s.toggleTodo);
   const deleteTodo = useTodoStore(s => s.deleteTodo);
   const updateTodo = useTodoStore(s => s.updateTodo);
+  const reorderTodos = useTodoStore(s => s.reorderTodos);
   const carryOverTodos = useTodoStore(s => s.carryOverTodos);
+
+  // Date navigation
+  const [viewingDate, setViewingDate] = useState(logicalDate);
+  const isToday = viewingDate === logicalDate;
+
+  // Search
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<TextInput>(null);
 
   // Category filter
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
 
-  // All today's todos (sorted by priority in store)
-  const todayTodos = useMemo(() => {
-    const today = allTodos.filter(t => t.logicalDate === logicalDate);
-    // Sort: incomplete first, then by priority (high>med>low>none), then order
-    return [...today].sort((a, b) => {
+  // All todos for the viewing date (sorted)
+  const dateTodos = useMemo(() => {
+    const dayTodos = allTodos.filter(t => t.logicalDate === viewingDate);
+    return [...dayTodos].sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       const pa = a.priority ? { high: 0, medium: 1, low: 2 }[a.priority] : 3;
       const pb = b.priority ? { high: 0, medium: 1, low: 2 }[b.priority] : 3;
       if (pa !== pb) return pa - pb;
       return a.order - b.order;
     });
-  }, [allTodos, logicalDate]);
+  }, [allTodos, viewingDate]);
 
   // Filtered by category
   const todos = useMemo(() => {
-    if (activeCategory === 'all') return todayTodos;
-    return todayTodos.filter(t => t.category === activeCategory);
-  }, [todayTodos, activeCategory]);
+    if (activeCategory === 'all') return dateTodos;
+    return dateTodos.filter(t => t.category === activeCategory);
+  }, [dateTodos, activeCategory]);
+
+  // Search results across all tasks
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return allTodos
+      .filter(t => t.title.toLowerCase().includes(q))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 15);
+  }, [allTodos, searchQuery]);
 
   const [pomodoroTodo, setPomodoroTodo] = useState<Todo | null>(null);
   const [quickActionTodo, setQuickActionTodo] = useState<Todo | null>(null);
@@ -95,7 +242,13 @@ function TodayScreenContent() {
   const [checkedCarryOver, setCheckedCarryOver] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [lastCelebratedCount, setLastCelebratedCount] = useState(0);
   const syncFromFirestore = useTodoStore(s => s.syncFromFirestore);
+
+  // Drag reorder state
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOrder, setDragOrder] = useState<string[]>([]);
 
   // Sync indicator
   const syncPulse = useRef(new RNAnimated.Value(1)).current;
@@ -125,8 +278,8 @@ function TodayScreenContent() {
   // Progress bar animation
   const progressAnim = useRef(new RNAnimated.Value(0)).current;
 
-  const completed = todayTodos.filter(t => t.completed).length;
-  const total = todayTodos.length;
+  const completed = dateTodos.filter(t => t.completed).length;
+  const total = dateTodos.length;
   const progress = total > 0 ? completed / total : 0;
 
   useEffect(() => {
@@ -137,10 +290,30 @@ function TodayScreenContent() {
     }).start();
   }, [progress]);
 
-  // Total pomodoro minutes for today
+  // Celebration: trigger when all tasks completed
+  useEffect(() => {
+    if (isToday && total > 0 && completed === total && completed > lastCelebratedCount) {
+      setShowCelebration(true);
+      setLastCelebratedCount(completed);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  }, [completed, total, isToday]);
+
+  // Reset celebration tracking when date changes
+  useEffect(() => {
+    setLastCelebratedCount(0);
+  }, [viewingDate]);
+
+  // Total pomodoro minutes for viewed date
   const totalPomodoroMinutes = useMemo(
-    () => todayTodos.reduce((s, t) => s + (t.pomodoroMinutesLogged || 0), 0),
-    [todayTodos]
+    () => dateTodos.reduce((s, t) => s + (t.pomodoroMinutesLogged || 0), 0),
+    [dateTodos]
+  );
+
+  // Total estimated time remaining (incomplete tasks)
+  const totalEstimatedMinutes = useMemo(
+    () => dateTodos.filter(t => !t.completed).reduce((s, t) => s + (t.estimatedMinutes || 0), 0),
+    [dateTodos]
   );
 
   // Check for carry-over tasks on mount
@@ -167,8 +340,8 @@ function TodayScreenContent() {
   }, [toggleTodo]);
 
   const handleAdd = useCallback((title: string, priority?: Priority, category?: Category) => {
-    addTodo(title, priority ?? null, category ?? null);
-  }, [addTodo]);
+    addTodo(title, priority ?? null, category ?? null, viewingDate);
+  }, [addTodo, viewingDate]);
 
   const greeting = useMemo(() => getTimeBasedGreeting(), [logicalDate]);
 
@@ -183,14 +356,72 @@ function TodayScreenContent() {
     [allTodos, yesterdayStr]
   );
 
-  // Categories that exist in today's tasks
+  // Categories that exist in viewed date's tasks
   const activeCats = useMemo(() => {
     const cats = new Set<string>();
-    todayTodos.forEach(t => { if (t.category) cats.add(t.category); });
+    dateTodos.forEach(t => { if (t.category) cats.add(t.category); });
     return CATEGORIES.filter(c => cats.has(c.key!));
-  }, [todayTodos]);
+  }, [dateTodos]);
 
-  const renderItem = useCallback(({ item }: { item: Todo }) => (
+  // Date navigation handlers
+  const goToPrevDay = useCallback(() => {
+    setViewingDate(prev => shiftDate(prev, -1));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const goToNextDay = useCallback(() => {
+    setViewingDate(prev => shiftDate(prev, 1));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const goToToday = useCallback(() => {
+    setViewingDate(logicalDate);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [logicalDate]);
+
+  // Search handlers
+  const toggleSearch = useCallback(() => {
+    setSearchExpanded(prev => {
+      if (!prev) {
+        setTimeout(() => searchInputRef.current?.focus(), 100);
+      } else {
+        setSearchQuery('');
+      }
+      return !prev;
+    });
+  }, []);
+
+  const handleSearchSelect = useCallback((todo: Todo) => {
+    setViewingDate(todo.logicalDate);
+    setSearchExpanded(false);
+    setSearchQuery('');
+  }, []);
+
+  // Drag to reorder handlers
+  const handleDragStart = useCallback((id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const incompleteIds = dateTodos.filter(t => !t.completed).map(t => t.id);
+    setDraggingId(id);
+    setDragOrder(incompleteIds);
+  }, [dateTodos]);
+
+  const handleDragEnd = useCallback((fromId: string, toIndex: number) => {
+    if (dragOrder.length === 0) return;
+    const fromIndex = dragOrder.indexOf(fromId);
+    if (fromIndex < 0 || fromIndex === toIndex) {
+      setDraggingId(null);
+      setDragOrder([]);
+      return;
+    }
+    const newOrder = [...dragOrder];
+    const [moved] = newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, moved);
+    reorderTodos(newOrder);
+    setDraggingId(null);
+    setDragOrder([]);
+  }, [dragOrder, reorderTodos]);
+
+  const renderItem = useCallback(({ item, index }: { item: Todo; index: number }) => (
     <TodoItem
       todo={item}
       onToggle={() => handleToggle(item.id)}
@@ -203,6 +434,12 @@ function TodayScreenContent() {
     />
   ), [handleToggle, deleteTodo]);
 
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: ITEM_HEIGHT,
+    offset: ITEM_HEIGHT * index,
+    index,
+  }), []);
+
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0%', '100%'],
@@ -213,12 +450,21 @@ function TodayScreenContent() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.dateText}>{formatDisplayDate(logicalDate)}</Text>
+          <TouchableOpacity onPress={goToPrevDay} style={styles.navArrow} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.navArrowText}>‹</Text>
+          </TouchableOpacity>
+          <Text style={styles.dateText}>{formatDisplayDate(viewingDate)}</Text>
+          <TouchableOpacity onPress={goToNextDay} style={styles.navArrow} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.navArrowText}>›</Text>
+          </TouchableOpacity>
           {isSyncing && (
             <RNAnimated.Text style={[styles.syncIcon, { opacity: syncPulse }]}>☁</RNAnimated.Text>
           )}
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity onPress={toggleSearch} style={styles.searchIconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.searchIconText}>{searchExpanded ? '✕' : '⌕'}</Text>
+          </TouchableOpacity>
           {totalPomodoroMinutes > 0 && (
             <Text style={styles.pomodoroTotal}>⏱ {totalPomodoroMinutes}m</Text>
           )}
@@ -228,9 +474,47 @@ function TodayScreenContent() {
         </View>
       </View>
 
-      {/* Greeting */}
-      <Text style={styles.greetingPrefix}>{greeting.prefix}</Text>
-      <Text style={styles.greeting}>{greeting.message}</Text>
+      {/* Search bar (collapsible) */}
+      {searchExpanded && (
+        <View style={styles.searchContainer}>
+          <TextInput
+            ref={searchInputRef}
+            style={styles.searchInput}
+            placeholder="Search all tasks..."
+            placeholderTextColor={Colors.dark.textTertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          <SearchResults
+            query={searchQuery}
+            results={searchResults}
+            onSelect={handleSearchSelect}
+            onClose={() => { setSearchExpanded(false); setSearchQuery(''); }}
+          />
+        </View>
+      )}
+
+      {/* Back to Today pill */}
+      {!isToday && (
+        <TouchableOpacity style={styles.backToTodayPill} onPress={goToToday}>
+          <Text style={styles.backToTodayText}>Back to Today</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Greeting (only on today) */}
+      {isToday && (
+        <>
+          <Text style={styles.greetingPrefix}>{greeting.prefix}</Text>
+          <Text style={styles.greeting}>{greeting.message}</Text>
+        </>
+      )}
+
+      {/* Estimated time remaining */}
+      {totalEstimatedMinutes > 0 && (
+        <Text style={styles.estimatedTimeHeader}>{formatEstimatedTime(totalEstimatedMinutes)}</Text>
+      )}
 
       {/* Progress bar */}
       {total > 0 && (
@@ -283,6 +567,10 @@ function TodayScreenContent() {
         data={todos}
         keyExtractor={item => item.id}
         renderItem={renderItem}
+        getItemLayout={getItemLayout}
+        windowSize={10}
+        maxToRenderPerBatch={15}
+        removeClippedSubviews={true}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -300,8 +588,12 @@ function TodayScreenContent() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>+</Text>
-            <Text style={styles.emptyText}>Your day is a blank canvas</Text>
-            <Text style={styles.emptySubtext}>Add your first task above to get started</Text>
+            <Text style={styles.emptyText}>
+              {isToday ? 'Your day is a blank canvas' : 'No tasks for this day'}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {isToday ? 'Add your first task above to get started' : 'Add a task or navigate to another day'}
+            </Text>
           </View>
         }
       />
@@ -354,6 +646,12 @@ function TodayScreenContent() {
           onDelete={(id) => { deleteTodo(id); setQuickActionTodo(null); }}
         />
       )}
+
+      {/* Celebration overlay */}
+      <ConfettiCelebration
+        visible={showCelebration}
+        onDismiss={() => setShowCelebration(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -374,7 +672,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
+    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
@@ -382,12 +680,22 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
+    flex: 1,
   },
   headerRight: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: Spacing.md,
+  },
+  navArrow: {
+    padding: 4,
+  },
+  navArrowText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 28,
+    fontFamily: Fonts.body,
+    lineHeight: 32,
   },
   syncIcon: {
     fontSize: 14,
@@ -396,7 +704,8 @@ const styles = StyleSheet.create({
   dateText: {
     color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
-    fontSize: 28,
+    fontSize: 22,
+    flexShrink: 1,
   },
   countText: {
     color: Colors.dark.textSecondary,
@@ -408,6 +717,100 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 13,
   },
+
+  // Search
+  searchIconBtn: {
+    padding: 4,
+  },
+  searchIconText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 18,
+    fontFamily: Fonts.body,
+  },
+  searchContainer: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    zIndex: 10,
+  },
+  searchInput: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    color: Colors.dark.text,
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  searchResults: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    marginTop: Spacing.xs,
+    maxHeight: 240,
+    overflow: 'hidden',
+  },
+  searchScroll: {
+    maxHeight: 240,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.dark.border,
+  },
+  searchResultContent: {
+    flex: 1,
+  },
+  searchResultTitle: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+  },
+  searchResultTitleDone: {
+    color: Colors.dark.textTertiary,
+    textDecorationLine: 'line-through',
+  },
+  searchResultDate: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  searchResultCheck: {
+    color: Colors.dark.success,
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: Spacing.sm,
+  },
+  searchNoResults: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: Spacing.md,
+  },
+
+  // Back to today
+  backToTodayPill: {
+    alignSelf: 'center',
+    backgroundColor: Colors.dark.accent,
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  backToTodayText: {
+    color: Colors.dark.background,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 13,
+  },
+
   greetingPrefix: {
     color: Colors.dark.textSecondary,
     fontFamily: Fonts.headingMedium,
@@ -422,6 +825,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.sm,
   },
+
+  // Estimated time
+  estimatedTimeHeader: {
+    color: Colors.dark.timer,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xs,
+  },
+
   progressBar: {
     height: 3,
     backgroundColor: Colors.dark.border,
@@ -485,7 +898,10 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 14,
     marginTop: Spacing.xs,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.xl,
   },
+
   // Carry-over modal
   modalOverlay: {
     flex: 1,
@@ -541,5 +957,30 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 14,
+  },
+
+  // Celebration
+  confettiOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confettiParticle: {
+    position: 'absolute',
+  },
+  celebrationTextContainer: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 16,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  celebrationText: {
+    color: Colors.dark.success,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 22,
+    textAlign: 'center',
   },
 });

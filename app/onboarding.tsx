@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Colors, Fonts, Spacing } from '../lib/theme';
 import { useUserStore } from '../engines/user/store';
+import { useTodoStore } from '../engines/todo/store';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -199,6 +200,7 @@ export default function OnboardingScreen() {
   const [input, setInput] = useState('');
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const setUsername = useUserStore(s => s.setUsername);
+  const addSampleTasks = useTodoStore(s => s.addSampleTasks);
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -219,6 +221,7 @@ export default function OnboardingScreen() {
 
   const handleWalkthroughComplete = () => {
     setUsername(sanitized);
+    addSampleTasks();
     router.replace('/(tabs)');
   };
 

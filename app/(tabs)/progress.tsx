@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, memo } from 'react';
 import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
@@ -227,7 +227,7 @@ function DailyHistory() {
   );
 }
 
-function DayRow({ day }: { day: DaySummary }) {
+const DayRow = memo(function DayRow({ day }: { day: DaySummary }) {
   const date = new Date(day.date + 'T12:00:00');
   const label = format(date, 'EEE, MMM d');
   const pct = Math.round(day.completionRate * 100);
@@ -248,7 +248,7 @@ function DayRow({ day }: { day: DaySummary }) {
       </View>
     </View>
   );
-}
+});
 
 function WeeklyReviewSection() {
   const reviews = useProgressStore(s => s.weeklyReviews);

@@ -30,7 +30,6 @@ export async function syncTodoToFirestore(username: string, todo: Todo): Promise
     await setDoc(ref, data);
   } catch (e) {
     console.warn('Firestore todo sync failed:', e);
-    throw e;
   } finally {
     setSyncing(false);
   }

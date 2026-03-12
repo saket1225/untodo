@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
@@ -14,7 +14,7 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-export default function QuickActions({ todo, visible, onClose, onUpdate, onDelete }: Props) {
+function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(todo.title);
   const [editingEstimate, setEditingEstimate] = useState(false);
@@ -467,3 +467,6 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.dark.border,
   },
 });
+
+const QuickActions = memo(QuickActionsInner);
+export default QuickActions;

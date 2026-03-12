@@ -14,7 +14,7 @@ import {
 
 interface TodoStore {
   todos: Todo[];
-  addTodo: (title: string, priority?: Priority, category?: Category) => void;
+  addTodo: (title: string, priority?: Priority, category?: Category, date?: string) => void;
   toggleTodo: (id: string) => void;
   deleteTodo: (id: string) => void;
   updateTodo: (id: string, updates: Partial<Todo>) => void;
@@ -27,6 +27,7 @@ interface TodoStore {
   toggleSubtask: (todoId: string, subtaskId: string) => void;
   deleteSubtask: (todoId: string, subtaskId: string) => void;
   syncFromFirestore: () => Promise<void>;
+  addSampleTasks: () => void;
 }
 
 function sortTodos(todos: Todo[]): Todo[] {
@@ -47,12 +48,41 @@ function nowISO(): string {
   return new Date().toISOString();
 }
 
-// Fire-and-forget sync helper
-function syncTodo(todo: Todo) {
+// Debounced sync: batch sync calls within 500ms
+let _syncTimeout: ReturnType<typeof setTimeout> | null = null;
+let _pendingSyncTodos: Map<string, Todo> = new Map();
+
+function debouncedSyncTodo(todo: Todo) {
   const username = getUsername();
-  if (username) {
-    syncTodoToFirestore(username, todo).catch(() => {});
-  }
+  if (!username) return;
+  _pendingSyncTodos.set(todo.id, todo);
+  if (_syncTimeout) clearTimeout(_syncTimeout);
+  _syncTimeout = setTimeout(() => {
+    const todos = Array.from(_pendingSyncTodos.values());
+    _pendingSyncTodos.clear();
+    _syncTimeout = null;
+    if (todos.length === 1) {
+      syncTodoToFirestore(username, todos[0]).catch(() => {});
+    } else if (todos.length > 1) {
+      bulkSyncTodosToFirestore(username, todos).catch(() => {});
+    }
+  }, 500);
+}
+
+// Debounced toggle: prevent rapid-fire toggles
+let _toggleTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
+
+function debouncedToggleSync(todo: Todo) {
+  const existing = _toggleTimeouts.get(todo.id);
+  if (existing) clearTimeout(existing);
+  _toggleTimeouts.set(todo.id, setTimeout(() => {
+    _toggleTimeouts.delete(todo.id);
+    debouncedSyncTodo(todo);
+  }, 300));
+}
+
+function makeId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
 export const useTodoStore = create<TodoStore>()(
@@ -60,12 +90,12 @@ export const useTodoStore = create<TodoStore>()(
     (set, get) => ({
       todos: [],
 
-      addTodo: (title: string, priority?: Priority, category?: Category) => {
-        const logicalDate = getLogicalDate();
+      addTodo: (title: string, priority?: Priority, category?: Category, date?: string) => {
+        const logicalDate = date || getLogicalDate();
         const todayTodos = get().todos.filter(t => t.logicalDate === logicalDate);
         const now = nowISO();
         const newTodo: Todo = {
-          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+          id: makeId(),
           title,
           completed: false,
           createdAt: now,
@@ -81,7 +111,7 @@ export const useTodoStore = create<TodoStore>()(
           syncStatus: 'pending',
         };
         set(state => ({ todos: [...state.todos, newTodo] }));
-        syncTodo(newTodo);
+        debouncedSyncTodo(newTodo);
       },
 
       toggleTodo: (id: string) => {
@@ -92,7 +122,7 @@ export const useTodoStore = create<TodoStore>()(
           ),
         }));
         const todo = get().todos.find(t => t.id === id);
-        if (todo) syncTodo(todo);
+        if (todo) debouncedToggleSync(todo);
       },
 
       deleteTodo: (id: string) => {
@@ -111,7 +141,7 @@ export const useTodoStore = create<TodoStore>()(
           ),
         }));
         const todo = get().todos.find(t => t.id === id);
-        if (todo) syncTodo(todo);
+        if (todo) debouncedSyncTodo(todo);
       },
 
       reorderTodos: (ids: string[]) => {
@@ -122,7 +152,6 @@ export const useTodoStore = create<TodoStore>()(
             return idx >= 0 ? { ...t, order: idx, updatedAt: now, syncStatus: 'pending' as SyncStatus } : t;
           }),
         }));
-        // Bulk sync reordered todos
         const username = getUsername();
         if (username) {
           const reordered = get().todos.filter(t => ids.includes(t.id));
@@ -156,7 +185,7 @@ export const useTodoStore = create<TodoStore>()(
           );
           const carried = incomplete.map((t, i) => ({
             ...t,
-            id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+            id: makeId(),
             logicalDate,
             carriedOverFrom: t.logicalDate,
             order: i,
@@ -167,7 +196,6 @@ export const useTodoStore = create<TodoStore>()(
           return { todos: [...state.todos, ...carried] };
         });
 
-        // Sync carried todos
         const username = getUsername();
         if (username) {
           const carried = get().todos.filter(
@@ -185,13 +213,13 @@ export const useTodoStore = create<TodoStore>()(
           ),
         }));
         const todo = get().todos.find(t => t.id === id);
-        if (todo) syncTodo(todo);
+        if (todo) debouncedSyncTodo(todo);
       },
 
       addSubtask: (todoId: string, title: string) => {
         const now = nowISO();
         const subtask: Subtask = {
-          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+          id: makeId(),
           title,
           completed: false,
         };
@@ -203,7 +231,7 @@ export const useTodoStore = create<TodoStore>()(
           ),
         }));
         const todo = get().todos.find(t => t.id === todoId);
-        if (todo) syncTodo(todo);
+        if (todo) debouncedSyncTodo(todo);
       },
 
       toggleSubtask: (todoId: string, subtaskId: string) => {
@@ -223,7 +251,7 @@ export const useTodoStore = create<TodoStore>()(
           ),
         }));
         const todo = get().todos.find(t => t.id === todoId);
-        if (todo) syncTodo(todo);
+        if (todo) debouncedSyncTodo(todo);
       },
 
       deleteSubtask: (todoId: string, subtaskId: string) => {
@@ -241,29 +269,62 @@ export const useTodoStore = create<TodoStore>()(
           ),
         }));
         const todo = get().todos.find(t => t.id === todoId);
-        if (todo) syncTodo(todo);
+        if (todo) debouncedSyncTodo(todo);
+      },
+
+      addSampleTasks: () => {
+        const logicalDate = getLogicalDate();
+        const now = nowISO();
+        const samples = [
+          { title: 'Welcome to untodo — tap to start a pomodoro', order: 0 },
+          { title: 'Long press me for quick actions', order: 1 },
+          { title: 'Swipe left or use quick actions to delete', order: 2 },
+        ];
+        const newTodos: Todo[] = samples.map(s => ({
+          id: makeId(),
+          title: s.title,
+          completed: false,
+          createdAt: now,
+          updatedAt: now,
+          logicalDate,
+          order: s.order,
+          type: 'task' as const,
+          priority: null,
+          category: null,
+          pomodoroMinutesLogged: 0,
+          subtasks: [],
+          notes: '',
+          syncStatus: 'pending' as SyncStatus,
+        }));
+        set(state => ({ todos: [...state.todos, ...newTodos] }));
+        const username = getUsername();
+        if (username) {
+          bulkSyncTodosToFirestore(username, newTodos).catch(() => {});
+        }
       },
 
       syncFromFirestore: async () => {
         const username = getUsername();
         if (!username) return;
-        const remote = await fetchAllTodosFromFirestore(username);
-        if (remote.length === 0) {
-          // Nothing remote — push all local
-          const local = get().todos;
-          if (local.length > 0) {
-            bulkSyncTodosToFirestore(username, local).catch(() => {});
+        try {
+          const remote = await fetchAllTodosFromFirestore(username);
+          if (remote.length === 0) {
+            const local = get().todos;
+            if (local.length > 0) {
+              bulkSyncTodosToFirestore(username, local).catch(() => {});
+            }
+            return;
           }
-          return;
-        }
-        const local = get().todos;
-        const merged = mergeTodos(local, remote);
-        set({ todos: merged });
-        // Push any local-only todos
-        const remoteIds = new Set(remote.map(t => t.id));
-        const localOnly = merged.filter(t => !remoteIds.has(t.id));
-        if (localOnly.length > 0) {
-          bulkSyncTodosToFirestore(username, localOnly).catch(() => {});
+          const local = get().todos;
+          const merged = mergeTodos(local, remote);
+          set({ todos: merged });
+          const remoteIds = new Set(remote.map(t => t.id));
+          const localOnly = merged.filter(t => !remoteIds.has(t.id));
+          if (localOnly.length > 0) {
+            bulkSyncTodosToFirestore(username, localOnly).catch(() => {});
+          }
+        } catch {
+          // Fail silently — data stays local
         }
       },
     }),
