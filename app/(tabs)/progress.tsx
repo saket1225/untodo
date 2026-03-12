@@ -1,11 +1,12 @@
-import { useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { useMemo, useState, useCallback } from 'react';
+import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useTodoStore } from '../../engines/todo/store';
 import { useProgressStore, getWeekStats, getRecentDays } from '../../engines/progress/store';
 import { DaySummary } from '../../engines/progress/types';
 import { format } from 'date-fns';
+import ErrorBoundary from '../../components/ErrorBoundary';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const BAR_MAX_HEIGHT = 120;
@@ -14,59 +15,69 @@ function WeeklyOverview() {
   const todos = useTodoStore(s => s.todos);
   const stats = useMemo(() => getWeekStats(), [todos]);
   const pct = Math.round(stats.completionRate * 100);
+  const hasData = stats.totalTasks > 0;
 
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>This Week</Text>
 
-      <Text style={styles.bigPct}>{pct}%</Text>
-      <Text style={styles.bigPctLabel}>completion rate</Text>
+      {!hasData ? (
+        <View style={styles.emptySection}>
+          <Text style={styles.emptyTitle}>No tasks this week yet</Text>
+          <Text style={styles.emptySubtext}>Start adding tasks to see your weekly progress</Text>
+        </View>
+      ) : (
+        <>
+          <Text style={styles.bigPct}>{pct}%</Text>
+          <Text style={styles.bigPctLabel}>completion rate</Text>
 
-      <View style={styles.barChart}>
-        {stats.weekDays.map((day, i) => {
-          const height = day.totalTasks > 0
-            ? Math.max(4, (day.completionRate * BAR_MAX_HEIGHT))
-            : 4;
-          const isToday = day.date === new Date().toISOString().split('T')[0];
-          return (
-            <View key={day.date} style={styles.barCol}>
-              <View style={styles.barTrack}>
-                <View
-                  style={[
-                    styles.barFill,
-                    {
-                      height,
-                      backgroundColor: isToday
-                        ? Colors.dark.accent
-                        : day.totalTasks > 0
-                          ? Colors.dark.textSecondary
-                          : Colors.dark.border,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={[
-                styles.barLabel,
-                isToday && { color: Colors.dark.accent },
-              ]}>
-                {DAY_LABELS[i]}
-              </Text>
+          <View style={styles.barChart}>
+            {stats.weekDays.map((day, i) => {
+              const height = day.totalTasks > 0
+                ? Math.max(4, (day.completionRate * BAR_MAX_HEIGHT))
+                : 4;
+              const isToday = day.date === new Date().toISOString().split('T')[0];
+              return (
+                <View key={day.date} style={styles.barCol}>
+                  <View style={styles.barTrack}>
+                    <View
+                      style={[
+                        styles.barFill,
+                        {
+                          height,
+                          backgroundColor: isToday
+                            ? Colors.dark.accent
+                            : day.totalTasks > 0
+                              ? Colors.dark.textSecondary
+                              : Colors.dark.border,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[
+                    styles.barLabel,
+                    isToday && { color: Colors.dark.accent },
+                  ]}>
+                    {DAY_LABELS[i]}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.totalCompleted}</Text>
+              <Text style={styles.statLabel}>completed</Text>
             </View>
-          );
-        })}
-      </View>
-
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{stats.totalCompleted}</Text>
-          <Text style={styles.statLabel}>completed</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{stats.totalTasks}</Text>
-          <Text style={styles.statLabel}>total</Text>
-        </View>
-      </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.totalTasks}</Text>
+              <Text style={styles.statLabel}>total</Text>
+            </View>
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -100,7 +111,10 @@ function DailyHistory() {
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>History</Text>
-        <Text style={styles.emptyText}>No task history yet</Text>
+        <View style={styles.emptySection}>
+          <Text style={styles.emptyTitle}>No history yet</Text>
+          <Text style={styles.emptySubtext}>Complete some tasks and your history will appear here</Text>
+        </View>
       </View>
     );
   }
@@ -176,10 +190,26 @@ function WeeklyReviewSection() {
   );
 }
 
-export default function ProgressScreen() {
+function ProgressScreenContent() {
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    // Force re-render by briefly setting refreshing
+    setTimeout(() => setRefreshing(false), 500);
+  }, []);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.dark.textSecondary}
+          />
+        }
+      >
         <Text style={styles.heading}>Progress</Text>
         <WeeklyOverview />
         <Streaks />
@@ -188,6 +218,14 @@ export default function ProgressScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+export default function ProgressScreen() {
+  return (
+    <ErrorBoundary>
+      <ProgressScreenContent />
+    </ErrorBoundary>
   );
 }
 
@@ -214,6 +252,28 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: Spacing.md,
+  },
+
+  // Empty state
+  emptySection: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.xl,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 16,
+    marginBottom: Spacing.xs,
+  },
+  emptySubtext: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    textAlign: 'center',
   },
 
   // Weekly overview
@@ -398,10 +458,5 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.accentItalic,
     fontSize: 14,
     textAlign: 'center',
-  },
-  emptyText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
   },
 });

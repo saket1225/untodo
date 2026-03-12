@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, Vibration, StatusBar, Dimensions } from 'react-native';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Todo } from '../types';
+import { sendPomodoroEndNotification } from '../../notifications/service';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -104,6 +105,7 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
       setIsRunning(false);
       clearTimer();
       Vibration.vibrate([0, 500, 200, 500]);
+      sendPomodoroEndNotification();
       if (phase === 'work') {
         setShowLog(true);
       } else {
@@ -128,6 +130,7 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
       setIsRunning(false);
       clearTimer();
       Vibration.vibrate([0, 500, 200, 500]);
+      sendPomodoroEndNotification();
       startWork();
     }
     return clearTimer;

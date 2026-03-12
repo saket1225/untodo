@@ -46,9 +46,14 @@ export default function TodoItem({ todo, onToggle, onDelete, onPress }: Props) {
           </View>
         </TouchableOpacity>
         <TouchableOpacity style={styles.content} onPress={onPress} activeOpacity={0.7}>
-          <Text style={[styles.title, todo.completed && styles.titleCompleted]} numberOfLines={2}>
-            {todo.title}
-          </Text>
+          <View style={styles.titleRow}>
+            {todo.carriedOverFrom && (
+              <Text style={styles.carriedOverArrow}>↩ </Text>
+            )}
+            <Text style={[styles.title, todo.completed && styles.titleCompleted]} numberOfLines={2}>
+              {todo.title}
+            </Text>
+          </View>
           {todo.carriedOverFrom && (
             <Text style={styles.carriedOver}>carried over</Text>
           )}
@@ -116,11 +121,21 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  carriedOverArrow: {
+    color: Colors.dark.timer,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+  },
   title: {
     color: Colors.dark.text,
     fontFamily: Fonts.body,
     fontSize: 16,
     lineHeight: 22,
+    flex: 1,
   },
   titleCompleted: {
     textDecorationLine: 'line-through',

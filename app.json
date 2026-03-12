@@ -37,6 +37,12 @@
           "photosPermission": "Allow untodo to save wallpapers to your gallery.",
           "savePhotosPermission": "Allow untodo to save wallpapers to your gallery."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "sounds": []
+        }
       ]
     ]
   }

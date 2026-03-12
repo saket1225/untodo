@@ -1,12 +1,17 @@
+import { useEffect } from 'react';
 import { Stack, Redirect } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useUserStore } from '../engines/user/store';
+import { setupDefaultNotifications } from '../engines/notifications/service';
+import { useNotificationStore } from '../engines/notifications/store';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function RootLayout() {
   const username = useUserStore(s => s.username);
+  const notifInitialized = useNotificationStore(s => s.initialized);
 
   const [fontsLoaded] = useFonts({
     'ApfelGrotezk-Bold': require('../assets/fonts/ApfelGrotezk-Bold.ttf'),
@@ -19,6 +24,13 @@ export default function RootLayout() {
     'Inter-Bold': require('../assets/fonts/Inter-Bold.ttf'),
   });
 
+  // Setup notifications on first load
+  useEffect(() => {
+    if (username && !notifInitialized) {
+      setupDefaultNotifications();
+    }
+  }, [username, notifInitialized]);
+
   if (!fontsLoaded) {
     return (
       <View style={styles.loading}>
@@ -29,12 +41,14 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="(tabs)" />
-      </Stack>
-      {!username && <Redirect href="/onboarding" />}
+      <ErrorBoundary>
+        <StatusBar style="light" />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+        {!username && <Redirect href="/onboarding" />}
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

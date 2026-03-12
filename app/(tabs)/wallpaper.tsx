@@ -8,34 +8,47 @@ import { useWallpaperStore } from '../../engines/wallpaper/store';
 import { useTodoStore } from '../../engines/todo/store';
 import { DayData } from '../../engines/wallpaper/types';
 import { getLogicalDate } from '../../lib/date-utils';
+import ErrorBoundary from '../../components/ErrorBoundary';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PREVIEW_WIDTH = SCREEN_WIDTH - Spacing.lg * 2;
 const PREVIEW_HEIGHT = PREVIEW_WIDTH * (16 / 9);
+const MAX_DOTS = 1000;
+
+function isValidDateStr(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s + 'T00:00:00').getTime());
+}
 
 function computeDayData(startDate: Date, endDate: Date, todos: any[]): DayData[] {
   const days: DayData[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const current = new Date(startDate);
+  try {
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return days;
+    if (endDate < startDate) return days;
 
-  while (current <= endDate) {
-    const dateStr = current.toISOString().split('T')[0];
-    const dayTodos = todos.filter(t => t.logicalDate === dateStr);
-    const total = dayTodos.length;
-    const completed = dayTodos.filter(t => t.completed).length;
-    const completionRate = total > 0 ? completed / total : 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const current = new Date(startDate);
 
-    const dayTime = new Date(current);
-    dayTime.setHours(0, 0, 0, 0);
+    while (current <= endDate && days.length < MAX_DOTS) {
+      const dateStr = current.toISOString().split('T')[0];
+      const dayTodos = todos.filter(t => t.logicalDate === dateStr);
+      const total = dayTodos.length;
+      const completed = dayTodos.filter(t => t.completed).length;
+      const completionRate = total > 0 ? completed / total : 0;
 
-    days.push({
-      date: dateStr,
-      completionRate,
-      isFuture: dayTime > today,
-      isToday: dayTime.getTime() === today.getTime(),
-    });
-    current.setDate(current.getDate() + 1);
+      const dayTime = new Date(current);
+      dayTime.setHours(0, 0, 0, 0);
+
+      days.push({
+        date: dateStr,
+        completionRate,
+        isFuture: dayTime > today,
+        isToday: dayTime.getTime() === today.getTime(),
+      });
+      current.setDate(current.getDate() + 1);
+    }
+  } catch {
+    // Return whatever we have so far
   }
   return days;
 }
@@ -134,26 +147,39 @@ function getDayNumber(startDate: Date): number {
 }
 
 function getDaysLeft(goalDate: string): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const goal = new Date(goalDate + 'T00:00:00');
-  const diff = goal.getTime() - today.getTime();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const goal = new Date(goalDate + 'T00:00:00');
+    if (isNaN(goal.getTime())) return 0;
+    const diff = goal.getTime() - today.getTime();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  } catch {
+    return 0;
+  }
 }
 
-export default function WallpaperScreen() {
+function WallpaperScreenContent() {
   const { config, updateConfig } = useWallpaperStore();
   const todos = useTodoStore(s => s.todos);
   const viewShotRef = useRef<ViewShot>(null);
 
   const startDate = new Date(2026, 2, 10); // March 10, 2026
   const goalDate = config.goalDate || '2028-01-12';
-  const endDate = new Date(goalDate + 'T00:00:00');
+  const goalDateValid = isValidDateStr(goalDate);
+  const endDate = goalDateValid ? new Date(goalDate + 'T00:00:00') : new Date(startDate);
 
-  const days = useMemo(() => computeDayData(startDate, endDate, todos), [todos, goalDate]);
+  const days = useMemo(() => {
+    try {
+      return computeDayData(startDate, endDate, todos);
+    } catch {
+      return [];
+    }
+  }, [todos, goalDate]);
 
-  const daysLeft = getDaysLeft(goalDate);
+  const daysLeft = goalDateValid ? getDaysLeft(goalDate) : 0;
   const dayNumber = getDayNumber(startDate);
+  const dateError = goalDate.length >= 10 && !goalDateValid ? 'Invalid date format (use YYYY-MM-DD)' : null;
   const displayNumber = config.showDaysLeft ? daysLeft : dayNumber;
   const displayLabel = config.showDaysLeft
     ? `days until ${config.goalTitle || '20'}`
@@ -165,7 +191,6 @@ export default function WallpaperScreen() {
       if (!config.wallpaperEnabled) return;
       const logicalDate = getLogicalDate();
       if (config.lastWallpaperDate !== logicalDate) {
-        // Date changed, save new wallpaper
         handleSaveWallpaper(true);
       }
     };
@@ -174,7 +199,6 @@ export default function WallpaperScreen() {
       if (state === 'active') checkAndRefresh();
     });
 
-    // Also check on mount
     checkAndRefresh();
 
     return () => sub.remove();
@@ -248,7 +272,7 @@ export default function WallpaperScreen() {
           <View style={styles.inputRow}>
             <Text style={styles.inputLabel}>Date</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, dateError ? { borderColor: Colors.dark.error } : null]}
               value={config.goalDate}
               onChangeText={v => updateConfig({ goalDate: v })}
               placeholder="YYYY-MM-DD"
@@ -256,6 +280,7 @@ export default function WallpaperScreen() {
               autoCapitalize="none"
             />
           </View>
+          {dateError && <Text style={styles.dateError}>{dateError}</Text>}
         </View>
 
         {/* Controls */}
@@ -315,9 +340,41 @@ export default function WallpaperScreen() {
           />
         </View>
 
+        {/* Dot count info */}
+        <Text style={styles.dotCountText}>
+          {days.length} dots in grid{days.length >= MAX_DOTS ? ` (capped at ${MAX_DOTS})` : ''}
+        </Text>
+
+        {/* Reset to defaults */}
+        <TouchableOpacity
+          style={styles.resetBtn}
+          onPress={() => {
+            Alert.alert('Reset to Defaults', 'Reset all wallpaper settings?', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Reset', style: 'destructive', onPress: () => updateConfig({
+                  dotSize: 6, spacing: 14, opacity: 1, showQuote: true,
+                  showDayCount: true, showStreak: true, cols: 25,
+                  goalTitle: '20', goalDate: '2028-01-12', showDaysLeft: true,
+                }),
+              },
+            ]);
+          }}
+        >
+          <Text style={styles.resetBtnText}>Reset to Defaults</Text>
+        </TouchableOpacity>
+
         <View style={{ height: 120 }} />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+export default function WallpaperScreen() {
+  return (
+    <ErrorBoundary fallbackMessage="Failed to load wallpaper preview. Try resetting your goal date.">
+      <WallpaperScreenContent />
+    </ErrorBoundary>
   );
 }
 
@@ -465,5 +522,33 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.dark.border,
     marginVertical: Spacing.sm,
+  },
+  dateError: {
+    color: Colors.dark.error,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    marginTop: -Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  dotCountText: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  resetBtn: {
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  resetBtnText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 14,
   },
 });

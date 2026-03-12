@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Switch, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import {
   generatePairingCode,
@@ -11,13 +12,21 @@ import {
 } from '../../engines/silicon/bridge';
 import { SiliconConnection } from '../../engines/silicon/types';
 import { useUserStore } from '../../engines/user/store';
+import { useNotificationStore } from '../../engines/notifications/store';
+import { setupDefaultNotifications } from '../../engines/notifications/service';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import Constants from 'expo-constants';
 
-export default function SettingsScreen() {
+function SettingsScreenContent() {
   const [resetHour, setResetHour] = useState(5);
   const [silicon, setSilicon] = useState<SiliconConnection | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const username = useUserStore(s => s.username);
+  const notifPrefs = useNotificationStore(s => s.preferences);
+  const updateNotifPref = useNotificationStore(s => s.updatePreference);
+
+  const appVersion = Constants.expoConfig?.version || '1.0.0';
 
   useEffect(() => {
     getSiliconConnection().then(conn => {
@@ -45,7 +54,7 @@ export default function SettingsScreen() {
 
   const handleCopyMessage = async () => {
     if (!pairingCode || !username) return;
-    const msg = `Connect to my untodo app. Username: ${username}, Pairing code: ${pairingCode}. Docs: https://untodo.netlify.app/`;
+    const msg = `Connect to my untodo app. Username: ${username}, Pairing code: ${pairingCode}. Docs: https://untodo-docs.vercel.app/`;
     try {
       await Clipboard.setStringAsync(msg);
       setCopied(true);
@@ -65,6 +74,41 @@ export default function SettingsScreen() {
     await disconnectSilicon();
     setSilicon(null);
     setPairingCode(null);
+  };
+
+  const handleNotifToggle = async (key: 'morningReminder' | 'afternoonCheck' | 'eveningReminder', value: boolean) => {
+    updateNotifPref(key, value);
+    // Re-schedule all notifications with updated preferences
+    setTimeout(() => setupDefaultNotifications(), 100);
+  };
+
+  const handleResetAllData = () => {
+    Alert.alert(
+      'Reset All Data',
+      'This will permanently delete all your tasks, progress, and settings. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Everything',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AsyncStorage.multiRemove([
+                'untodo-todos',
+                'untodo-progress',
+                'untodo-wallpaper',
+                'untodo-notifications',
+                'untodo-user',
+                'untodo-silicon-connection',
+              ]);
+              Alert.alert('Data cleared', 'Restart the app for changes to take effect.');
+            } catch {
+              Alert.alert('Error', 'Failed to clear data.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -99,6 +143,47 @@ export default function SettingsScreen() {
           <Text style={styles.hint}>
             New day starts at {String(resetHour).padStart(2, '0')}:00 AM
           </Text>
+        </View>
+
+        {/* Notifications */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notifications</Text>
+          <View style={styles.notifRow}>
+            <View style={styles.notifInfo}>
+              <Text style={styles.notifLabel}>Morning motivation</Text>
+              <Text style={styles.notifTime}>10:00 AM</Text>
+            </View>
+            <Switch
+              value={notifPrefs.morningReminder}
+              onValueChange={v => handleNotifToggle('morningReminder', v)}
+              trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
+              thumbColor={notifPrefs.morningReminder ? Colors.dark.accent : Colors.dark.textTertiary}
+            />
+          </View>
+          <View style={styles.notifRow}>
+            <View style={styles.notifInfo}>
+              <Text style={styles.notifLabel}>Afternoon check</Text>
+              <Text style={styles.notifTime}>3:00 PM</Text>
+            </View>
+            <Switch
+              value={notifPrefs.afternoonCheck}
+              onValueChange={v => handleNotifToggle('afternoonCheck', v)}
+              trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
+              thumbColor={notifPrefs.afternoonCheck ? Colors.dark.accent : Colors.dark.textTertiary}
+            />
+          </View>
+          <View style={styles.notifRow}>
+            <View style={styles.notifInfo}>
+              <Text style={styles.notifLabel}>Evening reminder</Text>
+              <Text style={styles.notifTime}>9:00 PM</Text>
+            </View>
+            <Switch
+              value={notifPrefs.eveningReminder}
+              onValueChange={v => handleNotifToggle('eveningReminder', v)}
+              trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
+              thumbColor={notifPrefs.eveningReminder ? Colors.dark.accent : Colors.dark.textTertiary}
+            />
+          </View>
         </View>
 
         {/* Theme */}
@@ -161,7 +246,7 @@ export default function SettingsScreen() {
                 </Text>
                 <TouchableOpacity style={styles.messageBlock} onPress={handleCopyMessage} activeOpacity={0.7}>
                   <Text style={styles.messageText}>
-                    Connect to my untodo app. Username: {username}, Pairing code: {pairingCode}. Docs: https://untodo.netlify.app/
+                    Connect to my untodo app. Username: {username}, Pairing code: {pairingCode}. Docs: https://untodo-docs.vercel.app/
                   </Text>
                   <Text style={styles.tapToCopy}>Tap to copy</Text>
                 </TouchableOpacity>
@@ -185,13 +270,29 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* Danger Zone */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Danger Zone</Text>
+          <TouchableOpacity style={styles.dangerBtn} onPress={handleResetAllData}>
+            <Text style={styles.dangerBtnText}>Reset All Data</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.footer}>
-          <Text style={styles.footerText}>untodo v1.0.0</Text>
+          <Text style={styles.footerText}>untodo v{appVersion}</Text>
         </View>
 
         <View style={{ height: 120 }} />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+export default function SettingsScreen() {
+  return (
+    <ErrorBoundary>
+      <SettingsScreenContent />
+    </ErrorBoundary>
   );
 }
 
@@ -255,18 +356,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: Spacing.sm,
   },
-  controlLabel: {
+  // Notifications
+  notifRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm + 2,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.dark.border,
+  },
+  notifInfo: {
+    flex: 1,
+  },
+  notifLabel: {
     color: Colors.dark.text,
     fontFamily: Fonts.bodyMedium,
     fontSize: 15,
-    flex: 1,
   },
-  pollValue: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 20,
-    minWidth: 36,
-    textAlign: 'center',
+  notifTime: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    marginTop: 2,
   },
   statusRow: {
     flexDirection: 'row',
@@ -366,18 +477,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 22,
   },
-  input: {
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 10,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    marginBottom: Spacing.md,
-  },
   actionBtn: {
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
@@ -398,7 +497,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
-    marginTop: Spacing.lg,
+    marginTop: Spacing.sm,
   },
   dangerBtnText: {
     color: Colors.dark.error,

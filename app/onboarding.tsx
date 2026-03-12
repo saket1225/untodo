@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors, Fonts, Spacing } from '../lib/theme';
 import { useUserStore } from '../engines/user/store';
@@ -8,6 +8,15 @@ export default function OnboardingScreen() {
   const [input, setInput] = useState('');
   const setUsername = useUserStore(s => s.setUsername);
   const router = useRouter();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   const sanitized = input.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9_]/g, '');
 
@@ -22,8 +31,9 @@ export default function OnboardingScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.content}>
+      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         <Text style={styles.title}>untodo</Text>
+        <Text style={styles.tagline}>Do less. Mean more.</Text>
         <Text style={styles.subtitle}>pick a username</Text>
 
         <TextInput
@@ -49,7 +59,7 @@ export default function OnboardingScreen() {
         >
           <Text style={styles.buttonText}>Get Started</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     </KeyboardAvoidingView>
   );
 }
@@ -69,7 +79,13 @@ const styles = StyleSheet.create({
     color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
     fontSize: 64,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  tagline: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 16,
+    marginBottom: Spacing.xl,
   },
   subtitle: {
     color: Colors.dark.textSecondary,
