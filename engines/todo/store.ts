@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Todo } from './types';
+import { Todo, Priority, Category } from './types';
 import { getLogicalDate } from '../../lib/date-utils';
 
 interface TodoStore {
   todos: Todo[];
-  addTodo: (title: string) => void;
+  addTodo: (title: string, priority?: Priority, category?: Category) => void;
   toggleTodo: (id: string) => void;
   deleteTodo: (id: string) => void;
   updateTodo: (id: string, updates: Partial<Todo>) => void;
@@ -14,6 +14,20 @@ interface TodoStore {
   getTodayTodos: () => Todo[];
   getTodosForDate: (date: string) => Todo[];
   carryOverTodos: () => void;
+  logPomodoroMinutes: (id: string, minutes: number) => void;
+}
+
+function sortTodos(todos: Todo[]): Todo[] {
+  return [...todos].sort((a, b) => {
+    // Completed tasks go to bottom
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    // Sort by priority (high=0, medium=1, low=2, null=3)
+    const pa = a.priority ? { high: 0, medium: 1, low: 2 }[a.priority] : 3;
+    const pb = b.priority ? { high: 0, medium: 1, low: 2 }[b.priority] : 3;
+    if (pa !== pb) return pa - pb;
+    // Then by order
+    return a.order - b.order;
+  });
 }
 
 export const useTodoStore = create<TodoStore>()(
@@ -21,7 +35,7 @@ export const useTodoStore = create<TodoStore>()(
     (set, get) => ({
       todos: [],
 
-      addTodo: (title: string) => {
+      addTodo: (title: string, priority?: Priority, category?: Category) => {
         const logicalDate = getLogicalDate();
         const todayTodos = get().todos.filter(t => t.logicalDate === logicalDate);
         const newTodo: Todo = {
@@ -32,6 +46,9 @@ export const useTodoStore = create<TodoStore>()(
           logicalDate,
           order: todayTodos.length,
           type: 'task',
+          priority: priority ?? null,
+          category: category ?? null,
+          pomodoroMinutesLogged: 0,
         };
         set(state => ({ todos: [...state.todos, newTodo] }));
       },
@@ -69,15 +86,15 @@ export const useTodoStore = create<TodoStore>()(
 
       getTodayTodos: () => {
         const logicalDate = getLogicalDate();
-        return get().todos
-          .filter(t => t.logicalDate === logicalDate)
-          .sort((a, b) => a.order - b.order);
+        return sortTodos(
+          get().todos.filter(t => t.logicalDate === logicalDate)
+        );
       },
 
       getTodosForDate: (date: string) => {
-        return get().todos
-          .filter(t => t.logicalDate === date)
-          .sort((a, b) => a.order - b.order);
+        return sortTodos(
+          get().todos.filter(t => t.logicalDate === date)
+        );
       },
 
       carryOverTodos: () => {
@@ -100,6 +117,14 @@ export const useTodoStore = create<TodoStore>()(
           }));
           return { todos: [...state.todos, ...carried] };
         });
+      },
+
+      logPomodoroMinutes: (id: string, minutes: number) => {
+        set(state => ({
+          todos: state.todos.map(t =>
+            t.id === id ? { ...t, pomodoroMinutesLogged: (t.pomodoroMinutesLogged || 0) + minutes } : t
+          ),
+        }));
       },
     }),
     {

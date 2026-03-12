@@ -11,6 +11,9 @@ export const Colors = {
     success: '#4ADE80',
     error: '#EF4444',
     timer: '#F59E0B',
+    priorityHigh: '#F5F5F5',
+    priorityMedium: '#FBBF24',
+    priorityLow: '#555555',
   },
   light: {
     background: '#FFFFFF',

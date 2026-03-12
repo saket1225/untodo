@@ -1,3 +1,21 @@
+export type Priority = 'high' | 'medium' | 'low' | null;
+export type Category = 'work' | 'personal' | 'health' | 'learning' | 'finance' | 'creative' | null;
+
+export const CATEGORIES: { key: Category; label: string; color: string }[] = [
+  { key: 'work', label: 'Work', color: '#60A5FA' },
+  { key: 'personal', label: 'Personal', color: '#A78BFA' },
+  { key: 'health', label: 'Health', color: '#34D399' },
+  { key: 'learning', label: 'Learning', color: '#FBBF24' },
+  { key: 'finance', label: 'Finance', color: '#F87171' },
+  { key: 'creative', label: 'Creative', color: '#F472B6' },
+];
+
+export const PRIORITY_CONFIG: Record<string, { label: string; color: string; sort: number }> = {
+  high: { label: 'High', color: '#F5F5F5', sort: 0 },
+  medium: { label: 'Med', color: '#FBBF24', sort: 1 },
+  low: { label: 'Low', color: '#555555', sort: 2 },
+};
+
 export interface Todo {
   id: string;
   title: string;
@@ -13,4 +31,7 @@ export interface Todo {
   pomodoroWork?: number;
   pomodoroBreak?: number;
   pomodoroPreset?: string;
+  priority: Priority;
+  category: Category;
+  pomodoroMinutesLogged: number;
 }

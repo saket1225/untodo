@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, Modal, TouchableOpacity } from 'react-native';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { View, Text, FlatList, StyleSheet, Modal, TouchableOpacity, ScrollView, Animated as RNAnimated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
@@ -8,8 +8,9 @@ import { useTodoStore } from '../../engines/todo/store';
 import TodoInput from '../../engines/todo/components/TodoInput';
 import TodoItem from '../../engines/todo/components/TodoItem';
 import PomodoroTimer from '../../engines/todo/components/PomodoroTimer';
+import QuickActions from '../../engines/todo/components/QuickActions';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import { Todo } from '../../engines/todo/types';
+import { Todo, Category, CATEGORIES, Priority } from '../../engines/todo/types';
 
 const GREETINGS = [
   'What will you conquer today?',
@@ -42,14 +43,56 @@ function TodayScreenContent() {
   const addTodo = useTodoStore(s => s.addTodo);
   const toggleTodo = useTodoStore(s => s.toggleTodo);
   const deleteTodo = useTodoStore(s => s.deleteTodo);
+  const updateTodo = useTodoStore(s => s.updateTodo);
   const carryOverTodos = useTodoStore(s => s.carryOverTodos);
-  const todos = useMemo(() =>
-    allTodos.filter(t => t.logicalDate === logicalDate).sort((a, b) => a.order - b.order),
-    [allTodos, logicalDate]
-  );
+
+  // Category filter
+  const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
+
+  // All today's todos (sorted by priority in store)
+  const todayTodos = useMemo(() => {
+    const today = allTodos.filter(t => t.logicalDate === logicalDate);
+    // Sort: incomplete first, then by priority (high>med>low>none), then order
+    return [...today].sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      const pa = a.priority ? { high: 0, medium: 1, low: 2 }[a.priority] : 3;
+      const pb = b.priority ? { high: 0, medium: 1, low: 2 }[b.priority] : 3;
+      if (pa !== pb) return pa - pb;
+      return a.order - b.order;
+    });
+  }, [allTodos, logicalDate]);
+
+  // Filtered by category
+  const todos = useMemo(() => {
+    if (activeCategory === 'all') return todayTodos;
+    return todayTodos.filter(t => t.category === activeCategory);
+  }, [todayTodos, activeCategory]);
+
   const [pomodoroTodo, setPomodoroTodo] = useState<Todo | null>(null);
+  const [quickActionTodo, setQuickActionTodo] = useState<Todo | null>(null);
   const [showCarryOver, setShowCarryOver] = useState(false);
   const [checkedCarryOver, setCheckedCarryOver] = useState(false);
+
+  // Progress bar animation
+  const progressAnim = useRef(new RNAnimated.Value(0)).current;
+
+  const completed = todayTodos.filter(t => t.completed).length;
+  const total = todayTodos.length;
+  const progress = total > 0 ? completed / total : 0;
+
+  useEffect(() => {
+    RNAnimated.timing(progressAnim, {
+      toValue: progress,
+      duration: 500,
+      useNativeDriver: false,
+    }).start();
+  }, [progress]);
+
+  // Total pomodoro minutes for today
+  const totalPomodoroMinutes = useMemo(
+    () => todayTodos.reduce((s, t) => s + (t.pomodoroMinutesLogged || 0), 0),
+    [todayTodos]
+  );
 
   // Check for carry-over tasks on mount
   useEffect(() => {
@@ -63,7 +106,6 @@ function TodayScreenContent() {
     const yesterdayIncomplete = allTodos.filter(
       t => t.logicalDate === yesterdayStr && !t.completed
     );
-    // Only show if there are incomplete tasks from yesterday and no carried-over tasks today yet
     const alreadyCarried = todayTodos.some(t => t.carriedOverFrom);
     if (yesterdayIncomplete.length > 0 && !alreadyCarried) {
       setShowCarryOver(true);
@@ -75,12 +117,13 @@ function TodayScreenContent() {
     toggleTodo(id);
   }, [toggleTodo]);
 
-  const completed = todos.filter(t => t.completed).length;
-  const total = todos.length;
-  const progress = total > 0 ? completed / total : 0;
+  const handleAdd = useCallback((title: string, priority?: Priority, category?: Category) => {
+    addTodo(title, priority ?? null, category ?? null);
+  }, [addTodo]);
+
   const greeting = useMemo(() => getDailyGreeting(), [logicalDate]);
 
-  // Count carry-over candidates
+  // Carry-over candidates count
   const yesterdayStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
@@ -91,23 +134,46 @@ function TodayScreenContent() {
     [allTodos, yesterdayStr]
   );
 
+  // Categories that exist in today's tasks
+  const activeCats = useMemo(() => {
+    const cats = new Set<string>();
+    todayTodos.forEach(t => { if (t.category) cats.add(t.category); });
+    return CATEGORIES.filter(c => cats.has(c.key!));
+  }, [todayTodos]);
+
   const renderItem = useCallback(({ item }: { item: Todo }) => (
     <TodoItem
       todo={item}
       onToggle={() => handleToggle(item.id)}
       onDelete={() => deleteTodo(item.id)}
       onPress={() => setPomodoroTodo(item)}
+      onLongPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setQuickActionTodo(item);
+      }}
     />
   ), [handleToggle, deleteTodo]);
+
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.dateText}>{formatDisplayDate(logicalDate)}</Text>
-        <Text style={styles.countText}>
-          {completed}/{total} done
-        </Text>
+        <View>
+          <Text style={styles.dateText}>{formatDisplayDate(logicalDate)}</Text>
+        </View>
+        <View style={styles.headerRight}>
+          {totalPomodoroMinutes > 0 && (
+            <Text style={styles.pomodoroTotal}>⏱ {totalPomodoroMinutes}m</Text>
+          )}
+          <Text style={styles.countText}>
+            {completed}/{total} done
+          </Text>
+        </View>
       </View>
 
       {/* Greeting */}
@@ -116,12 +182,48 @@ function TodayScreenContent() {
       {/* Progress bar */}
       {total > 0 && (
         <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+          <RNAnimated.View style={[styles.progressFill, { width: progressWidth }]} />
         </View>
       )}
 
+      {/* Category filter chips */}
+      {activeCats.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterScroll}
+          contentContainerStyle={styles.filterContent}
+        >
+          <TouchableOpacity
+            style={[styles.filterChip, activeCategory === 'all' && styles.filterChipActive]}
+            onPress={() => setActiveCategory('all')}
+          >
+            <Text style={[styles.filterChipText, activeCategory === 'all' && styles.filterChipTextActive]}>
+              All
+            </Text>
+          </TouchableOpacity>
+          {activeCats.map(c => (
+            <TouchableOpacity
+              key={c.key}
+              style={[
+                styles.filterChip,
+                activeCategory === c.key && { backgroundColor: c.color, borderColor: c.color },
+              ]}
+              onPress={() => setActiveCategory(activeCategory === c.key ? 'all' : c.key)}
+            >
+              <Text style={[
+                styles.filterChipText,
+                activeCategory === c.key && { color: Colors.dark.background },
+              ]}>
+                {c.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
       {/* Input */}
-      <TodoInput onAdd={addTodo} />
+      <TodoInput onAdd={handleAdd} />
 
       {/* Todo list */}
       <FlatList
@@ -176,6 +278,17 @@ function TodayScreenContent() {
           onClose={() => setPomodoroTodo(null)}
         />
       )}
+
+      {/* Quick actions */}
+      {quickActionTodo && (
+        <QuickActions
+          todo={quickActionTodo}
+          visible={!!quickActionTodo}
+          onClose={() => setQuickActionTodo(null)}
+          onUpdate={updateTodo}
+          onDelete={(id) => { deleteTodo(id); setQuickActionTodo(null); }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -201,6 +314,11 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Spacing.md,
+  },
   dateText: {
     color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
@@ -210,6 +328,11 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 14,
+  },
+  pomodoroTotal: {
+    color: Colors.dark.timer,
+    fontFamily: Fonts.body,
+    fontSize: 13,
   },
   greeting: {
     color: Colors.dark.textTertiary,
@@ -229,6 +352,34 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: Colors.dark.success,
     borderRadius: 2,
+  },
+  filterScroll: {
+    maxHeight: 40,
+    marginTop: Spacing.sm,
+  },
+  filterContent: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.dark.accent,
+    borderColor: Colors.dark.accent,
+  },
+  filterChipText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+  },
+  filterChipTextActive: {
+    color: Colors.dark.background,
   },
   list: {
     paddingBottom: Spacing.xxl,

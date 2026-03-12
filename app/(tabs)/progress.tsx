@@ -11,11 +11,78 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const BAR_MAX_HEIGHT = 120;
 
+function TaskCompletionStreak() {
+  const todos = useTodoStore(s => s.todos);
+
+  const { streak, bestDay } = useMemo(() => {
+    // Calculate consecutive days with >50% completion
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let streak = 0;
+    let bestDay: { date: string; rate: number; completed: number; total: number } | null = null;
+
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayTodos = todos.filter(t => t.logicalDate === dateStr);
+      const total = dayTodos.length;
+      const completed = dayTodos.filter(t => t.completed).length;
+      const rate = total > 0 ? completed / total : 0;
+
+      if (total > 0) {
+        if (!bestDay || rate > bestDay.rate || (rate === bestDay.rate && completed > bestDay.completed)) {
+          bestDay = { date: dateStr, rate, completed, total };
+        }
+      }
+
+      if (i === 0 && total === 0) continue; // Skip today if no tasks yet
+      if (total > 0 && rate >= 0.5) {
+        streak++;
+      } else if (total > 0) {
+        break;
+      }
+    }
+
+    return { streak, bestDay };
+  }, [todos]);
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Your Streak</Text>
+      <View style={styles.streakCardRow}>
+        <View style={styles.streakCard}>
+          <Text style={styles.streakBigNum}>{streak}</Text>
+          <Text style={styles.streakCardLabel}>day streak</Text>
+          <Text style={styles.streakCardSub}>({'>'}50% completion)</Text>
+        </View>
+        {bestDay && (
+          <View style={styles.streakCard}>
+            <Text style={styles.streakBigNum}>{Math.round(bestDay.rate * 100)}%</Text>
+            <Text style={styles.streakCardLabel}>best day</Text>
+            <Text style={styles.streakCardSub}>
+              {format(new Date(bestDay.date + 'T12:00:00'), 'MMM d')} ({bestDay.completed}/{bestDay.total})
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
 function WeeklyOverview() {
   const todos = useTodoStore(s => s.todos);
   const stats = useMemo(() => getWeekStats(), [todos]);
   const pct = Math.round(stats.completionRate * 100);
   const hasData = stats.totalTasks > 0;
+
+  // Total pomodoro minutes for the week
+  const weekPomodoroMins = useMemo(() => {
+    return stats.weekDays.reduce((sum, day) => {
+      const dayTodos = todos.filter(t => t.logicalDate === day.date);
+      return sum + dayTodos.reduce((s, t) => s + (t.pomodoroMinutesLogged || 0), 0);
+    }, 0);
+  }, [todos, stats]);
 
   return (
     <View style={styles.section}>
@@ -28,17 +95,34 @@ function WeeklyOverview() {
         </View>
       ) : (
         <>
-          <Text style={styles.bigPct}>{pct}%</Text>
-          <Text style={styles.bigPctLabel}>completion rate</Text>
+          <View style={styles.weekHeaderRow}>
+            <View>
+              <Text style={styles.bigPct}>{pct}%</Text>
+              <Text style={styles.bigPctLabel}>completion rate</Text>
+            </View>
+            {weekPomodoroMins > 0 && (
+              <View style={styles.weekPomodoroCard}>
+                <Text style={styles.weekPomodoroNum}>{weekPomodoroMins}</Text>
+                <Text style={styles.weekPomodoroLabel}>focus mins</Text>
+              </View>
+            )}
+          </View>
 
           <View style={styles.barChart}>
             {stats.weekDays.map((day, i) => {
+              const rate = day.totalTasks > 0 ? day.completionRate : 0;
               const height = day.totalTasks > 0
-                ? Math.max(4, (day.completionRate * BAR_MAX_HEIGHT))
+                ? Math.max(4, (rate * BAR_MAX_HEIGHT))
                 : 4;
               const isToday = day.date === new Date().toISOString().split('T')[0];
+              const pctLabel = day.totalTasks > 0 ? `${Math.round(rate * 100)}%` : '';
               return (
                 <View key={day.date} style={styles.barCol}>
+                  {pctLabel ? (
+                    <Text style={styles.barPctLabel}>{pctLabel}</Text>
+                  ) : (
+                    <Text style={styles.barPctLabel}> </Text>
+                  )}
                   <View style={styles.barTrack}>
                     <View
                       style={[
@@ -53,6 +137,20 @@ function WeeklyOverview() {
                         },
                       ]}
                     />
+                    {/* Glow effect for bars with data */}
+                    {day.totalTasks > 0 && rate > 0 && (
+                      <View
+                        style={[
+                          styles.barGlow,
+                          {
+                            height: Math.min(height + 8, BAR_MAX_HEIGHT),
+                            backgroundColor: isToday
+                              ? 'rgba(255,255,255,0.06)'
+                              : 'rgba(136,136,136,0.06)',
+                          },
+                        ]}
+                      />
+                    )}
                   </View>
                   <Text style={[
                     styles.barLabel,
@@ -90,9 +188,9 @@ function Streaks() {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Streaks</Text>
+      <Text style={styles.sectionTitle}>Habit Streaks</Text>
       {active.map(h => (
-        <View key={h.id} style={styles.streakRow}>
+        <View key={h.id} style={styles.habitRow}>
           <Text style={styles.streakFlame}>*</Text>
           <Text style={styles.streakName}>{h.name}</Text>
           <Text style={styles.streakCount}>{h.streak}d</Text>
@@ -194,7 +292,6 @@ function ProgressScreenContent() {
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    // Force re-render by briefly setting refreshing
     setTimeout(() => setRefreshing(false), 500);
   }, []);
 
@@ -211,6 +308,7 @@ function ProgressScreenContent() {
         }
       >
         <Text style={styles.heading}>Progress</Text>
+        <TaskCompletionStreak />
         <WeeklyOverview />
         <Streaks />
         <DailyHistory />
@@ -254,6 +352,39 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
 
+  // Streak cards
+  streakCardRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  streakCard: {
+    flex: 1,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.md,
+    alignItems: 'center',
+  },
+  streakBigNum: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accent,
+    fontSize: 42,
+    lineHeight: 48,
+  },
+  streakCardLabel: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  streakCardSub: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    marginTop: 2,
+  },
+
   // Empty state
   emptySection: {
     backgroundColor: Colors.dark.surface,
@@ -277,6 +408,12 @@ const styles = StyleSheet.create({
   },
 
   // Weekly overview
+  weekHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: Spacing.lg,
+  },
   bigPct: {
     color: Colors.dark.text,
     fontFamily: Fonts.accent,
@@ -287,13 +424,31 @@ const styles = StyleSheet.create({
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 14,
-    marginBottom: Spacing.lg,
+  },
+  weekPomodoroCard: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.md,
+    alignItems: 'center',
+  },
+  weekPomodoroNum: {
+    color: Colors.dark.timer,
+    fontFamily: Fonts.accent,
+    fontSize: 28,
+  },
+  weekPomodoroLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    marginTop: 2,
   },
   barChart: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    height: BAR_MAX_HEIGHT + 24,
+    height: BAR_MAX_HEIGHT + 44,
     marginBottom: Spacing.md,
   },
   barCol: {
@@ -301,16 +456,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.xs,
   },
+  barPctLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 9,
+    height: 14,
+  },
   barTrack: {
-    width: 20,
+    width: 24,
     height: BAR_MAX_HEIGHT,
     justifyContent: 'flex-end',
-    borderRadius: 4,
+    borderRadius: 6,
     overflow: 'hidden',
+    position: 'relative',
   },
   barFill: {
     width: '100%',
-    borderRadius: 4,
+    borderRadius: 6,
+    zIndex: 2,
+  },
+  barGlow: {
+    position: 'absolute',
+    bottom: 0,
+    left: -4,
+    right: -4,
+    borderRadius: 8,
+    zIndex: 1,
   },
   barLabel: {
     color: Colors.dark.textTertiary,
@@ -345,8 +516,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Streaks
-  streakRow: {
+  // Habit Streaks
+  habitRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: Spacing.sm + 2,

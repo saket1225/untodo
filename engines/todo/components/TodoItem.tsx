@@ -3,17 +3,19 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Animated, PanResponder,
 } from 'react-native';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
-import { Todo } from '../types';
+import { Todo, CATEGORIES, PRIORITY_CONFIG } from '../types';
 
 interface Props {
   todo: Todo;
   onToggle: () => void;
   onDelete: () => void;
   onPress: () => void;
+  onLongPress?: () => void;
 }
 
-export default function TodoItem({ todo, onToggle, onDelete, onPress }: Props) {
+export default function TodoItem({ todo, onToggle, onDelete, onPress, onLongPress }: Props) {
   const translateX = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -31,21 +33,44 @@ export default function TodoItem({ todo, onToggle, onDelete, onPress }: Props) {
     })
   ).current;
 
+  const handleToggle = () => {
+    // Scale animation on toggle
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.95, duration: 80, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4 }),
+    ]).start();
+    onToggle();
+  };
+
+  const priorityColor = todo.priority ? PRIORITY_CONFIG[todo.priority].color : null;
+  const categoryInfo = todo.category ? CATEGORIES.find(c => c.key === todo.category) : null;
+  const pomodoroMins = todo.pomodoroMinutesLogged || 0;
+
   return (
     <View style={styles.wrapper}>
       <View style={styles.deleteBackground}>
         <Text style={styles.deleteText}>Delete</Text>
       </View>
       <Animated.View
-        style={[styles.container, { transform: [{ translateX }] }]}
+        style={[
+          styles.container,
+          { transform: [{ translateX }, { scale: scaleAnim }] },
+          priorityColor && { borderLeftWidth: 3, borderLeftColor: priorityColor },
+        ]}
         {...panResponder.panHandlers}
       >
-        <TouchableOpacity style={styles.checkbox} onPress={onToggle}>
+        <TouchableOpacity style={styles.checkbox} onPress={handleToggle}>
           <View style={[styles.checkboxInner, todo.completed && styles.checkboxChecked]}>
             {todo.completed && <Text style={styles.checkmark}>✓</Text>}
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.content} onPress={onPress} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.content}
+          onPress={onPress}
+          onLongPress={onLongPress}
+          activeOpacity={0.7}
+          delayLongPress={400}
+        >
           <View style={styles.titleRow}>
             {todo.carriedOverFrom && (
               <Text style={styles.carriedOverArrow}>↩ </Text>
@@ -54,11 +79,26 @@ export default function TodoItem({ todo, onToggle, onDelete, onPress }: Props) {
               {todo.title}
             </Text>
           </View>
-          {todo.carriedOverFrom && (
-            <Text style={styles.carriedOver}>carried over</Text>
-          )}
+          <View style={styles.metaRow}>
+            {todo.carriedOverFrom && (
+              <Text style={styles.carriedOver}>carried over</Text>
+            )}
+            {categoryInfo && (
+              <View style={[styles.categoryChip, { backgroundColor: categoryInfo.color + '22', borderColor: categoryInfo.color + '44' }]}>
+                <Text style={[styles.categoryChipText, { color: categoryInfo.color }]}>
+                  {categoryInfo.label}
+                </Text>
+              </View>
+            )}
+            {pomodoroMins > 0 && (
+              <View style={styles.pomodoroMeta}>
+                <Text style={styles.pomodoroIcon}>⏱</Text>
+                <Text style={styles.pomodoroText}>{pomodoroMins}m</Text>
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
-        {todo.estimatedMinutes && (
+        {todo.estimatedMinutes != null && todo.estimatedMinutes > 0 && (
           <Text style={styles.estimate}>{todo.estimatedMinutes}m</Text>
         )}
       </Animated.View>
@@ -141,11 +181,40 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
     color: Colors.dark.textTertiary,
   },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginTop: 2,
+    flexWrap: 'wrap',
+  },
   carriedOver: {
     color: Colors.dark.timer,
     fontFamily: Fonts.body,
     fontSize: 12,
-    marginTop: 2,
+  },
+  categoryChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  categoryChipText: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+  },
+  pomodoroMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  pomodoroIcon: {
+    fontSize: 10,
+  },
+  pomodoroText: {
+    color: Colors.dark.timer,
+    fontFamily: Fonts.body,
+    fontSize: 11,
   },
   estimate: {
     color: Colors.dark.textSecondary,

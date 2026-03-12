@@ -1,0 +1,312 @@
+import { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { Todo, Priority, Category, CATEGORIES, PRIORITY_CONFIG } from '../types';
+import { getLogicalDate } from '../../../lib/date-utils';
+
+interface Props {
+  todo: Todo;
+  visible: boolean;
+  onClose: () => void;
+  onUpdate: (id: string, updates: Partial<Todo>) => void;
+  onDelete: (id: string) => void;
+}
+
+export default function QuickActions({ todo, visible, onClose, onUpdate, onDelete }: Props) {
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [title, setTitle] = useState(todo.title);
+  const [editingEstimate, setEditingEstimate] = useState(false);
+  const [estimate, setEstimate] = useState(String(todo.estimatedMinutes || ''));
+
+  const handlePriority = (p: Priority) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onUpdate(todo.id, { priority: p });
+    onClose();
+  };
+
+  const handleCategory = (c: Category) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onUpdate(todo.id, { category: c });
+    onClose();
+  };
+
+  const handleSaveTitle = () => {
+    const trimmed = title.trim();
+    if (trimmed && trimmed !== todo.title) {
+      onUpdate(todo.id, { title: trimmed });
+    }
+    setEditingTitle(false);
+    onClose();
+  };
+
+  const handleSaveEstimate = () => {
+    const mins = parseInt(estimate);
+    onUpdate(todo.id, { estimatedMinutes: mins > 0 ? mins : undefined });
+    setEditingEstimate(false);
+    onClose();
+  };
+
+  const handleMoveToTomorrow = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    onUpdate(todo.id, { logicalDate: tomorrowStr });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onClose();
+  };
+
+  const handleDelete = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    onDelete(todo.id);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
+        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+          <View style={styles.handle} />
+          <Text style={styles.taskTitle} numberOfLines={1}>{todo.title}</Text>
+
+          {/* Edit title */}
+          {editingTitle ? (
+            <View style={styles.editRow}>
+              <TextInput
+                style={styles.editInput}
+                value={title}
+                onChangeText={setTitle}
+                autoFocus
+                onSubmitEditing={handleSaveTitle}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveTitle}>
+                <Text style={styles.saveBtnText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.actionRow} onPress={() => setEditingTitle(true)}>
+              <Text style={styles.actionIcon}>✎</Text>
+              <Text style={styles.actionText}>Edit title</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Priority */}
+          <Text style={styles.sectionLabel}>Priority</Text>
+          <View style={styles.priorityRow}>
+            {([null, 'low', 'medium', 'high'] as Priority[]).map(p => {
+              const isActive = todo.priority === p;
+              const color = p ? PRIORITY_CONFIG[p].color : Colors.dark.textTertiary;
+              return (
+                <TouchableOpacity
+                  key={String(p)}
+                  style={[styles.priorityChip, isActive && { backgroundColor: color, borderColor: color }]}
+                  onPress={() => handlePriority(p)}
+                >
+                  <Text style={[styles.priorityChipText, isActive && { color: Colors.dark.background }]}>
+                    {p ? PRIORITY_CONFIG[p].label : 'None'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Category */}
+          <Text style={styles.sectionLabel}>Category</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
+            <TouchableOpacity
+              style={[styles.catChip, !todo.category && styles.catChipActive]}
+              onPress={() => handleCategory(null)}
+            >
+              <Text style={[styles.catChipText, !todo.category && styles.catChipTextActive]}>None</Text>
+            </TouchableOpacity>
+            {CATEGORIES.map(c => (
+              <TouchableOpacity
+                key={c.key}
+                style={[styles.catChip, todo.category === c.key && { backgroundColor: c.color, borderColor: c.color }]}
+                onPress={() => handleCategory(c.key)}
+              >
+                <Text style={[styles.catChipText, todo.category === c.key && { color: Colors.dark.background }]}>
+                  {c.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Estimated time */}
+          {editingEstimate ? (
+            <View style={styles.editRow}>
+              <TextInput
+                style={styles.editInput}
+                value={estimate}
+                onChangeText={setEstimate}
+                keyboardType="number-pad"
+                placeholder="minutes"
+                placeholderTextColor={Colors.dark.textTertiary}
+                autoFocus
+                onSubmitEditing={handleSaveEstimate}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEstimate}>
+                <Text style={styles.saveBtnText}>Set</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.actionRow} onPress={() => setEditingEstimate(true)}>
+              <Text style={styles.actionIcon}>⏱</Text>
+              <Text style={styles.actionText}>
+                {todo.estimatedMinutes ? `Estimated: ${todo.estimatedMinutes}m` : 'Set estimated time'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Move to tomorrow */}
+          <TouchableOpacity style={styles.actionRow} onPress={handleMoveToTomorrow}>
+            <Text style={styles.actionIcon}>→</Text>
+            <Text style={styles.actionText}>Move to tomorrow</Text>
+          </TouchableOpacity>
+
+          {/* Delete */}
+          <TouchableOpacity style={[styles.actionRow, styles.deleteRow]} onPress={handleDelete}>
+            <Text style={[styles.actionIcon, { color: Colors.dark.error }]}>✕</Text>
+            <Text style={[styles.actionText, { color: Colors.dark.error }]}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: Colors.dark.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Spacing.lg,
+    paddingBottom: Spacing.xxl,
+    maxHeight: '70%',
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.dark.border,
+    alignSelf: 'center',
+    marginBottom: Spacing.md,
+  },
+  taskTitle: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 16,
+    marginBottom: Spacing.lg,
+  },
+  sectionLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  priorityRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  priorityChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: Colors.dark.background,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  priorityChipText: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+  },
+  catScroll: {
+    maxHeight: 40,
+  },
+  catChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: Colors.dark.background,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    marginRight: Spacing.sm,
+  },
+  catChipActive: {
+    backgroundColor: Colors.dark.accent,
+    borderColor: Colors.dark.accent,
+  },
+  catChipText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+  },
+  catChipTextActive: {
+    color: Colors.dark.background,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.dark.border,
+  },
+  actionIcon: {
+    color: Colors.dark.textSecondary,
+    fontSize: 16,
+    width: 24,
+    textAlign: 'center',
+  },
+  actionText: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.body,
+    fontSize: 15,
+  },
+  deleteRow: {
+    borderBottomWidth: 0,
+    marginTop: Spacing.sm,
+  },
+  editRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.dark.border,
+  },
+  editInput: {
+    flex: 1,
+    backgroundColor: Colors.dark.background,
+    borderRadius: 10,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    color: Colors.dark.text,
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  saveBtn: {
+    backgroundColor: Colors.dark.accent,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  saveBtnText: {
+    color: Colors.dark.background,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 14,
+  },
+});

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput,
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Todo } from '../types';
 import { sendPomodoroEndNotification } from '../../notifications/service';
+import { useTodoStore } from '../store';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -81,6 +82,8 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
   // Session log
   const [showLog, setShowLog] = useState(false);
   const [sessionLog, setSessionLog] = useState('');
+  const logPomodoroMinutes = useTodoStore(s => s.logPomodoroMinutes);
+  const sessionStartRef = useRef<number>(Date.now());
 
   // Is the timer in active/immersive mode (running or paused mid-session)
   const isActive = isRunning || (session > 1 && phase === 'work') || phase !== 'work';
@@ -107,6 +110,8 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
       Vibration.vibrate([0, 500, 200, 500]);
       sendPomodoroEndNotification();
       if (phase === 'work') {
+        const worked = Math.round((Date.now() - sessionStartRef.current) / 60000);
+        if (worked > 0) logPomodoroMinutes(todo.id, worked);
         setShowLog(true);
       } else {
         startWork();
@@ -137,6 +142,7 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
   }, [isRunning, phase, seconds, preset.isFlowtime, flowElapsed]);
 
   const startWork = () => {
+    sessionStartRef.current = Date.now();
     setPhase('work');
     if (preset.isFlowtime) {
       setFlowElapsed(0);
@@ -152,6 +158,7 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
     clearTimer();
     setIsRunning(false);
     const workedMinutes = Math.floor(flowElapsed / 60);
+    if (workedMinutes > 0) logPomodoroMinutes(todo.id, workedMinutes);
     const breakMins = getFlowBreak(workedMinutes);
     setShowLog(true);
     setSeconds(breakMins * 60);
