@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import {
   generatePairingCode,
@@ -16,6 +17,7 @@ export default function SettingsScreen() {
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState('');
   const [pollInterval, setPollInterval] = useState(5);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     getSiliconConnection().then(conn => {
@@ -26,9 +28,32 @@ export default function SettingsScreen() {
     });
   }, []);
 
-  const handleGenerateCode = () => {
-    const code = generatePairingCode();
-    setPairingCode(code);
+  useEffect(() => {
+    // Auto-generate pairing code if not connected
+    if (!silicon?.connected && !pairingCode) {
+      setPairingCode(generatePairingCode());
+    }
+  }, [silicon]);
+
+  const handleCopyCode = async () => {
+    if (!pairingCode) return;
+    try {
+      await Clipboard.setStringAsync(pairingCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard may not be available
+    }
+  };
+
+  const handleCopyMessage = async () => {
+    if (!pairingCode) return;
+    const msg = `Hey Silicon, connect to my untodo app. My pairing code is ${pairingCode}. Set up the bridge server and I'll enter the URL here.`;
+    try {
+      await Clipboard.setStringAsync(msg);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
   };
 
   const handleConnect = async () => {
@@ -37,7 +62,6 @@ export default function SettingsScreen() {
     await saveSiliconConnection(serverUrl.trim(), code);
     const conn = await getSiliconConnection();
     setSilicon(conn);
-    setPairingCode(null);
   };
 
   const handleDisconnect = async () => {
@@ -60,7 +84,7 @@ export default function SettingsScreen() {
               style={styles.ctrlBtn}
               onPress={() => setResetHour(h => Math.max(0, h - 1))}
             >
-              <Text style={styles.ctrlBtnText}>−</Text>
+              <Text style={styles.ctrlBtnText}>-</Text>
             </TouchableOpacity>
             <Text style={styles.timeValue}>{String(resetHour).padStart(2, '0')}:00</Text>
             <TouchableOpacity
@@ -107,7 +131,7 @@ export default function SettingsScreen() {
                     style={styles.ctrlBtn}
                     onPress={() => setPollInterval(v => Math.max(1, v - 1))}
                   >
-                    <Text style={styles.ctrlBtnText}>−</Text>
+                    <Text style={styles.ctrlBtnText}>-</Text>
                   </TouchableOpacity>
                   <Text style={styles.pollValue}>{pollInterval}m</Text>
                   <TouchableOpacity
@@ -130,20 +154,42 @@ export default function SettingsScreen() {
                 <Text style={styles.statusText}>Not connected</Text>
               </View>
 
+              {/* Pairing Code - Prominent Display */}
               {pairingCode && (
                 <View style={styles.codeContainer}>
                   <Text style={styles.codeLabel}>Pairing Code</Text>
-                  <Text style={styles.codeValue}>{pairingCode}</Text>
-                  <Text style={styles.hint}>Give this code to your Silicon instance</Text>
+                  <TouchableOpacity onPress={handleCopyCode} activeOpacity={0.7}>
+                    <Text style={styles.codeValue}>{pairingCode}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.copyBtn} onPress={handleCopyCode}>
+                    <Text style={styles.copyBtnText}>{copied ? 'Copied' : 'Copy Code'}</Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
-              {!pairingCode && (
-                <TouchableOpacity style={styles.actionBtn} onPress={handleGenerateCode}>
-                  <Text style={styles.actionBtnText}>Generate Pairing Code</Text>
+              {/* Instructional message */}
+              <View style={styles.instructionBlock}>
+                <Text style={styles.instructionText}>
+                  Send this to your Silicon instance to connect:
+                </Text>
+                <TouchableOpacity style={styles.messageBlock} onPress={handleCopyMessage} activeOpacity={0.7}>
+                  <Text style={styles.messageText}>
+                    Hey Silicon, connect to my untodo app. My pairing code is {pairingCode}. Set up the bridge server and I'll enter the URL here.
+                  </Text>
+                  <Text style={styles.tapToCopy}>Tap to copy</Text>
                 </TouchableOpacity>
-              )}
+              </View>
 
+              {/* What Silicon can do */}
+              <View style={styles.capabilitiesBlock}>
+                <Text style={styles.capabilitiesTitle}>What Silicon can do</Text>
+                <Text style={styles.capabilityItem}>  Add and manage your tasks remotely</Text>
+                <Text style={styles.capabilityItem}>  Write daily summaries and weekly reviews</Text>
+                <Text style={styles.capabilityItem}>  Track your progress and send nudges</Text>
+                <Text style={styles.capabilityItem}>  Control app settings</Text>
+              </View>
+
+              {/* Server URL Input */}
               <TextInput
                 style={styles.input}
                 value={serverUrl}
@@ -263,7 +309,11 @@ const styles = StyleSheet.create({
   codeContainer: {
     alignItems: 'center',
     paddingVertical: Spacing.lg,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
   codeLabel: {
     color: Colors.dark.textSecondary,
@@ -278,7 +328,64 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.accent,
     fontSize: 48,
     letterSpacing: 8,
+    marginBottom: Spacing.md,
+  },
+  copyBtn: {
+    backgroundColor: Colors.dark.background,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    borderRadius: 8,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 8,
+  },
+  copyBtnText: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 13,
+  },
+  instructionBlock: {
+    marginBottom: Spacing.lg,
+  },
+  instructionText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
     marginBottom: Spacing.sm,
+  },
+  messageBlock: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.md,
+  },
+  messageText: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  tapToCopy: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    marginTop: Spacing.sm,
+    textAlign: 'right',
+  },
+  capabilitiesBlock: {
+    marginBottom: Spacing.lg,
+  },
+  capabilitiesTitle: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 13,
+    marginBottom: Spacing.sm,
+  },
+  capabilityItem: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    lineHeight: 22,
   },
   input: {
     backgroundColor: Colors.dark.surface,

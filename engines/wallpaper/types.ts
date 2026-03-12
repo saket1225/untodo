@@ -7,6 +7,11 @@ export interface WallpaperConfig {
   showDayCount: boolean;
   showStreak: boolean;
   cols: number;
+  goalTitle: string;
+  goalDate: string;
+  showDaysLeft: boolean;
+  wallpaperEnabled: boolean;
+  lastWallpaperDate: string | null;
 }
 
 export interface DayData {

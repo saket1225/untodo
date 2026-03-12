@@ -29,6 +29,15 @@
       "bundler": "metro"
     },
     "scheme": "untodo",
-    "plugins": ["expo-router"]
+    "plugins": [
+      "expo-router",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow untodo to save wallpapers to your gallery.",
+          "savePhotosPermission": "Allow untodo to save wallpapers to your gallery."
+        }
+      ]
+    ]
   }
 }
