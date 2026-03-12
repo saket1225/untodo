@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Todo, Priority, Category, Subtask, SyncStatus } from './types';
+import { Todo, Priority, Category, Subtask, SyncStatus, Recurrence } from './types';
 import { getLogicalDate } from '../../lib/date-utils';
 import { useUserStore } from '../user/store';
 import {
@@ -28,6 +28,7 @@ interface TodoStore {
   deleteSubtask: (todoId: string, subtaskId: string) => void;
   syncFromFirestore: () => Promise<void>;
   addSampleTasks: () => void;
+  spawnRecurringTasks: () => void;
 }
 
 function sortTodos(todos: Todo[]): Todo[] {
@@ -270,6 +271,66 @@ export const useTodoStore = create<TodoStore>()(
         }));
         const todo = get().todos.find(t => t.id === todoId);
         if (todo) debouncedSyncTodo(todo);
+      },
+
+      spawnRecurringTasks: () => {
+        const logicalDate = getLogicalDate();
+        const state = get();
+        // Find all tasks with recurrence set (these are templates)
+        const recurringTemplates = state.todos.filter(t => t.recurrence);
+        const todayTodos = state.todos.filter(t => t.logicalDate === logicalDate);
+        const now = nowISO();
+        const dayOfWeek = new Date().getDay(); // 0=Sun, 1=Mon, ...6=Sat
+
+        const newTodos: Todo[] = [];
+        for (const template of recurringTemplates) {
+          if (!template.recurrence) continue;
+          // Check if already spawned for today
+          const alreadyExists = todayTodos.some(
+            t => t.recurringParentId === template.id
+          );
+          if (alreadyExists) continue;
+          // Also skip if the template itself is for today (don't duplicate)
+          if (template.logicalDate === logicalDate && !template.recurringParentId) continue;
+
+          let shouldSpawn = false;
+          if (template.recurrence.type === 'daily') {
+            shouldSpawn = true;
+          } else if (template.recurrence.type === 'weekly') {
+            shouldSpawn = (template.recurrence.days || []).includes(dayOfWeek);
+          } else if (template.recurrence.type === 'custom') {
+            shouldSpawn = (template.recurrence.days || []).includes(dayOfWeek);
+          }
+
+          if (shouldSpawn) {
+            newTodos.push({
+              id: makeId(),
+              title: template.title,
+              completed: false,
+              createdAt: now,
+              updatedAt: now,
+              logicalDate,
+              order: todayTodos.length + newTodos.length,
+              type: 'task',
+              priority: template.priority,
+              category: template.category,
+              pomodoroMinutesLogged: 0,
+              subtasks: [],
+              notes: '',
+              syncStatus: 'pending',
+              recurrence: template.recurrence,
+              recurringParentId: template.id,
+            });
+          }
+        }
+
+        if (newTodos.length > 0) {
+          set(state => ({ todos: [...state.todos, ...newTodos] }));
+          const username = getUsername();
+          if (username) {
+            bulkSyncTodosToFirestore(username, newTodos).catch(() => {});
+          }
+        }
       },
 
       addSampleTasks: () => {

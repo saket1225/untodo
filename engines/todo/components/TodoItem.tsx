@@ -89,6 +89,9 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
             {todo.carriedOverFrom && (
               <Text style={styles.carriedOver}>carried over</Text>
             )}
+            {todo.recurrence && (
+              <Text style={styles.recurringIcon}>↻</Text>
+            )}
             {categoryInfo && (
               <View style={[styles.categoryChip, { backgroundColor: categoryInfo.color + '22', borderColor: categoryInfo.color + '44' }]}>
                 <Text style={[styles.categoryChipText, { color: categoryInfo.color }]}>
@@ -131,7 +134,8 @@ const TodoItem = memo(TodoItemInner, (prev, next) => {
     prev.todo.pomodoroMinutesLogged === next.todo.pomodoroMinutesLogged &&
     prev.todo.notes === next.todo.notes &&
     prev.todo.subtasks?.length === next.todo.subtasks?.length &&
-    prev.todo.carriedOverFrom === next.todo.carriedOverFrom
+    prev.todo.carriedOverFrom === next.todo.carriedOverFrom &&
+    prev.todo.recurrence?.type === next.todo.recurrence?.type
   );
 });
 
@@ -218,6 +222,11 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginTop: 2,
     flexWrap: 'wrap',
+  },
+  recurringIcon: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+    fontFamily: Fonts.body,
   },
   carriedOver: {
     color: Colors.dark.timer,

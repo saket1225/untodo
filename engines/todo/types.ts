@@ -24,6 +24,11 @@ export interface Subtask {
 
 export type SyncStatus = 'synced' | 'pending' | 'error';
 
+export interface Recurrence {
+  type: 'daily' | 'weekly' | 'custom';
+  days?: number[]; // 0=Sun, 1=Mon, ... 6=Sat (for weekly/custom)
+}
+
 export interface Todo {
   id: string;
   title: string;
@@ -46,4 +51,6 @@ export interface Todo {
   subtasks: Subtask[];
   notes: string;
   syncStatus: SyncStatus;
+  recurrence?: Recurrence;
+  recurringParentId?: string; // ID of the original recurring task template
 }

@@ -2,7 +2,7 @@ import { useState, memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
-import { Todo, Priority, Category, CATEGORIES, PRIORITY_CONFIG } from '../types';
+import { Todo, Priority, Category, CATEGORIES, PRIORITY_CONFIG, Recurrence } from '../types';
 import { getLogicalDate } from '../../../lib/date-utils';
 import { useTodoStore } from '../store';
 
@@ -263,6 +263,36 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
             <Text style={styles.notePreview} numberOfLines={2}>{todo.notes}</Text>
           ) : null}
 
+          {/* Make recurring */}
+          <Text style={styles.sectionLabel}>Recurring</Text>
+          <View style={styles.priorityRow}>
+            <TouchableOpacity
+              style={[styles.priorityChip, !todo.recurrence && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
+              onPress={() => { onUpdate(todo.id, { recurrence: undefined }); }}
+            >
+              <Text style={[styles.priorityChipText, !todo.recurrence && { color: Colors.dark.background }]}>None</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.priorityChip, todo.recurrence?.type === 'daily' && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onUpdate(todo.id, { recurrence: { type: 'daily' } });
+              }}
+            >
+              <Text style={[styles.priorityChipText, todo.recurrence?.type === 'daily' && { color: Colors.dark.background }]}>Daily</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.priorityChip, todo.recurrence?.type === 'weekly' && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                const dayOfWeek = new Date().getDay();
+                onUpdate(todo.id, { recurrence: { type: 'weekly', days: [dayOfWeek] } });
+              }}
+            >
+              <Text style={[styles.priorityChipText, todo.recurrence?.type === 'weekly' && { color: Colors.dark.background }]}>Weekly</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Move to tomorrow */}
           <TouchableOpacity style={styles.actionRow} onPress={handleMoveToTomorrow}>
             <Text style={styles.actionIcon}>→</Text>
@@ -293,6 +323,14 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     paddingBottom: Spacing.xxl,
     maxHeight: '70%',
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: Colors.dark.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 24,
   },
   handle: {
     width: 36,

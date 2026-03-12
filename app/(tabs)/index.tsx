@@ -13,8 +13,9 @@ import TodoItem from '../../engines/todo/components/TodoItem';
 import PomodoroTimer from '../../engines/todo/components/PomodoroTimer';
 import QuickActions from '../../engines/todo/components/QuickActions';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import { Todo, Category, CATEGORIES, Priority } from '../../engines/todo/types';
+import { Todo, Category, CATEGORIES, Priority, Recurrence } from '../../engines/todo/types';
 import { onSyncStateChange } from '../../lib/firebase-sync';
+import { useKeyboardShortcuts } from '../../lib/useKeyboardShortcuts';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_HEIGHT = 72; // Approximate fixed height for getItemLayout
@@ -236,6 +237,7 @@ function TodayScreenContent() {
       .slice(0, 15);
   }, [allTodos, searchQuery]);
 
+  const [focusMode, setFocusMode] = useState(false);
   const [pomodoroTodo, setPomodoroTodo] = useState<Todo | null>(null);
   const [quickActionTodo, setQuickActionTodo] = useState<Todo | null>(null);
   const [showCarryOver, setShowCarryOver] = useState(false);
@@ -245,6 +247,35 @@ function TodayScreenContent() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [lastCelebratedCount, setLastCelebratedCount] = useState(0);
   const syncFromFirestore = useTodoStore(s => s.syncFromFirestore);
+  const spawnRecurringTasks = useTodoStore(s => s.spawnRecurringTasks);
+
+  // Keyboard shortcut state (for web)
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const inputRefForFocus = useRef<any>(null);
+
+  useKeyboardShortcuts({
+    onNewTask: () => {
+      // Focus the TodoInput - we use a ref indirectly
+      inputRefForFocus.current?.focus?.();
+    },
+    onNavigateUp: () => {
+      setSelectedIndex(prev => Math.max(0, prev - 1));
+    },
+    onNavigateDown: () => {
+      setSelectedIndex(prev => Math.min(todos.length - 1, prev + 1));
+    },
+    onToggleSelected: () => {
+      if (selectedIndex >= 0 && selectedIndex < todos.length) {
+        handleToggle(todos[selectedIndex].id);
+      }
+    },
+    onDeleteSelected: () => {
+      if (selectedIndex >= 0 && selectedIndex < todos.length) {
+        deleteTodo(todos[selectedIndex].id);
+        setSelectedIndex(prev => Math.min(prev, todos.length - 2));
+      }
+    },
+  }, !focusMode);
 
   // Drag reorder state
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -270,9 +301,10 @@ function TodayScreenContent() {
     return unsub;
   }, []);
 
-  // Sync on mount
+  // Sync on mount and spawn recurring tasks
   useEffect(() => {
     syncFromFirestore().catch(() => {});
+    spawnRecurringTasks();
   }, []);
 
   // Progress bar animation
@@ -342,6 +374,12 @@ function TodayScreenContent() {
   const handleAdd = useCallback((title: string, priority?: Priority, category?: Category) => {
     addTodo(title, priority ?? null, category ?? null, viewingDate);
   }, [addTodo, viewingDate]);
+
+  // Focus mode: top priority incomplete task
+  const focusTask = useMemo(() => {
+    const incomplete = dateTodos.filter(t => !t.completed);
+    return incomplete.length > 0 ? incomplete[0] : null;
+  }, [dateTodos]);
 
   const greeting = useMemo(() => getTimeBasedGreeting(), [logicalDate]);
 
@@ -462,6 +500,11 @@ function TodayScreenContent() {
           )}
         </View>
         <View style={styles.headerRight}>
+          {isToday && !focusMode && (
+            <TouchableOpacity onPress={() => setFocusMode(true)} style={styles.focusBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.focusBtnText}>Focus</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={toggleSearch} style={styles.searchIconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={styles.searchIconText}>{searchExpanded ? '✕' : '⌕'}</Text>
           </TouchableOpacity>
@@ -474,8 +517,53 @@ function TodayScreenContent() {
         </View>
       </View>
 
+      {/* Focus Mode */}
+      {focusMode && (
+        <View style={styles.focusModeContainer}>
+          <TouchableOpacity style={styles.focusExitBtn} onPress={() => setFocusMode(false)}>
+            <Text style={styles.focusExitText}>Exit Focus</Text>
+          </TouchableOpacity>
+          {focusTask ? (
+            <View style={styles.focusTaskCard}>
+              <Text style={styles.focusLabel}>CURRENT TASK</Text>
+              <Text style={styles.focusTaskTitle}>{focusTask.title}</Text>
+              {focusTask.category && (
+                <Text style={styles.focusTaskMeta}>
+                  {CATEGORIES.find(c => c.key === focusTask.category)?.label}
+                </Text>
+              )}
+              <View style={styles.focusActions}>
+                <TouchableOpacity
+                  style={styles.focusStartBtn}
+                  onPress={() => setPomodoroTodo(focusTask)}
+                >
+                  <Text style={styles.focusStartBtnText}>Start Pomodoro</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.focusCompleteBtn}
+                  onPress={() => {
+                    handleToggle(focusTask.id);
+                  }}
+                >
+                  <Text style={styles.focusCompleteBtnText}>Mark Complete</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.focusProgress}>
+                {completed}/{total} tasks done today
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.focusTaskCard}>
+              <Text style={styles.focusLabel}>ALL DONE</Text>
+              <Text style={styles.focusTaskTitle}>No more tasks!</Text>
+              <Text style={styles.focusTaskMeta}>You've completed everything for today.</Text>
+            </View>
+          )}
+        </View>
+      )}
+
       {/* Search bar (collapsible) */}
-      {searchExpanded && (
+      {searchExpanded && !focusMode && (
         <View style={styles.searchContainer}>
           <TextInput
             ref={searchInputRef}
@@ -497,14 +585,14 @@ function TodayScreenContent() {
       )}
 
       {/* Back to Today pill */}
-      {!isToday && (
+      {!isToday && !focusMode && (
         <TouchableOpacity style={styles.backToTodayPill} onPress={goToToday}>
           <Text style={styles.backToTodayText}>Back to Today</Text>
         </TouchableOpacity>
       )}
 
       {/* Greeting (only on today) */}
-      {isToday && (
+      {isToday && !focusMode && (
         <>
           <Text style={styles.greetingPrefix}>{greeting.prefix}</Text>
           <Text style={styles.greeting}>{greeting.message}</Text>
@@ -512,19 +600,19 @@ function TodayScreenContent() {
       )}
 
       {/* Estimated time remaining */}
-      {totalEstimatedMinutes > 0 && (
+      {totalEstimatedMinutes > 0 && !focusMode && (
         <Text style={styles.estimatedTimeHeader}>{formatEstimatedTime(totalEstimatedMinutes)}</Text>
       )}
 
       {/* Progress bar */}
-      {total > 0 && (
+      {total > 0 && !focusMode && (
         <View style={styles.progressBar}>
           <RNAnimated.View style={[styles.progressFill, { width: progressWidth }]} />
         </View>
       )}
 
       {/* Category filter chips */}
-      {activeCats.length > 0 && (
+      {activeCats.length > 0 && !focusMode && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -560,10 +648,10 @@ function TodayScreenContent() {
       )}
 
       {/* Input */}
-      <TodoInput onAdd={handleAdd} />
+      {!focusMode && <TodoInput onAdd={handleAdd} />}
 
       {/* Todo list */}
-      <FlatList
+      {!focusMode && <FlatList
         data={todos}
         keyExtractor={item => item.id}
         renderItem={renderItem}
@@ -596,7 +684,7 @@ function TodayScreenContent() {
             </Text>
           </View>
         }
-      />
+      />}
 
       {/* Carry-over modal */}
       {showCarryOver && (
@@ -716,6 +804,114 @@ const styles = StyleSheet.create({
     color: Colors.dark.timer,
     fontFamily: Fonts.body,
     fontSize: 13,
+  },
+
+  // Focus mode button
+  focusBtn: {
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  focusBtnText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 12,
+  },
+
+  // Focus mode view
+  focusModeContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  focusExitBtn: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: 0,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  focusExitText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+  },
+  focusTaskCard: {
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  focusLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 11,
+    letterSpacing: 2,
+    marginBottom: Spacing.lg,
+  },
+  focusTaskTitle: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 32,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+    lineHeight: 40,
+  },
+  focusTaskMeta: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    marginBottom: Spacing.xl,
+  },
+  focusActions: {
+    gap: Spacing.md,
+    width: '100%',
+    alignItems: 'center',
+  },
+  focusStartBtn: {
+    backgroundColor: Colors.dark.accent,
+    borderRadius: 14,
+    paddingVertical: 18,
+    paddingHorizontal: Spacing.xxl,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#fff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  focusStartBtnText: {
+    color: Colors.dark.background,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 18,
+  },
+  focusCompleteBtn: {
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.xxl,
+    width: '100%',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    backgroundColor: Colors.dark.surface,
+  },
+  focusCompleteBtnText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 15,
+  },
+  focusProgress: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    marginTop: Spacing.xl,
   },
 
   // Search
@@ -918,6 +1114,11 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     width: '100%',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 24,
+    elevation: 24,
   },
   modalTitle: {
     color: Colors.dark.text,
@@ -940,6 +1141,11 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     marginBottom: Spacing.sm,
+    shadowColor: '#fff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   modalPrimaryBtnText: {
     color: Colors.dark.background,
@@ -976,6 +1182,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.dark.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 16,
   },
   celebrationText: {
     color: Colors.dark.success,

@@ -1,15 +1,113 @@
 import { useMemo, useState, useCallback, memo } from 'react';
 import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useTodoStore } from '../../engines/todo/store';
 import { useProgressStore, getWeekStats, getRecentDays } from '../../engines/progress/store';
 import { DaySummary } from '../../engines/progress/types';
+import { getLogicalDate } from '../../lib/date-utils';
 import { format } from 'date-fns';
 import ErrorBoundary from '../../components/ErrorBoundary';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const BAR_MAX_HEIGHT = 120;
+
+function TodaySummaryCard() {
+  const todos = useTodoStore(s => s.todos);
+  const logicalDate = getLogicalDate();
+
+  const { completed, total, pomodoroMins, streak } = useMemo(() => {
+    const todayTodos = todos.filter(t => t.logicalDate === logicalDate);
+    const completed = todayTodos.filter(t => t.completed).length;
+    const total = todayTodos.length;
+    const pomodoroMins = todayTodos.reduce((s, t) => s + (t.pomodoroMinutesLogged || 0), 0);
+
+    // Calculate streak
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let streak = 0;
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayTodos = todos.filter(t => t.logicalDate === dateStr);
+      const dayTotal = dayTodos.length;
+      const dayCompleted = dayTodos.filter(t => t.completed).length;
+      const rate = dayTotal > 0 ? dayCompleted / dayTotal : 0;
+      if (i === 0 && dayTotal === 0) continue;
+      if (dayTotal > 0 && rate >= 0.5) streak++;
+      else if (dayTotal > 0) break;
+    }
+    return { completed, total, pomodoroMins, streak };
+  }, [todos, logicalDate]);
+
+  const progress = total > 0 ? completed / total : 0;
+  const pct = Math.round(progress * 100);
+
+  // Circular progress ring dimensions
+  const size = 100;
+  const strokeWidth = 8;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference * (1 - progress);
+
+  return (
+    <View style={styles.todayCard}>
+      <View style={styles.todayCardInner}>
+        {/* Circular Progress Ring */}
+        <View style={styles.todayRingContainer}>
+          <Svg width={size} height={size}>
+            {/* Background ring */}
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke={Colors.dark.border}
+              strokeWidth={strokeWidth}
+              fill="transparent"
+            />
+            {/* Progress ring */}
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke={progress === 1 ? Colors.dark.success : Colors.dark.accent}
+              strokeWidth={strokeWidth}
+              fill="transparent"
+              strokeDasharray={`${circumference}`}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            />
+          </Svg>
+          <View style={styles.todayRingCenter}>
+            <Text style={styles.todayRingPct}>{pct}%</Text>
+          </View>
+        </View>
+
+        {/* Stats */}
+        <View style={styles.todayStats}>
+          <Text style={styles.todayCardTitle}>Today</Text>
+          <View style={styles.todayStatRow}>
+            <Text style={styles.todayStatValue}>{completed}/{total}</Text>
+            <Text style={styles.todayStatLabel}>tasks done</Text>
+          </View>
+          {pomodoroMins > 0 && (
+            <View style={styles.todayStatRow}>
+              <Text style={[styles.todayStatValue, { color: Colors.dark.timer }]}>{pomodoroMins}</Text>
+              <Text style={styles.todayStatLabel}>focus mins</Text>
+            </View>
+          )}
+          <View style={styles.todayStatRow}>
+            <Text style={styles.todayStatValue}>{streak}</Text>
+            <Text style={styles.todayStatLabel}>day streak</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 function TaskCompletionStreak() {
   const todos = useTodoStore(s => s.todos);
@@ -308,6 +406,7 @@ function ProgressScreenContent() {
         }
       >
         <Text style={styles.heading}>Progress</Text>
+        <TodaySummaryCard />
         <TaskCompletionStreak />
         <WeeklyOverview />
         <Streaks />
@@ -340,6 +439,72 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     marginBottom: Spacing.lg,
   },
+  // Today Summary Card
+  todayCard: {
+    marginBottom: Spacing.xl,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  todayCardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.lg,
+  },
+  todayRingContainer: {
+    position: 'relative',
+    width: 100,
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  todayRingCenter: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  todayRingPct: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accent,
+    fontSize: 28,
+    lineHeight: 32,
+  },
+  todayStats: {
+    flex: 1,
+    gap: Spacing.sm,
+  },
+  todayCardTitle: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 13,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.xs,
+  },
+  todayStatRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Spacing.sm,
+  },
+  todayStatValue: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accent,
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  todayStatLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+  },
+
   section: {
     marginBottom: Spacing.xl,
   },
@@ -365,6 +530,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.dark.border,
     padding: Spacing.md,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   streakBigNum: {
     color: Colors.dark.text,
@@ -596,6 +766,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   reviewText: {
     color: Colors.dark.text,
