@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Switch, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import {
@@ -77,6 +78,7 @@ function SettingsScreenContent() {
   };
 
   const handleNotifToggle = async (key: 'morningReminder' | 'afternoonCheck' | 'eveningReminder', value: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     updateNotifPref(key, value);
     // Re-schedule all notifications with updated preferences
     setTimeout(() => setupDefaultNotifications(), 100);
@@ -114,12 +116,12 @@ function SettingsScreenContent() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.heading}>Settings</Text>
+        <Text style={styles.heading} accessibilityRole="header">Settings</Text>
 
         {/* Username */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
-          <Text style={styles.usernameValue}>@{username}</Text>
+          <Text style={styles.usernameValue} accessibilityLabel={`Username: ${username}`}>@{username}</Text>
         </View>
 
         {/* Day Reset Time */}
@@ -128,14 +130,26 @@ function SettingsScreenContent() {
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.ctrlBtn}
-              onPress={() => setResetHour(h => Math.max(0, h - 1))}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setResetHour(h => Math.max(0, h - 1));
+              }}
+              accessibilityLabel="Decrease reset hour"
+              accessibilityRole="button"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={styles.ctrlBtnText}>-</Text>
             </TouchableOpacity>
-            <Text style={styles.timeValue}>{String(resetHour).padStart(2, '0')}:00</Text>
+            <Text style={styles.timeValue} accessibilityLabel={`Reset time: ${String(resetHour).padStart(2, '0')}:00`}>{String(resetHour).padStart(2, '0')}:00</Text>
             <TouchableOpacity
               style={styles.ctrlBtn}
-              onPress={() => setResetHour(h => Math.min(12, h + 1))}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setResetHour(h => Math.min(12, h + 1));
+              }}
+              accessibilityLabel="Increase reset hour"
+              accessibilityRole="button"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={styles.ctrlBtnText}>+</Text>
             </TouchableOpacity>
@@ -158,6 +172,8 @@ function SettingsScreenContent() {
               onValueChange={v => handleNotifToggle('morningReminder', v)}
               trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
               thumbColor={notifPrefs.morningReminder ? Colors.dark.accent : Colors.dark.textTertiary}
+              accessibilityLabel="Morning motivation notification"
+              accessibilityRole="switch"
             />
           </View>
           <View style={styles.notifRow}>
@@ -170,6 +186,8 @@ function SettingsScreenContent() {
               onValueChange={v => handleNotifToggle('afternoonCheck', v)}
               trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
               thumbColor={notifPrefs.afternoonCheck ? Colors.dark.accent : Colors.dark.textTertiary}
+              accessibilityLabel="Afternoon check notification"
+              accessibilityRole="switch"
             />
           </View>
           <View style={styles.notifRow}>
@@ -182,6 +200,8 @@ function SettingsScreenContent() {
               onValueChange={v => handleNotifToggle('eveningReminder', v)}
               trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
               thumbColor={notifPrefs.eveningReminder ? Colors.dark.accent : Colors.dark.textTertiary}
+              accessibilityLabel="Evening reminder notification"
+              accessibilityRole="switch"
             />
           </View>
         </View>
@@ -217,7 +237,15 @@ function SettingsScreenContent() {
                 </View>
               )}
 
-              <TouchableOpacity style={styles.dangerBtn} onPress={handleDisconnect}>
+              <TouchableOpacity
+                style={styles.dangerBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  handleDisconnect();
+                }}
+                accessibilityLabel="Disconnect Silicon"
+                accessibilityRole="button"
+              >
                 <Text style={styles.dangerBtnText}>Disconnect</Text>
               </TouchableOpacity>
             </>
@@ -262,7 +290,12 @@ function SettingsScreenContent() {
 
               <TouchableOpacity
                 style={styles.actionBtn}
-                onPress={handleConnect}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  handleConnect();
+                }}
+                accessibilityLabel="Connect to Silicon"
+                accessibilityRole="button"
               >
                 <Text style={styles.actionBtnText}>Connect</Text>
               </TouchableOpacity>
@@ -273,7 +306,16 @@ function SettingsScreenContent() {
         {/* Danger Zone */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Danger Zone</Text>
-          <TouchableOpacity style={styles.dangerBtn} onPress={handleResetAllData}>
+          <TouchableOpacity
+            style={styles.dangerBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+              handleResetAllData();
+            }}
+            accessibilityLabel="Reset all data"
+            accessibilityRole="button"
+            accessibilityHint="Permanently deletes all tasks, progress, and settings"
+          >
             <Text style={styles.dangerBtnText}>Reset All Data</Text>
           </TouchableOpacity>
         </View>

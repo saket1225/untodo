@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, Switch, TextInput, StyleSheet
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
+import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useWallpaperStore } from '../../engines/wallpaper/store';
 import { useTodoStore } from '../../engines/todo/store';
@@ -105,14 +106,26 @@ function NumericControl({ label, value, min, max, step = 1, onChange, format }: 
       <View style={styles.controlButtons}>
         <TouchableOpacity
           style={styles.controlBtn}
-          onPress={() => onChange(Math.max(min, +(value - step).toFixed(2)))}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onChange(Math.max(min, +(value - step).toFixed(2)));
+          }}
+          accessibilityLabel={`Decrease ${label}`}
+          accessibilityRole="button"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={styles.controlBtnText}>-</Text>
         </TouchableOpacity>
-        <Text style={styles.controlValue}>{format ? format(value) : value}</Text>
+        <Text style={styles.controlValue} accessibilityLabel={`${label}: ${format ? format(value) : value}`}>{format ? format(value) : value}</Text>
         <TouchableOpacity
           style={styles.controlBtn}
-          onPress={() => onChange(Math.min(max, +(value + step).toFixed(2)))}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onChange(Math.min(max, +(value + step).toFixed(2)));
+          }}
+          accessibilityLabel={`Increase ${label}`}
+          accessibilityRole="button"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={styles.controlBtnText}>+</Text>
         </TouchableOpacity>
@@ -129,9 +142,15 @@ function ToggleControl({ label, value, onChange }: {
       <Text style={styles.controlLabel}>{label}</Text>
       <Switch
         value={value}
-        onValueChange={onChange}
+        onValueChange={(v) => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onChange(v);
+        }}
         trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
         thumbColor={value ? Colors.dark.accent : Colors.dark.textTertiary}
+        accessibilityLabel={label}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: value }}
       />
     </View>
   );
@@ -228,7 +247,7 @@ function WallpaperScreenContent() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.heading}>Wallpaper</Text>
+        <Text style={styles.heading} accessibilityRole="header">Wallpaper</Text>
 
         {/* Live Preview */}
         <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1, result: 'tmpfile' }}>
@@ -252,9 +271,28 @@ function WallpaperScreenContent() {
         </ViewShot>
 
         {/* Save Wallpaper Button */}
-        <TouchableOpacity style={styles.saveBtn} onPress={() => handleSaveWallpaper(false)}>
+        <TouchableOpacity
+          style={styles.saveBtn}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            handleSaveWallpaper(false);
+          }}
+          accessibilityLabel="Save wallpaper to gallery"
+          accessibilityRole="button"
+        >
           <Text style={styles.saveBtnText}>Save to Gallery</Text>
         </TouchableOpacity>
+
+        {/* No goal date prompt */}
+        {!goalDateValid && (
+          <View style={styles.noGoalPrompt}>
+            <Text style={styles.noGoalIcon}>◎</Text>
+            <Text style={styles.noGoalTitle}>Set a goal to get started</Text>
+            <Text style={styles.noGoalSubtext}>
+              Pick a date you're counting down to and watch the dots fill in as each day passes.
+            </Text>
+          </View>
+        )}
 
         {/* Goal Settings */}
         <View style={styles.section}>
@@ -537,6 +575,35 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: Spacing.md,
     marginBottom: Spacing.md,
+  },
+  noGoalPrompt: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  noGoalIcon: {
+    fontSize: 48,
+    color: Colors.dark.textTertiary,
+    marginBottom: Spacing.md,
+    opacity: 0.4,
+  },
+  noGoalTitle: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  noGoalSubtext: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   resetBtn: {
     borderWidth: 1,

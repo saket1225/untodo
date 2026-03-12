@@ -246,6 +246,7 @@ function TodayScreenContent() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [lastCelebratedCount, setLastCelebratedCount] = useState(0);
+  const [initialLoading, setInitialLoading] = useState(true);
   const syncFromFirestore = useTodoStore(s => s.syncFromFirestore);
   const spawnRecurringTasks = useTodoStore(s => s.spawnRecurringTasks);
 
@@ -303,7 +304,7 @@ function TodayScreenContent() {
 
   // Sync on mount and spawn recurring tasks
   useEffect(() => {
-    syncFromFirestore().catch(() => {});
+    syncFromFirestore().catch(() => {}).finally(() => setInitialLoading(false));
     spawnRecurringTasks();
   }, []);
 
@@ -419,6 +420,7 @@ function TodayScreenContent() {
 
   // Search handlers
   const toggleSearch = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSearchExpanded(prev => {
       if (!prev) {
         setTimeout(() => searchInputRef.current?.focus(), 100);
@@ -488,30 +490,57 @@ function TodayScreenContent() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={goToPrevDay} style={styles.navArrow} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity
+            onPress={goToPrevDay}
+            style={styles.navArrow}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityLabel="Previous day"
+            accessibilityRole="button"
+          >
             <Text style={styles.navArrowText}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.dateText}>{formatDisplayDate(viewingDate)}</Text>
-          <TouchableOpacity onPress={goToNextDay} style={styles.navArrow} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text style={styles.dateText} accessibilityRole="header">{formatDisplayDate(viewingDate)}</Text>
+          <TouchableOpacity
+            onPress={goToNextDay}
+            style={styles.navArrow}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityLabel="Next day"
+            accessibilityRole="button"
+          >
             <Text style={styles.navArrowText}>›</Text>
           </TouchableOpacity>
           {isSyncing && (
-            <RNAnimated.Text style={[styles.syncIcon, { opacity: syncPulse }]}>☁</RNAnimated.Text>
+            <RNAnimated.Text style={[styles.syncIcon, { opacity: syncPulse }]} accessibilityLabel="Syncing">☁</RNAnimated.Text>
           )}
         </View>
         <View style={styles.headerRight}>
           {isToday && !focusMode && (
-            <TouchableOpacity onPress={() => setFocusMode(true)} style={styles.focusBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setFocusMode(true);
+              }}
+              style={styles.focusBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Enter focus mode"
+              accessibilityRole="button"
+            >
               <Text style={styles.focusBtnText}>Focus</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={toggleSearch} style={styles.searchIconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity
+            onPress={toggleSearch}
+            style={styles.searchIconBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel={searchExpanded ? 'Close search' : 'Search tasks'}
+            accessibilityRole="button"
+          >
             <Text style={styles.searchIconText}>{searchExpanded ? '✕' : '⌕'}</Text>
           </TouchableOpacity>
           {totalPomodoroMinutes > 0 && (
-            <Text style={styles.pomodoroTotal}>⏱ {totalPomodoroMinutes}m</Text>
+            <Text style={styles.pomodoroTotal} accessibilityLabel={`${totalPomodoroMinutes} focus minutes`}>⏱ {totalPomodoroMinutes}m</Text>
           )}
-          <Text style={styles.countText}>
+          <Text style={styles.countText} accessibilityLabel={`${completed} of ${total} tasks done`}>
             {completed}/{total} done
           </Text>
         </View>
@@ -520,7 +549,15 @@ function TodayScreenContent() {
       {/* Focus Mode */}
       {focusMode && (
         <View style={styles.focusModeContainer}>
-          <TouchableOpacity style={styles.focusExitBtn} onPress={() => setFocusMode(false)}>
+          <TouchableOpacity
+            style={styles.focusExitBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setFocusMode(false);
+            }}
+            accessibilityLabel="Exit focus mode"
+            accessibilityRole="button"
+          >
             <Text style={styles.focusExitText}>Exit Focus</Text>
           </TouchableOpacity>
           {focusTask ? (
@@ -536,6 +573,8 @@ function TodayScreenContent() {
                 <TouchableOpacity
                   style={styles.focusStartBtn}
                   onPress={() => setPomodoroTodo(focusTask)}
+                  accessibilityLabel="Start pomodoro timer"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.focusStartBtnText}>Start Pomodoro</Text>
                 </TouchableOpacity>
@@ -544,6 +583,8 @@ function TodayScreenContent() {
                   onPress={() => {
                     handleToggle(focusTask.id);
                   }}
+                  accessibilityLabel="Mark task complete"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.focusCompleteBtnText}>Mark Complete</Text>
                 </TouchableOpacity>
@@ -586,7 +627,12 @@ function TodayScreenContent() {
 
       {/* Back to Today pill */}
       {!isToday && !focusMode && (
-        <TouchableOpacity style={styles.backToTodayPill} onPress={goToToday}>
+        <TouchableOpacity
+          style={styles.backToTodayPill}
+          onPress={goToToday}
+          accessibilityLabel="Go back to today"
+          accessibilityRole="button"
+        >
           <Text style={styles.backToTodayText}>Back to Today</Text>
         </TouchableOpacity>
       )}
@@ -618,10 +664,17 @@ function TodayScreenContent() {
           showsHorizontalScrollIndicator={false}
           style={styles.filterScroll}
           contentContainerStyle={styles.filterContent}
+          accessibilityRole="tablist"
         >
           <TouchableOpacity
             style={[styles.filterChip, activeCategory === 'all' && styles.filterChipActive]}
-            onPress={() => setActiveCategory('all')}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setActiveCategory('all');
+            }}
+            accessibilityLabel="All categories"
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeCategory === 'all' }}
           >
             <Text style={[styles.filterChipText, activeCategory === 'all' && styles.filterChipTextActive]}>
               All
@@ -634,7 +687,13 @@ function TodayScreenContent() {
                 styles.filterChip,
                 activeCategory === c.key && { backgroundColor: c.color, borderColor: c.color },
               ]}
-              onPress={() => setActiveCategory(activeCategory === c.key ? 'all' : c.key)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setActiveCategory(activeCategory === c.key ? 'all' : c.key);
+              }}
+              accessibilityLabel={`Filter: ${c.label}`}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeCategory === c.key }}
             >
               <Text style={[
                 styles.filterChipText,
@@ -648,7 +707,14 @@ function TodayScreenContent() {
       )}
 
       {/* Input */}
-      {!focusMode && <TodoInput onAdd={handleAdd} />}
+      {!focusMode && <TodoInput onAdd={handleAdd} autoFocus={isToday} />}
+
+      {/* Initial loading */}
+      {initialLoading && total === 0 && !focusMode && (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Syncing...</Text>
+        </View>
+      )}
 
       {/* Todo list */}
       {!focusMode && <FlatList
@@ -666,11 +732,14 @@ function TodayScreenContent() {
             refreshing={refreshing}
             onRefresh={async () => {
               setRefreshing(true);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setCheckedCarryOver(false);
               await syncFromFirestore().catch(() => {});
               setRefreshing(false);
             }}
             tintColor={Colors.dark.textTertiary}
+            title="Syncing..."
+            titleColor={Colors.dark.textTertiary}
           />
         }
         ListEmptyComponent={
@@ -698,15 +767,20 @@ function TodayScreenContent() {
               <TouchableOpacity
                 style={styles.modalPrimaryBtn}
                 onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   carryOverTodos();
                   setShowCarryOver(false);
                 }}
+                accessibilityLabel="Carry over all unfinished tasks"
+                accessibilityRole="button"
               >
                 <Text style={styles.modalPrimaryBtnText}>Carry Over All</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalSecondaryBtn}
                 onPress={() => setShowCarryOver(false)}
+                accessibilityLabel="Start fresh without carrying over"
+                accessibilityRole="button"
               >
                 <Text style={styles.modalSecondaryBtnText}>Start Fresh</Text>
               </TouchableOpacity>
@@ -1070,6 +1144,15 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: Colors.dark.background,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: Spacing.lg,
+  },
+  loadingText: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
   },
   list: {
     paddingBottom: Spacing.xxl,

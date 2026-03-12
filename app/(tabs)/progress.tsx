@@ -386,8 +386,27 @@ function WeeklyReviewSection() {
   );
 }
 
+function ProgressEmptyHero() {
+  const todos = useTodoStore(s => s.todos);
+  const total = todos.length;
+
+  if (total > 0) return null;
+
+  return (
+    <View style={styles.emptyHero}>
+      <Text style={styles.emptyHeroIcon}>◧</Text>
+      <Text style={styles.emptyHeroTitle}>Your progress story starts here</Text>
+      <Text style={styles.emptyHeroSubtext}>
+        Complete tasks on the Today tab and watch your progress unfold. Every task counts.
+      </Text>
+    </View>
+  );
+}
+
 function ProgressScreenContent() {
   const [refreshing, setRefreshing] = useState(false);
+  const todos = useTodoStore(s => s.todos);
+  const hasAnyTasks = todos.length > 0;
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 500);
@@ -402,16 +421,24 @@ function ProgressScreenContent() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={Colors.dark.textSecondary}
+            title="Syncing..."
+            titleColor={Colors.dark.textTertiary}
           />
         }
       >
-        <Text style={styles.heading}>Progress</Text>
-        <TodaySummaryCard />
-        <TaskCompletionStreak />
-        <WeeklyOverview />
-        <Streaks />
-        <DailyHistory />
-        <WeeklyReviewSection />
+        <Text style={styles.heading} accessibilityRole="header">Progress</Text>
+        {!hasAnyTasks ? (
+          <ProgressEmptyHero />
+        ) : (
+          <>
+            <TodaySummaryCard />
+            <TaskCompletionStreak />
+            <WeeklyOverview />
+            <Streaks />
+            <DailyHistory />
+            <WeeklyReviewSection />
+          </>
+        )}
         <View style={{ height: 120 }} />
       </ScrollView>
     </SafeAreaView>
@@ -553,6 +580,34 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 11,
     marginTop: 2,
+  },
+
+  // Empty hero
+  emptyHero: {
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingBottom: 40,
+    paddingHorizontal: Spacing.xl,
+  },
+  emptyHeroIcon: {
+    fontSize: 64,
+    color: Colors.dark.textTertiary,
+    marginBottom: Spacing.lg,
+    opacity: 0.4,
+  },
+  emptyHeroTitle: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 22,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  emptyHeroSubtext: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 
   // Empty state

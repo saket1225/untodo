@@ -43,6 +43,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
   const handleSaveTitle = () => {
     const trimmed = title.trim();
     if (trimmed && trimmed !== todo.title) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       onUpdate(todo.id, { title: trimmed });
     }
     setEditingTitle(false);
@@ -50,6 +51,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
   };
 
   const handleSaveEstimate = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const mins = parseInt(estimate);
     onUpdate(todo.id, { estimatedMinutes: mins > 0 ? mins : undefined });
     setEditingEstimate(false);
@@ -57,6 +59,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
   };
 
   const handleSaveNote = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onUpdate(todo.id, { notes: noteText });
     setEditingNote(false);
   };
@@ -64,6 +67,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
   const handleAddSubtask = () => {
     const trimmed = subtaskTitle.trim();
     if (trimmed) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       addSubtask(todo.id, trimmed);
       setSubtaskTitle('');
     }
@@ -105,13 +109,14 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
                 autoFocus
                 onSubmitEditing={handleSaveTitle}
                 returnKeyType="done"
+                accessibilityLabel="Edit task title"
               />
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveTitle}>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveTitle} accessibilityLabel="Save title" accessibilityRole="button">
                 <Text style={styles.saveBtnText}>Save</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity style={styles.actionRow} onPress={() => setEditingTitle(true)}>
+            <TouchableOpacity style={styles.actionRow} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setEditingTitle(true); }} accessibilityLabel="Edit title" accessibilityRole="button">
               <Text style={styles.actionIcon}>✎</Text>
               <Text style={styles.actionText}>Edit title</Text>
             </TouchableOpacity>
@@ -293,13 +298,13 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
           </View>
 
           {/* Move to tomorrow */}
-          <TouchableOpacity style={styles.actionRow} onPress={handleMoveToTomorrow}>
+          <TouchableOpacity style={styles.actionRow} onPress={handleMoveToTomorrow} accessibilityLabel="Move task to tomorrow" accessibilityRole="button">
             <Text style={styles.actionIcon}>→</Text>
             <Text style={styles.actionText}>Move to tomorrow</Text>
           </TouchableOpacity>
 
           {/* Delete */}
-          <TouchableOpacity style={[styles.actionRow, styles.deleteRow]} onPress={handleDelete}>
+          <TouchableOpacity style={[styles.actionRow, styles.deleteRow]} onPress={handleDelete} accessibilityLabel="Delete task" accessibilityRole="button">
             <Text style={[styles.actionIcon, { color: Colors.dark.error }]}>✕</Text>
             <Text style={[styles.actionText, { color: Colors.dark.error }]}>Delete</Text>
           </TouchableOpacity>
