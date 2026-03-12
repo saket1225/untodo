@@ -33,6 +33,23 @@ export const useNotificationStore = create<NotificationStore>()(
     {
       name: 'untodo-notifications',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      migrate: (persisted: any, version: number) => {
+        if (version === 0 || !version) {
+          const state = persisted as { preferences?: any; initialized?: boolean };
+          const prefs = state.preferences || {};
+          return {
+            ...state,
+            preferences: {
+              morningReminder: prefs.morningReminder ?? true,
+              afternoonCheck: prefs.afternoonCheck ?? true,
+              eveningReminder: prefs.eveningReminder ?? true,
+            },
+            initialized: state.initialized ?? false,
+          };
+        }
+        return persisted as NotificationStore;
+      },
     }
   )
 );

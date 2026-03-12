@@ -39,6 +39,32 @@ export const useWallpaperStore = create<WallpaperStore>()(
     {
       name: 'untodo-wallpaper',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      migrate: (persisted: any, version: number) => {
+        if (version === 0 || !version) {
+          const state = persisted as { config?: any };
+          const config = state.config || {};
+          return {
+            ...state,
+            config: {
+              enabled: config.enabled ?? true,
+              dotSize: config.dotSize ?? 6,
+              spacing: config.spacing ?? 14,
+              opacity: config.opacity ?? 1,
+              showQuote: config.showQuote ?? true,
+              showDayCount: config.showDayCount ?? true,
+              showStreak: config.showStreak ?? true,
+              cols: config.cols ?? 25,
+              goalTitle: config.goalTitle ?? '20',
+              goalDate: config.goalDate ?? '2028-01-12',
+              showDaysLeft: config.showDaysLeft ?? true,
+              wallpaperEnabled: config.wallpaperEnabled ?? false,
+              lastWallpaperDate: config.lastWallpaperDate ?? null,
+            },
+          };
+        }
+        return persisted as WallpaperStore;
+      },
     }
   )
 );

@@ -392,6 +392,24 @@ export const useTodoStore = create<TodoStore>()(
     {
       name: 'untodo-todos',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      migrate: (persisted: any, version: number) => {
+        if (version === 0 || !version) {
+          const state = persisted as { todos?: any[] };
+          const todos = (state.todos || []).map((t: any) => ({
+            ...t,
+            updatedAt: t.updatedAt || t.createdAt || new Date().toISOString(),
+            priority: t.priority !== undefined ? t.priority : null,
+            category: t.category !== undefined ? t.category : null,
+            pomodoroMinutesLogged: t.pomodoroMinutesLogged ?? 0,
+            subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
+            notes: t.notes ?? '',
+            syncStatus: t.syncStatus || 'pending',
+          }));
+          return { ...state, todos };
+        }
+        return persisted as TodoStore;
+      },
     }
   )
 );

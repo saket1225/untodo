@@ -1,9 +1,8 @@
 import { useState, memo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
-import { Todo, Priority, Category, CATEGORIES, PRIORITY_CONFIG, Recurrence } from '../types';
-import { getLogicalDate } from '../../../lib/date-utils';
+import { Todo, Priority, Category, CATEGORIES, PRIORITY_CONFIG } from '../types';
 import { useTodoStore } from '../store';
 
 interface Props {

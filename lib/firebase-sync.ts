@@ -55,10 +55,20 @@ export async function fetchAllTodosFromFirestore(username: string): Promise<Todo
     setSyncing(true);
     const q = query(collection(db, `users/${username}/todos`));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({
-      ...d.data(),
-      syncStatus: 'synced' as const,
-    })) as Todo[];
+    return snap.docs.map(d => {
+      const data = d.data();
+      return {
+        ...data,
+        id: data.id || d.id,
+        updatedAt: data.updatedAt || data.createdAt || new Date().toISOString(),
+        priority: data.priority !== undefined ? data.priority : null,
+        category: data.category !== undefined ? data.category : null,
+        pomodoroMinutesLogged: data.pomodoroMinutesLogged ?? 0,
+        subtasks: Array.isArray(data.subtasks) ? data.subtasks : [],
+        notes: data.notes ?? '',
+        syncStatus: 'synced' as const,
+      };
+    }) as Todo[];
   } catch (e) {
     console.warn('Firestore fetch todos failed:', e);
     return [];

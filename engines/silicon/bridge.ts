@@ -27,8 +27,13 @@ export async function saveSiliconConnection(code: string): Promise<void> {
 }
 
 export async function getSiliconConnection(): Promise<SiliconConnection | null> {
-  const data = await AsyncStorage.getItem(SILICON_KEY);
-  if (data) return JSON.parse(data);
+  try {
+    const data = await AsyncStorage.getItem(SILICON_KEY);
+    if (data) return JSON.parse(data);
+  } catch {
+    // Corrupted data — clear it
+    await AsyncStorage.removeItem(SILICON_KEY).catch(() => {});
+  }
   return null;
 }
 
@@ -86,14 +91,39 @@ async function processCommand(command: SiliconCommand, username: string): Promis
         break;
       }
       case 'write_daily_summary': {
-        const summary = command.payload;
-        useProgressStore.getState().addDaySummary(summary);
+        const summary = command.payload as {
+          date: string; completedTasks: number; totalTasks: number;
+          completionRate: number; pomodoroMinutes: number; note?: string;
+        };
+        if (!summary.date) { status = 'error'; result = { message: 'Missing date field' }; break; }
+        useProgressStore.getState().addDaySummary({
+          date: summary.date,
+          completedTasks: summary.completedTasks ?? 0,
+          totalTasks: summary.totalTasks ?? 0,
+          completionRate: summary.completionRate ?? 0,
+          pomodoroMinutes: summary.pomodoroMinutes ?? 0,
+          note: summary.note,
+        });
         result = { message: `Daily summary saved for ${summary.date}` };
         break;
       }
       case 'write_weekly_review': {
-        const review = command.payload;
-        useProgressStore.getState().addWeeklyReview(review);
+        const review = command.payload as {
+          weekStart: string; weekEnd: string; completionRate: number;
+          totalCompleted: number; totalTasks: number; pomodoroMinutes: number;
+          topStreak: number; review: string;
+        };
+        if (!review.weekStart) { status = 'error'; result = { message: 'Missing weekStart field' }; break; }
+        useProgressStore.getState().addWeeklyReview({
+          weekStart: review.weekStart,
+          weekEnd: review.weekEnd ?? '',
+          completionRate: review.completionRate ?? 0,
+          totalCompleted: review.totalCompleted ?? 0,
+          totalTasks: review.totalTasks ?? 0,
+          pomodoroMinutes: review.pomodoroMinutes ?? 0,
+          topStreak: review.topStreak ?? 0,
+          review: review.review ?? '',
+        });
         result = { message: `Weekly review saved for ${review.weekStart}` };
         break;
       }
@@ -122,20 +152,20 @@ async function processCommand(command: SiliconCommand, username: string): Promis
     result = { message: err?.message || 'Unknown error' };
   }
 
-  // Write response
-  const responseRef = doc(db, 'silicon_responses', username, 'responses', command.id);
-  await setDoc(responseRef, {
-    commandId: command.id,
-    result,
-    status,
-    completedAt: Date.now(),
-  });
-
-  // Mark command as done
-  await updateDoc(cmdRef, { status: 'done' });
-
-  // Update last sync
-  await saveSiliconConnection((await getSiliconConnection())?.pairingCode || '');
+  // Write response and mark done — wrap in try/catch to avoid crashing
+  try {
+    const responseRef = doc(db, 'silicon_responses', username, 'responses', command.id);
+    await setDoc(responseRef, {
+      commandId: command.id,
+      result,
+      status,
+      completedAt: Date.now(),
+    });
+    await updateDoc(cmdRef, { status: 'done' });
+    await saveSiliconConnection((await getSiliconConnection())?.pairingCode || '');
+  } catch (e) {
+    console.warn('[Silicon] Failed to write response:', e);
+  }
 }
 
 export function startSiliconListener(username: string): () => void {

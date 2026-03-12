@@ -13,7 +13,7 @@ import TodoItem from '../../engines/todo/components/TodoItem';
 import PomodoroTimer from '../../engines/todo/components/PomodoroTimer';
 import QuickActions from '../../engines/todo/components/QuickActions';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import { Todo, Category, CATEGORIES, Priority, Recurrence } from '../../engines/todo/types';
+import { Todo, Category, CATEGORIES, Priority } from '../../engines/todo/types';
 import { onSyncStateChange } from '../../lib/firebase-sync';
 import { useKeyboardShortcuts } from '../../lib/useKeyboardShortcuts';
 

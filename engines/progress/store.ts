@@ -144,6 +144,24 @@ export const useProgressStore = create<ProgressStore>()(
     {
       name: 'untodo-progress',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      migrate: (persisted: any, version: number) => {
+        if (version === 0 || !version) {
+          const state = persisted as { daySummaries?: any[]; weeklyReviews?: any[]; habits?: any[] };
+          return {
+            ...state,
+            daySummaries: Array.isArray(state.daySummaries) ? state.daySummaries : [],
+            weeklyReviews: Array.isArray(state.weeklyReviews) ? state.weeklyReviews : [],
+            habits: Array.isArray(state.habits) ? state.habits.map((h: any) => ({
+              ...h,
+              streak: h.streak ?? 0,
+              lastCompleted: h.lastCompleted ?? '',
+              history: Array.isArray(h.history) ? h.history : [],
+            })) : [],
+          };
+        }
+        return persisted as ProgressStore;
+      },
     }
   )
 );
