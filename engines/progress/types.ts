@@ -1,12 +1,27 @@
-export interface DailyStats {
+export interface DaySummary {
   date: string;
-  totalTodos: number;
-  completedTodos: number;
-  focusMinutes: number;
+  completedTasks: number;
+  totalTasks: number;
+  completionRate: number;
+  pomodoroMinutes: number;
+  note?: string;
 }
 
-export interface WeeklyStats {
+export interface WeeklyReview {
   weekStart: string;
-  days: DailyStats[];
+  weekEnd: string;
   completionRate: number;
+  totalCompleted: number;
+  totalTasks: number;
+  pomodoroMinutes: number;
+  topStreak: number;
+  review: string;
+}
+
+export interface HabitEntry {
+  id: string;
+  name: string;
+  streak: number;
+  lastCompleted: string;
+  history: string[];
 }
