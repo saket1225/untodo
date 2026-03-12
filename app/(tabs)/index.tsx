@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
@@ -11,10 +11,14 @@ import { Todo } from '../../engines/todo/types';
 
 export default function TodayScreen() {
   const logicalDate = getLogicalDate();
-  const todos = useTodoStore(s => s.todos.filter(t => t.logicalDate === logicalDate).sort((a, b) => a.order - b.order));
+  const allTodos = useTodoStore(s => s.todos);
   const addTodo = useTodoStore(s => s.addTodo);
   const toggleTodo = useTodoStore(s => s.toggleTodo);
   const deleteTodo = useTodoStore(s => s.deleteTodo);
+  const todos = useMemo(() =>
+    allTodos.filter(t => t.logicalDate === logicalDate).sort((a, b) => a.order - b.order),
+    [allTodos, logicalDate]
+  );
   const [pomodoroTodo, setPomodoroTodo] = useState<Todo | null>(null);
 
   const completed = todos.filter(t => t.completed).length;

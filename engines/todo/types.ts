@@ -12,4 +12,5 @@ export interface Todo {
   estimatedMinutes?: number;
   pomodoroWork?: number;
   pomodoroBreak?: number;
+  pomodoroPreset?: string;
 }
