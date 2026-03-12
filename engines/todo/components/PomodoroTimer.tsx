@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, Vibration } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, Vibration, StatusBar, Dimensions } from 'react-native';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Todo } from '../types';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface Preset {
   name: string;
@@ -61,6 +63,8 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
   const [customWork, setCustomWork] = useState(String(initialPreset.work));
   const [customBreak, setCustomBreak] = useState(String(initialPreset.shortBreak));
   const [customLongBreak, setCustomLongBreak] = useState(String(initialPreset.longBreak));
+  const [totalSessions, setTotalSessions] = useState(initialPreset.sessionsBeforeLong);
+  const [customSessions, setCustomSessions] = useState(String(initialPreset.sessionsBeforeLong));
 
   // Timer state
   const [seconds, setSeconds] = useState(initialPreset.isFlowtime ? 0 : initialPreset.work * 60);
@@ -76,6 +80,9 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
   // Session log
   const [showLog, setShowLog] = useState(false);
   const [sessionLog, setSessionLog] = useState('');
+
+  // Is the timer in active/immersive mode (running or paused mid-session)
+  const isActive = isRunning || (session > 1 && phase === 'work') || phase !== 'work';
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -114,7 +121,6 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
         setFlowElapsed(s => s + 1);
       }, 1000);
     } else if (isRunning && phase !== 'work' && seconds > 0) {
-      // Break countdown in flowtime
       intervalRef.current = setInterval(() => {
         setSeconds(s => s - 1);
       }, 1000);
@@ -151,7 +157,7 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
 
   const startBreak = () => {
     setShowLog(false);
-    const isLong = !preset.isFlowtime && session % preset.sessionsBeforeLong === 0;
+    const isLong = !preset.isFlowtime && session >= totalSessions;
     setPhase(isLong ? 'long-break' : 'short-break');
     if (!preset.isFlowtime) {
       const breakTime = isLong
@@ -171,6 +177,8 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
     setPhase('work');
     setSession(1);
     setFlowElapsed(0);
+    setTotalSessions(p.sessionsBeforeLong);
+    setCustomSessions(String(p.sessionsBeforeLong));
     if (p.isFlowtime) {
       setSeconds(0);
     } else if (p.name === 'custom') {
@@ -196,6 +204,12 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
     }
   };
 
+  const updateSessions = (val: string) => {
+    setCustomSessions(val);
+    const n = parseInt(val);
+    if (n > 0) setTotalSessions(n);
+  };
+
   const displayTime = preset.isFlowtime && phase === 'work' ? flowElapsed : seconds;
   const mins = Math.floor(displayTime / 60);
   const secs = displayTime % 60;
@@ -206,8 +220,73 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
 
   const phaseColor = phase === 'work' ? Colors.dark.text : Colors.dark.timer;
 
+  // Fullscreen immersive view when timer is active
+  if (isActive && !showLog) {
+    return (
+      <Modal visible={visible} animationType="slide" transparent={false} statusBarTranslucent>
+        <StatusBar hidden />
+        <TouchableOpacity
+          style={styles.immersiveContainer}
+          activeOpacity={1}
+          onPress={() => { if (isRunning) setIsRunning(false); }}
+        >
+          {/* Phase label */}
+          <Text style={[styles.immersivePhase, { color: phaseColor }]}>{phaseLabel}</Text>
+
+          {/* Giant timer */}
+          <Text style={styles.immersiveTimer}>
+            {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+          </Text>
+
+          {/* Task title */}
+          <Text style={styles.immersiveTask} numberOfLines={1}>{todo.title}</Text>
+
+          {/* Session counter */}
+          {!preset.isFlowtime && (
+            <Text style={styles.immersiveSession}>
+              {session} / {totalSessions}
+            </Text>
+          )}
+
+          {/* Break suggestion */}
+          {phase !== 'work' && (
+            <Text style={styles.immersiveBreakSuggestion}>{breakSuggestion}</Text>
+          )}
+
+          {/* Controls - show when paused */}
+          {!isRunning && (
+            <View style={styles.immersiveControls}>
+              <TouchableOpacity style={styles.button} onPress={() => setIsRunning(true)}>
+                <Text style={styles.buttonText}>Resume</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.button, styles.buttonSecondary]} onPress={reset}>
+                <Text style={styles.buttonSecondaryText}>Reset</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.button, styles.buttonSecondary]} onPress={() => { clearTimer(); onClose(); }}>
+                <Text style={styles.buttonSecondaryText}>Exit</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Flowtime: I lost focus button */}
+          {preset.isFlowtime && phase === 'work' && isRunning && (
+            <TouchableOpacity style={styles.lostFocusButton} onPress={endFlowSession}>
+              <Text style={styles.lostFocusText}>I lost focus</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Tap to pause hint */}
+          {isRunning && !preset.isFlowtime && (
+            <Text style={styles.immersiveHint}>tap to pause</Text>
+          )}
+        </TouchableOpacity>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal visible={visible} animationType="slide" transparent={false}>
+    <Modal visible={visible} animationType="slide" transparent={false} statusBarTranslucent>
+      <StatusBar hidden={false} barStyle="light-content" />
       <View style={styles.container}>
         {/* Task title */}
         <Text style={styles.taskTitle} numberOfLines={2}>{todo.title}</Text>
@@ -237,8 +316,34 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
           ))}
         </ScrollView>
 
+        {/* Sessions editor */}
+        {!preset.isFlowtime && (
+          <View style={styles.sessionsRow}>
+            <Text style={styles.sessionsLabel}>Sessions</Text>
+            <TouchableOpacity
+              style={styles.sessionsBtn}
+              onPress={() => { const n = Math.max(1, totalSessions - 1); setTotalSessions(n); setCustomSessions(String(n)); }}
+            >
+              <Text style={styles.sessionsBtnText}>-</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={styles.sessionsInput}
+              value={customSessions}
+              onChangeText={updateSessions}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+            <TouchableOpacity
+              style={styles.sessionsBtn}
+              onPress={() => { const n = totalSessions + 1; setTotalSessions(n); setCustomSessions(String(n)); }}
+            >
+              <Text style={styles.sessionsBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Custom time inputs */}
-        {preset.name === 'custom' && !isRunning && phase === 'work' && (
+        {preset.name === 'custom' && (
           <View style={styles.customInputs}>
             <View style={styles.customField}>
               <Text style={styles.customLabel}>Work</Text>
@@ -291,13 +396,8 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
         {/* Session counter */}
         {!preset.isFlowtime && (
           <Text style={styles.sessionCount}>
-            Session {session}{preset.sessionsBeforeLong > 0 ? ` of ${preset.sessionsBeforeLong}` : ''}
+            Session {session} of {totalSessions}
           </Text>
-        )}
-
-        {/* Break suggestion */}
-        {phase !== 'work' && (
-          <Text style={styles.breakSuggestion}>{breakSuggestion}</Text>
         )}
 
         {/* Session log prompt */}
@@ -322,17 +422,8 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
         {/* Controls */}
         {!showLog && (
           <View style={styles.controls}>
-            {preset.isFlowtime && phase === 'work' && isRunning ? (
-              <TouchableOpacity style={styles.button} onPress={endFlowSession}>
-                <Text style={styles.buttonText}>I lost focus</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.button} onPress={() => setIsRunning(!isRunning)}>
-                <Text style={styles.buttonText}>{isRunning ? 'Pause' : 'Start'}</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity style={[styles.button, styles.buttonSecondary]} onPress={reset}>
-              <Text style={styles.buttonSecondaryText}>Reset</Text>
+            <TouchableOpacity style={styles.button} onPress={() => setIsRunning(true)}>
+              <Text style={styles.buttonText}>Start</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -347,6 +438,7 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // Setup screen (before starting)
   container: {
     flex: 1,
     backgroundColor: Colors.dark.background,
@@ -364,7 +456,7 @@ const styles = StyleSheet.create({
   },
   presetScroll: {
     maxHeight: 64,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   presetContainer: {
     paddingHorizontal: Spacing.sm,
@@ -399,6 +491,45 @@ const styles = StyleSheet.create({
   },
   presetChipSubActive: {
     color: Colors.dark.surfaceHover,
+  },
+  sessionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  sessionsLabel: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    marginRight: Spacing.sm,
+  },
+  sessionsBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sessionsBtnText: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 18,
+  },
+  sessionsInput: {
+    backgroundColor: Colors.dark.surface,
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 18,
+    width: 48,
+    height: 36,
+    borderRadius: 10,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
   customInputs: {
     flexDirection: 'row',
@@ -442,7 +573,7 @@ const styles = StyleSheet.create({
   timer: {
     color: Colors.dark.text,
     fontFamily: Fonts.heading,
-    fontSize: 80,
+    fontSize: 72,
     marginBottom: Spacing.md,
   },
   sessionCount: {
@@ -450,13 +581,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 13,
     marginBottom: Spacing.sm,
-  },
-  breakSuggestion: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 16,
-    marginBottom: Spacing.lg,
-    textAlign: 'center',
   },
   logContainer: {
     width: '100%',
@@ -496,7 +620,7 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     gap: Spacing.md,
-    marginBottom: Spacing.lg,
+    marginTop: Spacing.md,
   },
   button: {
     backgroundColor: Colors.dark.accent,
@@ -529,6 +653,73 @@ const styles = StyleSheet.create({
   closeText: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
+    fontSize: 15,
+  },
+
+  // Immersive fullscreen (when timer is active)
+  immersiveContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  immersivePhase: {
+    fontFamily: Fonts.headingMedium,
+    fontSize: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 4,
+    marginBottom: Spacing.lg,
+  },
+  immersiveTimer: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.heading,
+    fontSize: 96,
+    marginBottom: Spacing.md,
+  },
+  immersiveTask: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    marginBottom: Spacing.sm,
+  },
+  immersiveSession: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    marginBottom: Spacing.md,
+  },
+  immersiveBreakSuggestion: {
+    color: Colors.dark.timer,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 18,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.xl,
+    marginBottom: Spacing.lg,
+  },
+  immersiveControls: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.xl,
+  },
+  immersiveHint: {
+    position: 'absolute',
+    bottom: 60,
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    opacity: 0.5,
+  },
+  lostFocusButton: {
+    marginTop: Spacing.xl,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  lostFocusText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
     fontSize: 15,
   },
 });
