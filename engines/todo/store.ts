@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Todo, Priority, Category, Subtask, SyncStatus, Recurrence } from './types';
+import { Todo, Priority, Category, Subtask, SyncStatus, Recurrence, TimeTracking } from './types';
 import { getLogicalDate } from '../../lib/date-utils';
 import { useUserStore } from '../user/store';
 import {
@@ -27,6 +27,8 @@ interface TodoStore {
   toggleSubtask: (todoId: string, subtaskId: string) => void;
   deleteSubtask: (todoId: string, subtaskId: string) => void;
   syncFromFirestore: () => Promise<void>;
+  startTimeTracking: (id: string) => void;
+  stopTimeTracking: (id: string) => void;
   addSampleTasks: () => void;
   spawnRecurringTasks: () => void;
 }
@@ -270,6 +272,48 @@ export const useTodoStore = create<TodoStore>()(
           ),
         }));
         const todo = get().todos.find(t => t.id === todoId);
+        if (todo) debouncedSyncTodo(todo);
+      },
+
+      startTimeTracking: (id: string) => {
+        const now = nowISO();
+        set(state => ({
+          todos: state.todos.map(t =>
+            t.id === id ? {
+              ...t,
+              timeTracking: {
+                startedAt: new Date().toISOString(),
+                totalSeconds: t.timeTracking?.totalSeconds || 0,
+              },
+              updatedAt: now,
+              syncStatus: 'pending' as SyncStatus,
+            } : t
+          ),
+        }));
+        const todo = get().todos.find(t => t.id === id);
+        if (todo) debouncedSyncTodo(todo);
+      },
+
+      stopTimeTracking: (id: string) => {
+        const now = nowISO();
+        set(state => ({
+          todos: state.todos.map(t => {
+            if (t.id !== id || !t.timeTracking?.startedAt) return t;
+            const elapsed = Math.floor(
+              (Date.now() - new Date(t.timeTracking.startedAt).getTime()) / 1000
+            );
+            return {
+              ...t,
+              timeTracking: {
+                totalSeconds: (t.timeTracking.totalSeconds || 0) + elapsed,
+                startedAt: undefined,
+              },
+              updatedAt: now,
+              syncStatus: 'pending' as SyncStatus,
+            };
+          }),
+        }));
+        const todo = get().todos.find(t => t.id === id);
         if (todo) debouncedSyncTodo(todo);
       },
 

@@ -1,23 +1,32 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, ScrollView, Animated } from 'react-native';
+import { View, TextInput, TouchableOpacity, Text, StyleSheet, ScrollView, Animated, Modal, Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Priority, Category, CATEGORIES, PRIORITY_CONFIG } from '../types';
+import { useTemplateStore, TaskTemplate, TemplateTask } from '../templates';
+import { useTodoStore } from '../store';
+import { getLogicalDate } from '../../../lib/date-utils';
 
 interface Props {
   onAdd: (title: string, priority?: Priority, category?: Category) => void;
   autoFocus?: boolean;
+  viewingDate?: string;
 }
 
 const PRIORITY_CYCLE: (Priority)[] = [null, 'low', 'medium', 'high'];
 
-export default function TodoInput({ onAdd, autoFocus }: Props) {
+export default function TodoInput({ onAdd, autoFocus, viewingDate }: Props) {
   const [text, setText] = useState('');
   const [priority, setPriority] = useState<Priority>(null);
   const [category, setCategory] = useState<Category>(null);
   const [showCategories, setShowCategories] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const flashAnim = useRef(new Animated.Value(0)).current;
+  const getAllTemplates = useTemplateStore(s => s.getAllTemplates);
+  const addCustomTemplate = useTemplateStore(s => s.addCustomTemplate);
+  const deleteTemplate = useTemplateStore(s => s.deleteTemplate);
+  const allTodos = useTodoStore(s => s.todos);
 
   useEffect(() => {
     if (autoFocus) {
@@ -34,7 +43,6 @@ export default function TodoInput({ onAdd, autoFocus }: Props) {
     setPriority(null);
     setCategory(null);
     setShowCategories(false);
-    // Flash animation
     flashAnim.setValue(1);
     Animated.timing(flashAnim, { toValue: 0, duration: 400, useNativeDriver: true }).start();
     inputRef.current?.focus();
@@ -46,10 +54,44 @@ export default function TodoInput({ onAdd, autoFocus }: Props) {
     setPriority(PRIORITY_CYCLE[(idx + 1) % PRIORITY_CYCLE.length]);
   };
 
+  const handleApplyTemplate = (template: TaskTemplate) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    template.tasks.forEach(task => {
+      onAdd(task.title, task.priority, task.category);
+    });
+    setShowTemplates(false);
+  };
+
+  const handleSaveAsTemplate = () => {
+    const date = viewingDate || getLogicalDate();
+    const dayTodos = allTodos.filter(t => t.logicalDate === date && !t.completed);
+    if (dayTodos.length === 0) {
+      Alert.alert('No Tasks', 'Add some tasks first to save as a template.');
+      return;
+    }
+    Alert.prompt(
+      'Save as Template',
+      'Enter a name for this template:',
+      (name) => {
+        if (!name?.trim()) return;
+        const tasks: TemplateTask[] = dayTodos.map(t => ({
+          title: t.title,
+          priority: t.priority,
+          category: t.category,
+        }));
+        addCustomTemplate(name.trim(), tasks);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      },
+      'plain-text',
+      '',
+      'default'
+    );
+  };
+
   const priorityLabel = priority ? PRIORITY_CONFIG[priority].label : '—';
   const priorityColor = priority ? PRIORITY_CONFIG[priority].color : Colors.dark.textTertiary;
-
   const selectedCat = CATEGORIES.find(c => c.key === category);
+  const templates = getAllTemplates();
 
   return (
     <View>
@@ -80,6 +122,20 @@ export default function TodoInput({ onAdd, autoFocus }: Props) {
           accessibilityLabel="Task title"
           accessibilityHint="Type a task name and press done to add"
         />
+
+        {/* Template button */}
+        <TouchableOpacity
+          style={styles.templateBtn}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowTemplates(true);
+          }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="Task templates"
+          accessibilityRole="button"
+        >
+          <Text style={styles.templateBtnText}>⊞</Text>
+        </TouchableOpacity>
 
         {/* Category toggle */}
         <TouchableOpacity
@@ -148,6 +204,49 @@ export default function TodoInput({ onAdd, autoFocus }: Props) {
           ))}
         </ScrollView>
       )}
+
+      {/* Template picker modal */}
+      <Modal visible={showTemplates} transparent animationType="slide">
+        <TouchableOpacity
+          style={styles.templateOverlay}
+          activeOpacity={1}
+          onPress={() => setShowTemplates(false)}
+        >
+          <View style={styles.templateSheet} onStartShouldSetResponder={() => true}>
+            <View style={styles.templateHandle} />
+            <Text style={styles.templateTitle}>Task Templates</Text>
+            <ScrollView style={styles.templateList} showsVerticalScrollIndicator={false}>
+              {templates.map(template => (
+                <TouchableOpacity
+                  key={template.id}
+                  style={styles.templateItem}
+                  onPress={() => handleApplyTemplate(template)}
+                  onLongPress={() => {
+                    if (template.isCustom) {
+                      Alert.alert('Delete Template', `Delete "${template.name}"?`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: () => deleteTemplate(template.id) },
+                      ]);
+                    }
+                  }}
+                >
+                  <View style={styles.templateItemHeader}>
+                    <Text style={styles.templateItemName}>{template.name}</Text>
+                    {template.isCustom && <Text style={styles.templateCustomBadge}>custom</Text>}
+                  </View>
+                  <Text style={styles.templateItemTasks}>
+                    {template.tasks.map(t => t.title).join(' · ')}
+                  </Text>
+                  <Text style={styles.templateItemCount}>{template.tasks.length} tasks</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.saveTemplateBtn} onPress={handleSaveAsTemplate}>
+              <Text style={styles.saveTemplateBtnText}>Save today's tasks as template</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -201,6 +300,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: Colors.dark.border,
+  },
+  templateBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  templateBtnText: {
+    fontFamily: Fonts.body,
+    fontSize: 16,
+    color: Colors.dark.textSecondary,
   },
   catBtn: {
     width: 36,
@@ -261,5 +375,90 @@ const styles = StyleSheet.create({
   },
   catChipTextActive: {
     color: Colors.dark.background,
+  },
+  // Template modal
+  templateOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  templateSheet: {
+    backgroundColor: Colors.dark.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xxl,
+    maxHeight: '70%',
+  },
+  templateHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.dark.border,
+    alignSelf: 'center',
+    marginTop: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  templateTitle: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 18,
+    marginBottom: Spacing.md,
+  },
+  templateList: {
+    flex: 1,
+  },
+  templateItem: {
+    backgroundColor: Colors.dark.background,
+    borderRadius: 12,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  templateItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: 4,
+  },
+  templateItemName: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 15,
+  },
+  templateCustomBadge: {
+    color: Colors.dark.timer,
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    backgroundColor: Colors.dark.timer + '22',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  templateItemTasks: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  templateItemCount: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+  },
+  saveTemplateBtn: {
+    backgroundColor: Colors.dark.background,
+    borderRadius: 12,
+    padding: Spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    marginTop: Spacing.sm,
+  },
+  saveTemplateBtnText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 14,
   },
 });

@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
 import {
   View, Text, FlatList, StyleSheet, Modal, TouchableOpacity, ScrollView,
-  Animated as RNAnimated, RefreshControl, TextInput, Dimensions,
+  Animated as RNAnimated, RefreshControl, TextInput, Dimensions, PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -16,6 +16,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { Todo, Category, CATEGORIES, Priority } from '../../engines/todo/types';
 import { onSyncStateChange } from '../../lib/firebase-sync';
 import { useKeyboardShortcuts } from '../../lib/useKeyboardShortcuts';
+import { generateDailyInsight } from '../../lib/insights';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_HEIGHT = 72; // Approximate fixed height for getItemLayout
@@ -247,8 +248,56 @@ function TodayScreenContent() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [lastCelebratedCount, setLastCelebratedCount] = useState(0);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [insightDismissed, setInsightDismissed] = useState(false);
   const syncFromFirestore = useTodoStore(s => s.syncFromFirestore);
   const spawnRecurringTasks = useTodoStore(s => s.spawnRecurringTasks);
+
+  // Daily insight
+  const dailyInsight = useMemo(() => {
+    if (insightDismissed || !isToday) return null;
+    return generateDailyInsight(allTodos);
+  }, [allTodos, insightDismissed, isToday]);
+
+  // Swipe gesture for day navigation
+  const swipeAnim = useRef(new RNAnimated.Value(0)).current;
+  const swipePanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dx) > 30 && Math.abs(gs.dy) < 30 && !searchExpanded,
+      onPanResponderMove: (_, gs) => {
+        swipeAnim.setValue(gs.dx * 0.3);
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx < -80) {
+          // Swipe left -> next day
+          RNAnimated.timing(swipeAnim, {
+            toValue: -SCREEN_WIDTH,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            setViewingDate(prev => shiftDate(prev, 1));
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            swipeAnim.setValue(SCREEN_WIDTH);
+            RNAnimated.spring(swipeAnim, { toValue: 0, useNativeDriver: true, friction: 8 }).start();
+          });
+        } else if (gs.dx > 80) {
+          // Swipe right -> prev day
+          RNAnimated.timing(swipeAnim, {
+            toValue: SCREEN_WIDTH,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            setViewingDate(prev => shiftDate(prev, -1));
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            swipeAnim.setValue(-SCREEN_WIDTH);
+            RNAnimated.spring(swipeAnim, { toValue: 0, useNativeDriver: true, friction: 8 }).start();
+          });
+        } else {
+          RNAnimated.spring(swipeAnim, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
 
   // Keyboard shortcut state (for web)
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -645,6 +694,19 @@ function TodayScreenContent() {
         </>
       )}
 
+      {/* Daily Insight Banner */}
+      {dailyInsight && !focusMode && (
+        <View style={styles.insightBanner}>
+          <Text style={styles.insightText}>{dailyInsight}</Text>
+          <TouchableOpacity
+            onPress={() => setInsightDismissed(true)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.insightDismiss}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Estimated time remaining */}
       {totalEstimatedMinutes > 0 && !focusMode && (
         <Text style={styles.estimatedTimeHeader}>{formatEstimatedTime(totalEstimatedMinutes)}</Text>
@@ -707,7 +769,7 @@ function TodayScreenContent() {
       )}
 
       {/* Input */}
-      {!focusMode && <TodoInput onAdd={handleAdd} autoFocus={isToday} />}
+      {!focusMode && <TodoInput onAdd={handleAdd} autoFocus={isToday} viewingDate={viewingDate} />}
 
       {/* Initial loading */}
       {initialLoading && total === 0 && !focusMode && (
@@ -716,8 +778,12 @@ function TodayScreenContent() {
         </View>
       )}
 
-      {/* Todo list */}
-      {!focusMode && <FlatList
+      {/* Todo list with swipe gesture */}
+      {!focusMode && <RNAnimated.View
+        style={{ flex: 1, transform: [{ translateX: swipeAnim }] }}
+        {...swipePanResponder.panHandlers}
+      >
+      <FlatList
         data={todos}
         keyExtractor={item => item.id}
         renderItem={renderItem}
@@ -753,7 +819,8 @@ function TodayScreenContent() {
             </Text>
           </View>
         }
-      />}
+      />
+      </RNAnimated.View>}
 
       {/* Carry-over modal */}
       {showCarryOver && (
@@ -1094,6 +1161,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.sm,
+  },
+
+  // Insight banner
+  insightBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+  },
+  insightText: {
+    flex: 1,
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  insightDismiss: {
+    color: Colors.dark.textTertiary,
+    fontSize: 12,
+    marginLeft: Spacing.sm,
+    padding: 4,
   },
 
   // Estimated time

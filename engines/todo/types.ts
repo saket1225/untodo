@@ -29,6 +29,11 @@ export interface Recurrence {
   days?: number[]; // 0=Sun, 1=Mon, ... 6=Sat (for weekly/custom)
 }
 
+export interface TimeTracking {
+  startedAt?: string;
+  totalSeconds: number;
+}
+
 export interface Todo {
   id: string;
   title: string;
@@ -52,5 +57,6 @@ export interface Todo {
   notes: string;
   syncStatus: SyncStatus;
   recurrence?: Recurrence;
-  recurringParentId?: string; // ID of the original recurring task template
+  recurringParentId?: string;
+  timeTracking?: TimeTracking;
 }

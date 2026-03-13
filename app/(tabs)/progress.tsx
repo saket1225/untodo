@@ -1,17 +1,141 @@
-import { useMemo, useState, useCallback, memo } from 'react';
-import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
+import { useMemo, useState, useCallback, useRef, memo } from 'react';
+import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity, Share, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
+import ViewShot from 'react-native-view-shot';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useTodoStore } from '../../engines/todo/store';
 import { useProgressStore, getWeekStats, getRecentDays } from '../../engines/progress/store';
 import { DaySummary } from '../../engines/progress/types';
 import { getLogicalDate } from '../../lib/date-utils';
+import { computeAnalytics, AnalyticsData } from '../../lib/insights';
 import { format } from 'date-fns';
 import ErrorBoundary from '../../components/ErrorBoundary';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const BAR_MAX_HEIGHT = 120;
+
+// --- Heatmap Component ---
+function WeeklyHeatmap({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
+  // 4 weeks x 7 days grid
+  const weeks: typeof heatmap[] = [];
+  for (let i = 0; i < 4; i++) {
+    weeks.push(heatmap.slice(i * 7, (i + 1) * 7));
+  }
+
+  const getColor = (rate: number, count: number) => {
+    if (count === 0) return Colors.dark.border;
+    if (rate >= 0.9) return Colors.dark.success;
+    if (rate >= 0.7) return '#4ADE80AA';
+    if (rate >= 0.5) return '#4ADE8066';
+    if (rate >= 0.2) return '#4ADE8033';
+    return Colors.dark.surfaceHover;
+  };
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Activity (4 Weeks)</Text>
+      <View style={styles.heatmapContainer}>
+        <View style={styles.heatmapDayLabels}>
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+            <Text key={i} style={styles.heatmapDayLabel}>{d}</Text>
+          ))}
+        </View>
+        <View style={styles.heatmapGrid}>
+          {weeks.map((week, wi) => (
+            <View key={wi} style={styles.heatmapWeek}>
+              {week.map((day, di) => (
+                <View
+                  key={di}
+                  style={[
+                    styles.heatmapCell,
+                    { backgroundColor: getColor(day.rate, day.count) },
+                  ]}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
+      </View>
+      <View style={styles.heatmapLegend}>
+        <Text style={styles.heatmapLegendText}>Less</Text>
+        {[Colors.dark.border, '#4ADE8033', '#4ADE8066', '#4ADE80AA', Colors.dark.success].map((c, i) => (
+          <View key={i} style={[styles.heatmapLegendDot, { backgroundColor: c }]} />
+        ))}
+        <Text style={styles.heatmapLegendText}>More</Text>
+      </View>
+    </View>
+  );
+}
+
+// --- Category Breakdown ---
+function CategoryBreakdown({ data }: { data: AnalyticsData['categoryBreakdown'] }) {
+  if (data.length === 0) return null;
+  const maxCount = data[0]?.count || 1;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Categories</Text>
+      {data.map(item => (
+        <View key={item.category} style={styles.catBarRow}>
+          <Text style={[styles.catBarLabel, { color: item.color }]}>{item.label}</Text>
+          <View style={styles.catBarTrack}>
+            <View
+              style={[
+                styles.catBarFill,
+                {
+                  width: `${Math.max(4, (item.count / maxCount) * 100)}%`,
+                  backgroundColor: item.color,
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.catBarCount}>{item.count}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// --- Analytics Summary Cards ---
+function AnalyticsSummary({ analytics }: { analytics: AnalyticsData }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Insights</Text>
+      <View style={styles.analyticsGrid}>
+        <View style={styles.analyticsCard}>
+          <Text style={styles.analyticsValue}>{analytics.avgDailyCompletion}%</Text>
+          <Text style={styles.analyticsLabel}>avg completion{'\n'}(30 days)</Text>
+        </View>
+        <View style={styles.analyticsCard}>
+          <Text style={styles.analyticsValue}>{analytics.mostProductiveDay.slice(0, 3)}</Text>
+          <Text style={styles.analyticsLabel}>most productive{'\n'}day</Text>
+        </View>
+        <View style={styles.analyticsCard}>
+          <Text style={[styles.analyticsValue, { color: Colors.dark.timer }]}>
+            {analytics.avgPomodoroMinutes}m
+          </Text>
+          <Text style={styles.analyticsLabel}>avg focus{'\n'}per day</Text>
+        </View>
+        <View style={styles.analyticsCard}>
+          <Text style={[styles.analyticsValue, { color: Colors.dark.success }]}>
+            {analytics.longestStreak}
+          </Text>
+          <Text style={styles.analyticsLabel}>longest{'\n'}streak ever</Text>
+        </View>
+        {analytics.totalTimeTrackedMinutes > 0 && (
+          <View style={styles.analyticsCard}>
+            <Text style={[styles.analyticsValue, { color: Colors.dark.timer }]}>
+              {analytics.totalTimeTrackedMinutes}m
+            </Text>
+            <Text style={styles.analyticsLabel}>total time{'\n'}tracked</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
 
 function TodaySummaryCard() {
   const todos = useTodoStore(s => s.todos);
@@ -23,7 +147,6 @@ function TodaySummaryCard() {
     const total = todayTodos.length;
     const pomodoroMins = todayTodos.reduce((s, t) => s + (t.pomodoroMinutesLogged || 0), 0);
 
-    // Calculate streak
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     let streak = 0;
@@ -45,7 +168,6 @@ function TodaySummaryCard() {
   const progress = total > 0 ? completed / total : 0;
   const pct = Math.round(progress * 100);
 
-  // Circular progress ring dimensions
   const size = 100;
   const strokeWidth = 8;
   const radius = (size - strokeWidth) / 2;
@@ -55,26 +177,16 @@ function TodaySummaryCard() {
   return (
     <View style={styles.todayCard}>
       <View style={styles.todayCardInner}>
-        {/* Circular Progress Ring */}
         <View style={styles.todayRingContainer}>
           <Svg width={size} height={size}>
-            {/* Background ring */}
             <Circle
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              stroke={Colors.dark.border}
-              strokeWidth={strokeWidth}
-              fill="transparent"
+              cx={size / 2} cy={size / 2} r={radius}
+              stroke={Colors.dark.border} strokeWidth={strokeWidth} fill="transparent"
             />
-            {/* Progress ring */}
             <Circle
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
+              cx={size / 2} cy={size / 2} r={radius}
               stroke={progress === 1 ? Colors.dark.success : Colors.dark.accent}
-              strokeWidth={strokeWidth}
-              fill="transparent"
+              strokeWidth={strokeWidth} fill="transparent"
               strokeDasharray={`${circumference}`}
               strokeDashoffset={strokeDashoffset}
               strokeLinecap="round"
@@ -85,8 +197,6 @@ function TodaySummaryCard() {
             <Text style={styles.todayRingPct}>{pct}%</Text>
           </View>
         </View>
-
-        {/* Stats */}
         <View style={styles.todayStats}>
           <Text style={styles.todayCardTitle}>Today</Text>
           <View style={styles.todayStatRow}>
@@ -113,7 +223,6 @@ function TaskCompletionStreak() {
   const todos = useTodoStore(s => s.todos);
 
   const { streak, bestDay } = useMemo(() => {
-    // Calculate consecutive days with >50% completion
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     let streak = 0;
@@ -133,15 +242,10 @@ function TaskCompletionStreak() {
           bestDay = { date: dateStr, rate, completed, total };
         }
       }
-
-      if (i === 0 && total === 0) continue; // Skip today if no tasks yet
-      if (total > 0 && rate >= 0.5) {
-        streak++;
-      } else if (total > 0) {
-        break;
-      }
+      if (i === 0 && total === 0) continue;
+      if (total > 0 && rate >= 0.5) streak++;
+      else if (total > 0) break;
     }
-
     return { streak, bestDay };
   }, [todos]);
 
@@ -174,7 +278,6 @@ function WeeklyOverview() {
   const pct = Math.round(stats.completionRate * 100);
   const hasData = stats.totalTasks > 0;
 
-  // Total pomodoro minutes for the week
   const weekPomodoroMins = useMemo(() => {
     return stats.weekDays.reduce((sum, day) => {
       const dayTodos = todos.filter(t => t.logicalDate === day.date);
@@ -185,7 +288,6 @@ function WeeklyOverview() {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>This Week</Text>
-
       {!hasData ? (
         <View style={styles.emptySection}>
           <Text style={styles.emptyTitle}>No tasks this week yet</Text>
@@ -205,13 +307,10 @@ function WeeklyOverview() {
               </View>
             )}
           </View>
-
           <View style={styles.barChart}>
             {stats.weekDays.map((day, i) => {
               const rate = day.totalTasks > 0 ? day.completionRate : 0;
-              const height = day.totalTasks > 0
-                ? Math.max(4, (rate * BAR_MAX_HEIGHT))
-                : 4;
+              const height = day.totalTasks > 0 ? Math.max(4, (rate * BAR_MAX_HEIGHT)) : 4;
               const isToday = day.date === new Date().toISOString().split('T')[0];
               const pctLabel = day.totalTasks > 0 ? `${Math.round(rate * 100)}%` : '';
               return (
@@ -229,38 +328,29 @@ function WeeklyOverview() {
                           height,
                           backgroundColor: isToday
                             ? Colors.dark.accent
-                            : day.totalTasks > 0
-                              ? Colors.dark.textSecondary
-                              : Colors.dark.border,
+                            : day.totalTasks > 0 ? Colors.dark.textSecondary : Colors.dark.border,
                         },
                       ]}
                     />
-                    {/* Glow effect for bars with data */}
                     {day.totalTasks > 0 && rate > 0 && (
                       <View
                         style={[
                           styles.barGlow,
                           {
                             height: Math.min(height + 8, BAR_MAX_HEIGHT),
-                            backgroundColor: isToday
-                              ? 'rgba(255,255,255,0.06)'
-                              : 'rgba(136,136,136,0.06)',
+                            backgroundColor: isToday ? 'rgba(255,255,255,0.06)' : 'rgba(136,136,136,0.06)',
                           },
                         ]}
                       />
                     )}
                   </View>
-                  <Text style={[
-                    styles.barLabel,
-                    isToday && { color: Colors.dark.accent },
-                  ]}>
+                  <Text style={[styles.barLabel, isToday && { color: Colors.dark.accent }]}>
                     {DAY_LABELS[i]}
                   </Text>
                 </View>
               );
             })}
           </View>
-
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{stats.totalCompleted}</Text>
@@ -281,7 +371,6 @@ function WeeklyOverview() {
 function Streaks() {
   const habits = useProgressStore(s => s.habits);
   const active = habits.filter(h => h.streak > 0);
-
   if (active.length === 0) return null;
 
   return (
@@ -334,9 +423,7 @@ const DayRow = memo(function DayRow({ day }: { day: DaySummary }) {
     <View style={styles.dayRow}>
       <View style={styles.dayInfo}>
         <Text style={styles.dayDate}>{label}</Text>
-        <Text style={styles.dayMeta}>
-          {day.completedTasks}/{day.totalTasks} tasks
-        </Text>
+        <Text style={styles.dayMeta}>{day.completedTasks}/{day.totalTasks} tasks</Text>
       </View>
       <View style={styles.dayBarContainer}>
         <View style={styles.dayBarTrack}>
@@ -357,7 +444,6 @@ function WeeklyReviewSection() {
   weekStart.setDate(now.getDate() - diff);
   weekStart.setHours(0, 0, 0, 0);
   const weekStartStr = weekStart.toISOString().split('T')[0];
-
   const currentReview = reviews.find(r => r.weekStart === weekStartStr);
 
   return (
@@ -388,9 +474,7 @@ function WeeklyReviewSection() {
 
 function ProgressEmptyHero() {
   const todos = useTodoStore(s => s.todos);
-  const total = todos.length;
-
-  if (total > 0) return null;
+  if (todos.length > 0) return null;
 
   return (
     <View style={styles.emptyHero}>
@@ -403,10 +487,91 @@ function ProgressEmptyHero() {
   );
 }
 
+// --- Share Card ---
+function ShareSection({ analytics }: { analytics: AnalyticsData }) {
+  const viewShotRef = useRef<ViewShot>(null);
+  const todos = useTodoStore(s => s.todos);
+
+  const weekStats = useMemo(() => getWeekStats(), [todos]);
+  const logicalDate = getLogicalDate();
+  const todayTodos = todos.filter(t => t.logicalDate === logicalDate);
+  const streak = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let s = 0;
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayTodos = todos.filter(t => t.logicalDate === dateStr);
+      const total = dayTodos.length;
+      const completed = dayTodos.filter(t => t.completed).length;
+      if (i === 0 && total === 0) continue;
+      if (total > 0 && completed / total >= 0.5) s++;
+      else if (total > 0) break;
+    }
+    return s;
+  }, [todos]);
+
+  const handleShare = async () => {
+    try {
+      const uri = await viewShotRef.current?.capture?.();
+      if (uri) {
+        await Share.share({
+          url: uri,
+          message: `This week: ${Math.round(weekStats.completionRate * 100)}% completion rate | ${streak} day streak | Powered by untodo`,
+        });
+      }
+    } catch {
+      // Share cancelled or failed
+    }
+  };
+
+  const weekPct = Math.round(weekStats.completionRate * 100);
+  const weekPomoMins = todos.reduce((sum, t) => {
+    const d = new Date(t.logicalDate + 'T12:00:00');
+    const now = new Date();
+    const dayDiff = Math.floor((now.getTime() - d.getTime()) / 86400000);
+    if (dayDiff <= 7) return sum + (t.pomodoroMinutesLogged || 0);
+    return sum;
+  }, 0);
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Share Progress</Text>
+      <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }}>
+        <View style={styles.shareCard}>
+          <Text style={styles.shareCardTitle}>Weekly Stats</Text>
+          <View style={styles.shareStatsRow}>
+            <View style={styles.shareStatItem}>
+              <Text style={styles.shareStatValue}>{weekPct}%</Text>
+              <Text style={styles.shareStatLabel}>completion</Text>
+            </View>
+            <View style={styles.shareStatItem}>
+              <Text style={styles.shareStatValue}>{streak}</Text>
+              <Text style={styles.shareStatLabel}>day streak</Text>
+            </View>
+            <View style={styles.shareStatItem}>
+              <Text style={[styles.shareStatValue, { color: Colors.dark.timer }]}>{weekPomoMins}m</Text>
+              <Text style={styles.shareStatLabel}>focus time</Text>
+            </View>
+          </View>
+          <Text style={styles.shareWatermark}>Powered by untodo</Text>
+        </View>
+      </ViewShot>
+      <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+        <Text style={styles.shareBtnText}>Share</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function ProgressScreenContent() {
   const [refreshing, setRefreshing] = useState(false);
   const todos = useTodoStore(s => s.todos);
   const hasAnyTasks = todos.length > 0;
+  const analytics = useMemo(() => computeAnalytics(todos), [todos]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 500);
@@ -432,11 +597,15 @@ function ProgressScreenContent() {
         ) : (
           <>
             <TodaySummaryCard />
+            <WeeklyHeatmap heatmap={analytics.heatmap} />
+            <AnalyticsSummary analytics={analytics} />
+            <CategoryBreakdown data={analytics.categoryBreakdown} />
             <TaskCompletionStreak />
             <WeeklyOverview />
             <Streaks />
             <DailyHistory />
             <WeeklyReviewSection />
+            <ShareSection analytics={analytics} />
           </>
         )}
         <View style={{ height: 120 }} />
@@ -542,6 +711,113 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: Spacing.md,
+  },
+
+  // Heatmap
+  heatmapContainer: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  heatmapDayLabels: {
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  heatmapDayLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    height: 18,
+    lineHeight: 18,
+  },
+  heatmapGrid: {
+    flexDirection: 'row',
+    gap: 4,
+    flex: 1,
+  },
+  heatmapWeek: {
+    flex: 1,
+    gap: 4,
+  },
+  heatmapCell: {
+    height: 18,
+    borderRadius: 3,
+  },
+  heatmapLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+    marginTop: Spacing.sm,
+  },
+  heatmapLegendText: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 10,
+  },
+  heatmapLegendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+  },
+
+  // Category breakdown
+  catBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  catBarLabel: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 12,
+    width: 70,
+  },
+  catBarTrack: {
+    flex: 1,
+    height: 8,
+    backgroundColor: Colors.dark.border,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  catBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  catBarCount: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.accent,
+    fontSize: 14,
+    minWidth: 28,
+    textAlign: 'right',
+  },
+
+  // Analytics summary
+  analyticsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  analyticsCard: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.md,
+    alignItems: 'center',
+    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 2) / 3,
+  },
+  analyticsValue: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accent,
+    fontSize: 24,
+    lineHeight: 28,
+  },
+  analyticsLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 4,
   },
 
   // Streak cards
@@ -859,5 +1135,60 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.accentItalic,
     fontSize: 14,
     textAlign: 'center',
+  },
+
+  // Share
+  shareCard: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.lg,
+    alignItems: 'center',
+  },
+  shareCardTitle: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 20,
+    marginBottom: Spacing.md,
+  },
+  shareStatsRow: {
+    flexDirection: 'row',
+    gap: Spacing.xl,
+    marginBottom: Spacing.md,
+  },
+  shareStatItem: {
+    alignItems: 'center',
+  },
+  shareStatValue: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accent,
+    fontSize: 28,
+  },
+  shareStatLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  shareWatermark: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  shareBtn: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.md,
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+  },
+  shareBtnText: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 15,
   },
 });
