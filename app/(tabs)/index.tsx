@@ -158,11 +158,17 @@ function TodayScreenContent() {
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  // All todos for the viewing date (sorted)
+  // All todos for the viewing date (sorted with smart ordering)
   const dateTodos = useMemo(() => {
     const dayTodos = allTodos.filter(t => t.logicalDate === viewingDate);
     return [...dayTodos].sort((a, b) => {
+      // Completed tasks always at bottom
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      // Carried-over / overdue tasks at top
+      const aCarried = a.carriedOverFrom ? 1 : 0;
+      const bCarried = b.carriedOverFrom ? 1 : 0;
+      if (aCarried !== bCarried) return bCarried - aCarried;
+      // Then by priority
       const pa = a.priority ? { high: 0, medium: 1, low: 2 }[a.priority] : 3;
       const pb = b.priority ? { high: 0, medium: 1, low: 2 }[b.priority] : 3;
       if (pa !== pb) return pa - pb;
@@ -644,12 +650,14 @@ function TodayScreenContent() {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>+</Text>
-            <Text style={styles.emptyText}>
-              {isToday ? 'Your day is a blank canvas' : 'No tasks for this day'}
+            <Text style={styles.emptyQuote}>
+              {isToday ? '"The secret of getting ahead\nis getting started."' : 'Nothing here yet'}
+            </Text>
+            <Text style={styles.emptyAttribution}>
+              {isToday ? '— Mark Twain' : ''}
             </Text>
             <Text style={styles.emptySubtext}>
-              {isToday ? 'Add your first task above to get started' : 'Add a task or navigate to another day'}
+              {isToday ? 'What will you accomplish today?' : 'Add a task or navigate to another day'}
             </Text>
           </View>
         }
@@ -923,26 +931,28 @@ const styles = StyleSheet.create({
   },
   empty: {
     alignItems: 'center',
-    paddingTop: 80,
+    paddingTop: 100,
+    paddingHorizontal: Spacing.xl,
   },
-  emptyIcon: {
-    fontSize: 48,
-    color: Colors.dark.textTertiary,
-    marginBottom: Spacing.md,
-    fontFamily: Fonts.body,
-  },
-  emptyText: {
+  emptyQuote: {
     color: Colors.dark.textSecondary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 18,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 22,
+    textAlign: 'center',
+    lineHeight: 32,
+  },
+  emptyAttribution: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    marginTop: Spacing.sm,
   },
   emptySubtext: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 14,
-    marginTop: Spacing.xs,
+    marginTop: Spacing.xl,
     textAlign: 'center',
-    paddingHorizontal: Spacing.xl,
   },
 
   // Carry-over modal

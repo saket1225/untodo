@@ -1096,20 +1096,21 @@ const styles = StyleSheet.create({
   // Action buttons
   setWallpaperBtn: {
     backgroundColor: Colors.dark.accent,
-    borderRadius: 14,
-    paddingVertical: 18,
+    borderRadius: 16,
+    paddingVertical: 22,
     alignItems: 'center',
     marginBottom: Spacing.sm,
     shadowColor: '#fff',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
   setWallpaperBtnText: {
     color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 16,
+    fontFamily: Fonts.bodyBold,
+    fontSize: 18,
+    letterSpacing: 0.5,
   },
   secondaryActionRow: {
     flexDirection: 'row',

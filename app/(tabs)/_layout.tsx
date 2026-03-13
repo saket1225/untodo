@@ -1,12 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
 
 import { Colors, Fonts } from '../../lib/theme';
 import { useUserStore } from '../../engines/user/store';
+import { useTodoStore } from '../../engines/todo/store';
+import { getLogicalDate } from '../../lib/date-utils';
 import { startSiliconListener } from '../../engines/silicon/bridge';
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
+function TabIcon({ label, focused, badge }: { label: string; focused: boolean; badge?: number }) {
   const icons: Record<string, string> = {
     'Today': '◉',
     'Progress': '◧',
@@ -15,13 +17,20 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   };
   return (
     <View style={styles.tabIcon}>
-      <Text style={[
-        styles.icon,
-        { color: focused ? Colors.dark.accent : Colors.dark.textTertiary },
-        focused && styles.iconFocused,
-      ]}>
-        {icons[label] || '●'}
-      </Text>
+      <View style={styles.iconContainer}>
+        <Text style={[
+          styles.icon,
+          { color: focused ? Colors.dark.accent : Colors.dark.textTertiary },
+          focused && styles.iconFocused,
+        ]}>
+          {icons[label] || '●'}
+        </Text>
+        {badge != null && badge > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badge > 99 ? '99' : badge}</Text>
+          </View>
+        )}
+      </View>
       <Text
         numberOfLines={1}
         style={[styles.label, {
@@ -33,6 +42,15 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
       </Text>
     </View>
   );
+}
+
+function TodayTabIcon({ focused }: { focused: boolean }) {
+  const todos = useTodoStore(s => s.todos);
+  const logicalDate = getLogicalDate();
+  const remaining = useMemo(() => {
+    return todos.filter(t => t.logicalDate === logicalDate && !t.completed).length;
+  }, [todos, logicalDate]);
+  return <TabIcon label="Today" focused={focused} badge={remaining} />;
 }
 
 export default function TabLayout() {
@@ -57,7 +75,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon label="Today" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TodayTabIcon focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -102,6 +120,9 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingTop: 2,
   },
+  iconContainer: {
+    position: 'relative',
+  },
   icon: {
     fontSize: 20,
     opacity: 0.5,
@@ -109,6 +130,24 @@ const styles = StyleSheet.create({
   iconFocused: {
     opacity: 1,
     fontSize: 22,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -10,
+    backgroundColor: Colors.dark.accent,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: Colors.dark.background,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 9,
+    lineHeight: 12,
   },
   label: {
     fontSize: 10,

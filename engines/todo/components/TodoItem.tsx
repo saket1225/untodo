@@ -1,10 +1,15 @@
 import { useRef, memo, useState, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Animated, PanResponder,
+  View, Text, TouchableOpacity, StyleSheet, Animated, PanResponder, Alert, Dimensions,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Todo, CATEGORIES, PRIORITY_CONFIG } from '../types';
 import { useTodoStore } from '../store';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SWIPE_COMPLETE_THRESHOLD = 80;
+const SWIPE_DELETE_THRESHOLD = -100;
 
 interface Props {
   todo: Todo;
@@ -47,6 +52,7 @@ function LiveTimer({ startedAt, baseSeconds }: { startedAt: string; baseSeconds:
 function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props) {
   const translateX = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
   const startTimeTracking = useTodoStore(s => s.startTimeTracking);
   const stopTimeTracking = useTodoStore(s => s.stopTimeTracking);
 
@@ -57,23 +63,80 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 20 && Math.abs(gs.dy) < 20,
       onPanResponderMove: (_, gs) => {
-        if (gs.dx < 0) translateX.setValue(gs.dx);
+        // Allow right swipe only if not completed, allow left swipe always
+        if (gs.dx > 0 && !todo.completed) {
+          translateX.setValue(gs.dx);
+        } else if (gs.dx < 0) {
+          translateX.setValue(gs.dx);
+        }
       },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dx < -100) {
-          Animated.timing(translateX, { toValue: -400, duration: 200, useNativeDriver: true }).start(onDelete);
+        if (gs.dx > SWIPE_COMPLETE_THRESHOLD && !todo.completed) {
+          // Swipe right -> complete task with satisfying animation
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Animated.parallel([
+            Animated.timing(translateX, { toValue: SCREEN_WIDTH, duration: 250, useNativeDriver: true }),
+            Animated.timing(opacityAnim, { toValue: 0.3, duration: 250, useNativeDriver: true }),
+          ]).start(() => {
+            if (isTracking) stopTimeTracking(todo.id);
+            onToggle();
+            // Reset for re-render
+            translateX.setValue(0);
+            opacityAnim.setValue(1);
+          });
+        } else if (gs.dx < SWIPE_DELETE_THRESHOLD) {
+          // Swipe left -> delete with confirmation
+          Animated.spring(translateX, { toValue: -120, useNativeDriver: true, friction: 8 }).start();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          Alert.alert(
+            'Delete task?',
+            todo.title,
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+                onPress: () => {
+                  Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+                },
+              },
+              {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: () => {
+                  Animated.parallel([
+                    Animated.timing(translateX, { toValue: -SCREEN_WIDTH, duration: 200, useNativeDriver: true }),
+                    Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+                  ]).start(() => {
+                    onDelete();
+                    translateX.setValue(0);
+                    opacityAnim.setValue(1);
+                  });
+                },
+              },
+            ]
+          );
         } else {
-          Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 8 }).start();
         }
       },
     })
   ).current;
 
   const handleToggle = () => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, { toValue: 0.95, duration: 80, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4 }),
-    ]).start();
+    if (!todo.completed) {
+      // Completing - satisfying animation
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Animated.sequence([
+        Animated.timing(scaleAnim, { toValue: 0.92, duration: 100, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4, tension: 200 }),
+      ]).start();
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Animated.sequence([
+        Animated.timing(scaleAnim, { toValue: 0.95, duration: 80, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4 }),
+      ]).start();
+    }
     if (!todo.completed && isTracking) {
       stopTimeTracking(todo.id);
     }
@@ -81,6 +144,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
   };
 
   const toggleTracking = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isTracking) {
       stopTimeTracking(todo.id);
     } else {
@@ -94,11 +158,30 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
   const subtasks = todo.subtasks || [];
   const subtasksDone = subtasks.filter(s => s.completed).length;
 
+  // Interpolate background colors for swipe hints
+  const completeBackgroundOpacity = translateX.interpolate({
+    inputRange: [0, SWIPE_COMPLETE_THRESHOLD],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const deleteBackgroundOpacity = translateX.interpolate({
+    inputRange: [SWIPE_DELETE_THRESHOLD, 0],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
   return (
-    <View style={styles.wrapper}>
-      <View style={styles.deleteBackground}>
+    <Animated.View style={[styles.wrapper, { opacity: opacityAnim }]}>
+      {/* Complete background (green, left side) */}
+      {!todo.completed && (
+        <Animated.View style={[styles.completeBackground, { opacity: completeBackgroundOpacity }]}>
+          <Text style={styles.completeText}>✓ Done</Text>
+        </Animated.View>
+      )}
+      {/* Delete background (red, right side) */}
+      <Animated.View style={[styles.deleteBackground, { opacity: deleteBackgroundOpacity }]}>
         <Text style={styles.deleteText}>Delete</Text>
-      </View>
+      </Animated.View>
       <Animated.View
         style={[
           styles.container,
@@ -126,7 +209,9 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
         >
           <View style={styles.titleRow}>
             {todo.carriedOverFrom && (
-              <Text style={styles.carriedOverArrow}>↩</Text>
+              <View style={styles.carriedOverBadge}>
+                <Text style={styles.carriedOverArrow}>↩</Text>
+              </View>
             )}
             {categoryInfo && (
               <View style={[styles.categoryDot, { backgroundColor: categoryInfo.color }]} />
@@ -177,7 +262,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
           </TouchableOpacity>
         )}
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -207,6 +292,23 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.dark.border,
+    overflow: 'hidden',
+  },
+  completeBackground: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: '100%',
+    backgroundColor: Colors.dark.success,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    paddingLeft: Spacing.lg,
+  },
+  completeText: {
+    color: '#000',
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 14,
   },
   deleteBackground: {
     position: 'absolute',
@@ -215,7 +317,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     backgroundColor: Colors.dark.error,
-    borderRadius: 0,
     justifyContent: 'center',
     alignItems: 'flex-end',
     paddingRight: Spacing.lg,
@@ -267,10 +368,15 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 6,
   },
+  carriedOverBadge: {
+    backgroundColor: Colors.dark.timer + '22',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
   carriedOverArrow: {
-    color: Colors.dark.textTertiary,
+    color: Colors.dark.timer,
     fontSize: 11,
-    opacity: 0.6,
   },
   categoryDot: {
     width: 7,

@@ -141,14 +141,35 @@ function TodaySummaryCard() {
   const todos = useTodoStore(s => s.todos);
   const logicalDate = getLogicalDate();
 
-  const { completed, total, pomodoroMins, streak } = useMemo(() => {
+  const { completed, total, pomodoroMins, streak, focusToday, weekRate } = useMemo(() => {
     const todayTodos = todos.filter(t => t.logicalDate === logicalDate);
     const completed = todayTodos.filter(t => t.completed).length;
     const total = todayTodos.length;
     const pomodoroMins = todayTodos.reduce((s, t) => s + (t.pomodoroMinutesLogged || 0), 0);
 
+    // Calculate focus time (pomodoro + time tracking)
+    const focusToday = todayTodos.reduce((s, t) => {
+      let mins = t.pomodoroMinutesLogged || 0;
+      if (t.timeTracking?.totalSeconds) mins += Math.floor(t.timeTracking.totalSeconds / 60);
+      return s + mins;
+    }, 0);
+
+    // Weekly completion rate
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    let weekTotal = 0, weekCompleted = 0;
+    for (const t of todos) {
+      if (!t.logicalDate) continue;
+      const d = new Date(t.logicalDate + 'T00:00:00');
+      if (d >= weekAgo && d <= today) {
+        weekTotal++;
+        if (t.completed) weekCompleted++;
+      }
+    }
+    const weekRate = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
+
     let streak = 0;
     for (let i = 0; i < 365; i++) {
       const d = new Date(today);
@@ -162,7 +183,7 @@ function TodaySummaryCard() {
       if (dayTotal > 0 && rate >= 0.5) streak++;
       else if (dayTotal > 0) break;
     }
-    return { completed, total, pomodoroMins, streak };
+    return { completed, total, pomodoroMins, streak, focusToday, weekRate };
   }, [todos, logicalDate]);
 
   const progress = total > 0 ? completed / total : 0;
@@ -176,6 +197,15 @@ function TodaySummaryCard() {
 
   return (
     <View style={styles.todayCard}>
+      {/* Prominent streak banner */}
+      {streak > 0 && (
+        <View style={styles.streakBanner}>
+          <Text style={styles.streakBannerFire}>🔥</Text>
+          <Text style={styles.streakBannerNum}>{streak}</Text>
+          <Text style={styles.streakBannerLabel}>day streak</Text>
+        </View>
+      )}
+
       <View style={styles.todayCardInner}>
         <View style={styles.todayRingContainer}>
           <Svg width={size} height={size}>
@@ -203,15 +233,15 @@ function TodaySummaryCard() {
             <Text style={styles.todayStatValue}>{completed}/{total}</Text>
             <Text style={styles.todayStatLabel}>tasks done</Text>
           </View>
-          {pomodoroMins > 0 && (
+          {focusToday > 0 && (
             <View style={styles.todayStatRow}>
-              <Text style={[styles.todayStatValue, { color: Colors.dark.timer }]}>{pomodoroMins}</Text>
+              <Text style={[styles.todayStatValue, { color: Colors.dark.timer }]}>{focusToday}</Text>
               <Text style={styles.todayStatLabel}>focus mins</Text>
             </View>
           )}
           <View style={styles.todayStatRow}>
-            <Text style={styles.todayStatValue}>{streak}</Text>
-            <Text style={styles.todayStatLabel}>day streak</Text>
+            <Text style={[styles.todayStatValue, { color: Colors.dark.success }]}>{weekRate}%</Text>
+            <Text style={styles.todayStatLabel}>this week</Text>
           </View>
         </View>
       </View>
@@ -652,6 +682,29 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 12,
   },
+  streakBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.dark.border,
+  },
+  streakBannerFire: {
+    fontSize: 24,
+  },
+  streakBannerNum: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accent,
+    fontSize: 32,
+    lineHeight: 36,
+  },
+  streakBannerLabel: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+  },
   todayCardInner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -963,6 +1016,7 @@ const styles = StyleSheet.create({
     height: BAR_MAX_HEIGHT + 44,
     marginBottom: Spacing.lg,
     paddingHorizontal: Spacing.xs,
+    gap: 6,
   },
   barCol: {
     flex: 1,
@@ -976,16 +1030,18 @@ const styles = StyleSheet.create({
     height: 14,
   },
   barTrack: {
-    width: 28,
+    width: '100%',
+    maxWidth: 36,
     height: BAR_MAX_HEIGHT,
     justifyContent: 'flex-end',
-    borderRadius: 6,
+    borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
+    backgroundColor: Colors.dark.surface,
   },
   barFill: {
     width: '100%',
-    borderRadius: 6,
+    borderRadius: 8,
     zIndex: 2,
   },
   barGlow: {
@@ -993,7 +1049,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: -4,
     right: -4,
-    borderRadius: 8,
+    borderRadius: 10,
     zIndex: 1,
   },
   barLabel: {
