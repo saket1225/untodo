@@ -1,9 +1,10 @@
-import { useState, memo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
+import { useState, memo, useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, LayoutAnimation } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { format, addDays } from 'date-fns';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Todo, Priority, Category, CATEGORIES, PRIORITY_CONFIG } from '../types';
-import { useTodoStore } from '../store';
+import { getLogicalDate } from '../../../lib/date-utils';
 
 interface Props {
   todo: Todo;
@@ -16,17 +17,9 @@ interface Props {
 function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(todo.title);
-  const [editingEstimate, setEditingEstimate] = useState(false);
-  const [estimate, setEstimate] = useState(String(todo.estimatedMinutes || ''));
-  const [editingNote, setEditingNote] = useState(false);
-  const [noteText, setNoteText] = useState(todo.notes || '');
-  const [addingSubtask, setAddingSubtask] = useState(false);
-  const [subtaskTitle, setSubtaskTitle] = useState('');
-  const [showSubtasks, setShowSubtasks] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const addSubtask = useTodoStore(s => s.addSubtask);
-  const toggleSubtask = useTodoStore(s => s.toggleSubtask);
-  const deleteSubtask = useTodoStore(s => s.deleteSubtask);
+  const today = useMemo(() => getLogicalDate(), []);
 
   const handlePriority = (p: Priority) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -50,32 +43,24 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
     onClose();
   };
 
-  const handleSaveEstimate = () => {
+  const handleScheduleDate = (dateStr: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const mins = parseInt(estimate);
-    onUpdate(todo.id, { estimatedMinutes: mins > 0 ? mins : undefined });
-    setEditingEstimate(false);
+    onUpdate(todo.id, { logicalDate: dateStr });
+    setShowDatePicker(false);
     onClose();
   };
 
-  const handleSaveNote = () => {
+  const handleRecurrence = (type: 'none' | 'daily' | 'custom') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onUpdate(todo.id, { notes: noteText });
-    setEditingNote(false);
-  };
-
-  const handleAddSubtask = () => {
-    const trimmed = subtaskTitle.trim();
-    if (trimmed) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      addSubtask(todo.id, trimmed);
-      setSubtaskTitle('');
+    if (type === 'none') {
+      onUpdate(todo.id, { recurrence: undefined });
+    } else if (type === 'daily') {
+      onUpdate(todo.id, { recurrence: { type: 'daily' } });
+    } else {
+      const dayOfWeek = new Date().getDay();
+      onUpdate(todo.id, { recurrence: { type: 'custom', days: todo.recurrence?.days || [dayOfWeek] } });
     }
-    setAddingSubtask(false);
   };
-
-  const subtasks = todo.subtasks || [];
-  const subtasksDone = subtasks.filter(s => s.completed).length;
 
   const handleMoveToTomorrow = () => {
     const tomorrow = new Date();
@@ -88,6 +73,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
 
   const handleDelete = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onDelete(todo.id);
     onClose();
   };
@@ -98,246 +84,169 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
         <View style={styles.sheet} onStartShouldSetResponder={() => true}>
           <View style={styles.handle} />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" bounces={false}>
-          <Text style={styles.taskTitle} numberOfLines={1}>{todo.title}</Text>
+            <Text style={styles.taskTitle} numberOfLines={2}>{todo.title}</Text>
 
-          {/* Edit title */}
-          {editingTitle ? (
-            <View style={styles.editRow}>
-              <TextInput
-                style={styles.editInput}
-                value={title}
-                onChangeText={setTitle}
-                autoFocus
-                onSubmitEditing={handleSaveTitle}
-                returnKeyType="done"
-                accessibilityLabel="Edit task title"
-              />
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveTitle} accessibilityLabel="Save title" accessibilityRole="button">
-                <Text style={styles.saveBtnText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.actionRow} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setEditingTitle(true); }} accessibilityLabel="Edit title" accessibilityRole="button">
-              <Text style={styles.actionIcon}>✎</Text>
-              <Text style={styles.actionText}>Edit title</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Priority */}
-          <Text style={styles.sectionLabel}>Priority</Text>
-          <View style={styles.priorityRow}>
-            {([null, 'low', 'medium', 'high'] as Priority[]).map(p => {
-              const isActive = todo.priority === p;
-              const color = p ? PRIORITY_CONFIG[p].color : Colors.dark.textTertiary;
-              return (
-                <TouchableOpacity
-                  key={String(p)}
-                  style={[styles.priorityChip, isActive && { backgroundColor: color, borderColor: color }]}
-                  onPress={() => handlePriority(p)}
-                >
-                  <Text style={[styles.priorityChipText, isActive && { color: Colors.dark.background }]}>
-                    {p ? PRIORITY_CONFIG[p].label : 'None'}
-                  </Text>
+            {/* Edit title */}
+            {editingTitle ? (
+              <View style={styles.editRow}>
+                <TextInput
+                  style={styles.editInput}
+                  value={title}
+                  onChangeText={setTitle}
+                  autoFocus
+                  onSubmitEditing={handleSaveTitle}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveTitle}>
+                  <Text style={styles.saveBtnText}>Save</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Category */}
-          <Text style={styles.sectionLabel}>Category</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
-            <TouchableOpacity
-              style={[styles.catChip, !todo.category && styles.catChipActive]}
-              onPress={() => handleCategory(null)}
-            >
-              <Text style={[styles.catChipText, !todo.category && styles.catChipTextActive]}>None</Text>
-            </TouchableOpacity>
-            {CATEGORIES.map(c => (
-              <TouchableOpacity
-                key={c.key}
-                style={[styles.catChip, todo.category === c.key && { backgroundColor: c.color, borderColor: c.color }]}
-                onPress={() => handleCategory(c.key)}
-              >
-                <Text style={[styles.catChipText, todo.category === c.key && { color: Colors.dark.background }]}>
-                  {c.label}
-                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.actionRow} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setEditingTitle(true); }}>
+                <Text style={styles.actionIcon}>✏️</Text>
+                <Text style={styles.actionText}>Edit</Text>
+                <Text style={styles.actionMeta} numberOfLines={1}>{todo.title}</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+            )}
 
-          {/* Estimated time */}
-          {editingEstimate ? (
-            <View style={styles.editRow}>
-              <TextInput
-                style={styles.editInput}
-                value={estimate}
-                onChangeText={setEstimate}
-                keyboardType="number-pad"
-                placeholder="minutes"
-                placeholderTextColor={Colors.dark.textTertiary}
-                autoFocus
-                onSubmitEditing={handleSaveEstimate}
-                returnKeyType="done"
-              />
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEstimate}>
-                <Text style={styles.saveBtnText}>Set</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.actionRow} onPress={() => setEditingEstimate(true)}>
-              <Text style={styles.actionIcon}>⏱</Text>
-              <Text style={styles.actionText}>
-                {todo.estimatedMinutes ? `Estimated: ${todo.estimatedMinutes}m` : 'Set estimated time'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Subtasks */}
-          {subtasks.length > 0 && !showSubtasks && (
-            <TouchableOpacity style={styles.actionRow} onPress={() => setShowSubtasks(true)}>
-              <Text style={styles.actionIcon}>☐</Text>
-              <Text style={styles.actionText}>Subtasks ({subtasksDone}/{subtasks.length})</Text>
-            </TouchableOpacity>
-          )}
-          {showSubtasks && subtasks.length > 0 && (
-            <View style={styles.subtaskList}>
-              <Text style={styles.sectionLabel}>Subtasks</Text>
-              {subtasks.map(s => (
-                <View key={s.id} style={styles.subtaskRow}>
-                  <TouchableOpacity onPress={() => toggleSubtask(todo.id, s.id)}>
-                    <View style={[styles.subtaskCheck, s.completed && styles.subtaskCheckDone]}>
-                      {s.completed && <Text style={styles.subtaskCheckmark}>✓</Text>}
-                    </View>
-                  </TouchableOpacity>
-                  <Text style={[styles.subtaskText, s.completed && styles.subtaskTextDone]}>{s.title}</Text>
-                  <TouchableOpacity onPress={() => deleteSubtask(todo.id, s.id)}>
-                    <Text style={styles.subtaskDelete}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-          {addingSubtask ? (
-            <View style={styles.editRow}>
-              <TextInput
-                style={styles.editInput}
-                value={subtaskTitle}
-                onChangeText={setSubtaskTitle}
-                placeholder="Subtask title"
-                placeholderTextColor={Colors.dark.textTertiary}
-                autoFocus
-                onSubmitEditing={handleAddSubtask}
-                returnKeyType="done"
-              />
-              <TouchableOpacity style={styles.saveBtn} onPress={handleAddSubtask}>
-                <Text style={styles.saveBtnText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.actionRow} onPress={() => setAddingSubtask(true)}>
-              <Text style={styles.actionIcon}>+</Text>
-              <Text style={styles.actionText}>Add subtask</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Notes */}
-          {editingNote ? (
-            <View style={styles.editRow}>
-              <TextInput
-                style={[styles.editInput, { minHeight: 60 }]}
-                value={noteText}
-                onChangeText={setNoteText}
-                placeholder="Add a note..."
-                placeholderTextColor={Colors.dark.textTertiary}
-                autoFocus
-                multiline
-              />
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveNote}>
-                <Text style={styles.saveBtnText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.actionRow} onPress={() => setEditingNote(true)}>
-              <Text style={styles.actionIcon}>📝</Text>
-              <Text style={styles.actionText}>
-                {todo.notes ? 'Edit note' : 'Add note'}
-              </Text>
-            </TouchableOpacity>
-          )}
-          {todo.notes && !editingNote ? (
-            <Text style={styles.notePreview} numberOfLines={2}>{todo.notes}</Text>
-          ) : null}
-
-          {/* Make recurring */}
-          <Text style={styles.sectionLabel}>Recurring</Text>
-          <View style={styles.priorityRow}>
-            <TouchableOpacity
-              style={[styles.priorityChip, !todo.recurrence && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onUpdate(todo.id, { recurrence: undefined });
-              }}
-            >
-              <Text style={[styles.priorityChipText, !todo.recurrence && { color: Colors.dark.background }]}>None</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.priorityChip, todo.recurrence?.type === 'daily' && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onUpdate(todo.id, { recurrence: { type: 'daily' } });
-              }}
-            >
-              <Text style={[styles.priorityChipText, todo.recurrence?.type === 'daily' && { color: Colors.dark.background }]}>Daily</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.priorityChip, (todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                const dayOfWeek = new Date().getDay();
-                onUpdate(todo.id, { recurrence: { type: 'custom', days: todo.recurrence?.days || [dayOfWeek] } });
-              }}
-            >
-              <Text style={[styles.priorityChipText, (todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && { color: Colors.dark.background }]}>Custom</Text>
-            </TouchableOpacity>
-          </View>
-          {/* Day picker for custom recurrence */}
-          {(todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && (
-            <View style={styles.dayPickerRow}>
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, idx) => {
-                const isSelected = (todo.recurrence?.days || []).includes(idx);
+            {/* Priority */}
+            <Text style={styles.sectionLabel}>PRIORITY</Text>
+            <View style={styles.chipRow}>
+              {([null, 'low', 'medium', 'high'] as Priority[]).map(p => {
+                const isActive = todo.priority === p;
+                const color = p ? PRIORITY_CONFIG[p].color : Colors.dark.textTertiary;
                 return (
                   <TouchableOpacity
-                    key={idx}
-                    style={[styles.dayChip, isSelected && styles.dayChipActive]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      const currentDays = todo.recurrence?.days || [];
-                      const newDays = isSelected
-                        ? currentDays.filter(d => d !== idx)
-                        : [...currentDays, idx];
-                      if (newDays.length > 0) {
-                        onUpdate(todo.id, { recurrence: { type: 'custom', days: newDays } });
-                      }
-                    }}
+                    key={String(p)}
+                    style={[styles.chip, isActive && { backgroundColor: color, borderColor: color }]}
+                    onPress={() => handlePriority(p)}
                   >
-                    <Text style={[styles.dayChipText, isSelected && styles.dayChipTextActive]}>{label}</Text>
+                    <Text style={[styles.chipText, isActive && { color: Colors.dark.background }]}>
+                      {p ? PRIORITY_CONFIG[p].label : 'None'}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-          )}
 
-          {/* Move to tomorrow */}
-          <TouchableOpacity style={styles.actionRow} onPress={handleMoveToTomorrow} accessibilityLabel="Move task to tomorrow" accessibilityRole="button">
-            <Text style={styles.actionIcon}>→</Text>
-            <Text style={styles.actionText}>Move to tomorrow</Text>
-          </TouchableOpacity>
+            {/* Category */}
+            <Text style={styles.sectionLabel}>CATEGORY</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScrollOuter}>
+              <View style={styles.chipRow}>
+                <TouchableOpacity
+                  style={[styles.chip, !todo.category && styles.chipActive]}
+                  onPress={() => handleCategory(null)}
+                >
+                  <Text style={[styles.chipText, !todo.category && styles.chipTextActive]}>None</Text>
+                </TouchableOpacity>
+                {CATEGORIES.map(c => (
+                  <TouchableOpacity
+                    key={c.key}
+                    style={[styles.chip, todo.category === c.key && { backgroundColor: c.color, borderColor: c.color }]}
+                    onPress={() => handleCategory(c.key)}
+                  >
+                    <Text style={[styles.chipText, todo.category === c.key && { color: Colors.dark.background }]}>
+                      {c.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
 
-          {/* Delete */}
-          <TouchableOpacity style={[styles.actionRow, styles.deleteRow]} onPress={handleDelete} accessibilityLabel="Delete task" accessibilityRole="button">
-            <Text style={[styles.actionIcon, { color: Colors.dark.error }]}>✕</Text>
-            <Text style={[styles.actionText, { color: Colors.dark.error }]}>Delete</Text>
-          </TouchableOpacity>
+            {/* Recurrence */}
+            <Text style={styles.sectionLabel}>RECURRENCE</Text>
+            <View style={styles.chipRow}>
+              <TouchableOpacity
+                style={[styles.chip, !todo.recurrence && styles.chipActive]}
+                onPress={() => handleRecurrence('none')}
+              >
+                <Text style={[styles.chipText, !todo.recurrence && styles.chipTextActive]}>None</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.chip, todo.recurrence?.type === 'daily' && styles.chipActive]}
+                onPress={() => handleRecurrence('daily')}
+              >
+                <Text style={[styles.chipText, todo.recurrence?.type === 'daily' && styles.chipTextActive]}>🔁 Daily</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.chip, (todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && styles.chipActive]}
+                onPress={() => handleRecurrence('custom')}
+              >
+                <Text style={[styles.chipText, (todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && styles.chipTextActive]}>📅 Custom</Text>
+              </TouchableOpacity>
+            </View>
+            {(todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && (
+              <View style={styles.dayPickerRow}>
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, idx) => {
+                  const isSelected = (todo.recurrence?.days || []).includes(idx);
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      style={[styles.dayChip, isSelected && styles.dayChipActive]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        const currentDays = todo.recurrence?.days || [];
+                        const newDays = isSelected
+                          ? currentDays.filter(d => d !== idx)
+                          : [...currentDays, idx];
+                        if (newDays.length > 0) {
+                          onUpdate(todo.id, { recurrence: { type: 'custom', days: newDays } });
+                        }
+                      }}
+                    >
+                      <Text style={[styles.dayChipText, isSelected && styles.dayChipTextActive]}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Schedule for date */}
+            {showDatePicker ? (
+              <View style={styles.datePickerSection}>
+                <Text style={styles.sectionLabel}>SCHEDULE FOR</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.chipRow}>
+                    {[
+                      { label: 'Today', days: 0 },
+                      { label: 'Tomorrow', days: 1 },
+                      { label: 'In 2 days', days: 2 },
+                      { label: 'In 3 days', days: 3 },
+                      { label: 'Next week', days: 7 },
+                    ].map(opt => {
+                      const d = format(addDays(new Date(today + 'T12:00:00'), opt.days), 'yyyy-MM-dd');
+                      const isActive = todo.logicalDate === d;
+                      return (
+                        <TouchableOpacity
+                          key={opt.label}
+                          style={[styles.chip, isActive && styles.chipActive]}
+                          onPress={() => handleScheduleDate(d)}
+                        >
+                          <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{opt.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.actionRow} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowDatePicker(true); }}>
+                <Text style={styles.actionIcon}>📆</Text>
+                <Text style={styles.actionText}>Schedule for date</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Move to tomorrow */}
+            <TouchableOpacity style={styles.actionRow} onPress={handleMoveToTomorrow}>
+              <Text style={styles.actionIcon}>➡️</Text>
+              <Text style={styles.actionText}>Move to tomorrow</Text>
+            </TouchableOpacity>
+
+            {/* Delete */}
+            <TouchableOpacity style={[styles.actionRow, styles.deleteRow]} onPress={handleDelete}>
+              <Text style={styles.actionIcon}>🗑️</Text>
+              <Text style={[styles.actionText, { color: Colors.dark.error }]}>Delete</Text>
+            </TouchableOpacity>
           </ScrollView>
         </View>
       </TouchableOpacity>
@@ -357,7 +266,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     padding: Spacing.lg,
     paddingBottom: Spacing.xxl,
-    maxHeight: '70%',
+    maxHeight: '75%',
     borderWidth: 1,
     borderBottomWidth: 0,
     borderColor: Colors.dark.border,
@@ -379,22 +288,22 @@ const styles = StyleSheet.create({
     color: Colors.dark.text,
     fontFamily: Fonts.headingMedium,
     fontSize: 16,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   sectionLabel: {
     color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 10,
+    letterSpacing: 1.5,
     marginBottom: Spacing.sm,
     marginTop: Spacing.md,
   },
-  priorityRow: {
+  chipRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
+    flexWrap: 'wrap',
   },
-  priorityChip: {
+  chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 16,
@@ -402,45 +311,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.dark.border,
   },
-  priorityChipText: {
+  chipActive: {
+    backgroundColor: Colors.dark.accent,
+    borderColor: Colors.dark.accent,
+  },
+  chipText: {
     fontFamily: Fonts.bodyMedium,
     fontSize: 12,
     color: Colors.dark.textSecondary,
   },
-  catScroll: {
-    flexGrow: 0,
-  },
-  catChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    marginRight: Spacing.sm,
-  },
-  catChipActive: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
-  },
-  catChipText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    color: Colors.dark.textSecondary,
-  },
-  catChipTextActive: {
+  chipTextActive: {
     color: Colors.dark.background,
+  },
+  catScrollOuter: {
+    flexGrow: 0,
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
     paddingVertical: 14,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.dark.border,
   },
   actionIcon: {
-    color: Colors.dark.textSecondary,
     fontSize: 16,
     width: 24,
     textAlign: 'center',
@@ -449,6 +343,13 @@ const styles = StyleSheet.create({
     color: Colors.dark.text,
     fontFamily: Fonts.body,
     fontSize: 15,
+    flex: 1,
+  },
+  actionMeta: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    maxWidth: '40%',
   },
   deleteRow: {
     borderBottomWidth: 0,
@@ -459,7 +360,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.dark.border,
   },
   editInput: {
@@ -484,51 +385,6 @@ const styles = StyleSheet.create({
     color: Colors.dark.background,
     fontFamily: Fonts.bodyMedium,
     fontSize: 14,
-  },
-  subtaskList: {
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
-  },
-  subtaskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: 6,
-    paddingLeft: 4,
-  },
-  subtaskCheck: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: Colors.dark.textTertiary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  subtaskCheckDone: {
-    backgroundColor: Colors.dark.success,
-    borderColor: Colors.dark.success,
-  },
-  subtaskCheckmark: {
-    color: Colors.dark.background,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  subtaskText: {
-    flex: 1,
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-  },
-  subtaskTextDone: {
-    textDecorationLine: 'line-through',
-    color: Colors.dark.textTertiary,
-  },
-  subtaskDelete: {
-    color: Colors.dark.textTertiary,
-    fontSize: 12,
-    padding: 4,
   },
   dayPickerRow: {
     flexDirection: 'row',
@@ -558,13 +414,9 @@ const styles = StyleSheet.create({
   dayChipTextActive: {
     color: Colors.dark.background,
   },
-  notePreview: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 13,
-    paddingHorizontal: 4,
-    paddingBottom: Spacing.sm,
-    borderBottomWidth: 1,
+  datePickerSection: {
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.dark.border,
   },
 });

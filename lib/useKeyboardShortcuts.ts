@@ -2,8 +2,12 @@ import { useEffect, useCallback } from 'react';
 import { Platform } from 'react-native';
 
 /**
- * Keyboard shortcuts hook for web/desktop support.
- * No-ops on native platforms. On web, attaches keydown listeners.
+ * Keyboard shortcuts hook for web/desktop and hardware keyboard support.
+ * On web, attaches keydown listeners.
+ * On native, we rely on React Native's built-in hardware keyboard support
+ * which dispatches keyDown events on Android/iOS when a hardware keyboard
+ * is connected. For native, this is a no-op — hardware keyboard shortcuts
+ * are handled via onKeyPress on focusable components.
  */
 interface ShortcutHandlers {
   onNewTask?: () => void;
@@ -25,11 +29,16 @@ export function useKeyboardShortcuts(
       // Don't intercept when user is typing in an input/textarea
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea') {
-        // Only handle Enter in inputs
         if (e.key === 'Enter' && handlers.onSubmit) {
-          // Let the input's own onSubmitEditing handle it
           return;
         }
+        return;
+      }
+
+      // Cmd/Ctrl+N for new task
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        e.preventDefault();
+        handlers.onNewTask?.();
         return;
       }
 

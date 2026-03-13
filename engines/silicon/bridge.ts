@@ -133,7 +133,6 @@ async function processCommand(command: SiliconCommand, username: string): Promis
         break;
       }
       case 'nudge': {
-        console.log('[Silicon] Nudge received:', command.payload);
         result = { message: 'Nudge received (notifications coming soon)' };
         break;
       }
@@ -192,6 +191,5 @@ export function startSiliconListener(username: string): () => void {
     console.error('[Silicon] Firestore listener error:', error);
   });
 
-  console.log(`[Silicon] Listening for commands for user: ${username}`);
   return unsubscribe;
 }
