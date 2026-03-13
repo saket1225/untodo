@@ -10,25 +10,29 @@ interface WallpaperStore {
   updateConfig: (updates: Partial<WallpaperConfig>) => void;
 }
 
+const DEFAULT_CONFIG: WallpaperConfig = {
+  enabled: true,
+  dotSize: 6,
+  spacing: 14,
+  opacity: 1,
+  showQuote: true,
+  showDayCount: true,
+  showStreak: true,
+  cols: 25,
+  goalTitle: '20',
+  goalDate: '2028-01-12',
+  showDaysLeft: true,
+  wallpaperEnabled: false,
+  lastWallpaperDate: null,
+  preset: 'full',
+  colorTheme: 'classic',
+  customQuote: '',
+};
+
 export const useWallpaperStore = create<WallpaperStore>()(
   persist(
     (set, get) => ({
-      config: {
-        enabled: true,
-        dotSize: 6,
-        spacing: 14,
-        opacity: 1,
-        showQuote: true,
-        showDayCount: true,
-        showStreak: true,
-        cols: 25,
-        goalTitle: '20',
-        goalDate: '2028-01-12',
-        showDaysLeft: true,
-        wallpaperEnabled: false,
-        lastWallpaperDate: null,
-        preset: 'full' as const,
-      },
+      config: { ...DEFAULT_CONFIG },
       updateConfig: (updates) => {
         set((s) => ({ config: { ...s.config, ...updates } }));
         const username = useUserStore.getState().username;
@@ -40,32 +44,20 @@ export const useWallpaperStore = create<WallpaperStore>()(
     {
       name: 'untodo-wallpaper',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      version: 2,
       migrate: (persisted: any, version: number) => {
-        if (version === 0 || !version) {
-          const state = persisted as { config?: any };
-          const config = state.config || {};
-          return {
-            ...state,
-            config: {
-              enabled: config.enabled ?? true,
-              dotSize: config.dotSize ?? 6,
-              spacing: config.spacing ?? 14,
-              opacity: config.opacity ?? 1,
-              showQuote: config.showQuote ?? true,
-              showDayCount: config.showDayCount ?? true,
-              showStreak: config.showStreak ?? true,
-              cols: config.cols ?? 25,
-              goalTitle: config.goalTitle ?? '20',
-              goalDate: config.goalDate ?? '2028-01-12',
-              showDaysLeft: config.showDaysLeft ?? true,
-              wallpaperEnabled: config.wallpaperEnabled ?? false,
-              lastWallpaperDate: config.lastWallpaperDate ?? null,
-              preset: config.preset ?? 'full',
-            },
-          };
-        }
-        return persisted as WallpaperStore;
+        const state = persisted as { config?: any };
+        const config = state.config || {};
+        return {
+          ...state,
+          config: {
+            ...DEFAULT_CONFIG,
+            ...config,
+            colorTheme: config.colorTheme ?? 'classic',
+            customQuote: config.customQuote ?? '',
+            preset: config.preset ?? 'full',
+          },
+        };
       },
     }
   )

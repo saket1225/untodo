@@ -1,4 +1,6 @@
-export type WallpaperPreset = 'minimal' | 'countdown' | 'full';
+export type WallpaperPreset = 'minimal' | 'countdown' | 'full' | 'stats';
+
+export type DotColorTheme = 'classic' | 'green' | 'blue' | 'warm';
 
 export interface WallpaperConfig {
   enabled: boolean;
@@ -15,6 +17,8 @@ export interface WallpaperConfig {
   wallpaperEnabled: boolean;
   lastWallpaperDate: string | null;
   preset: WallpaperPreset;
+  colorTheme: DotColorTheme;
+  customQuote: string;
 }
 
 export interface DayData {
