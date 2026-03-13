@@ -126,9 +126,9 @@ export function computeAnalytics(todos: Todo[]): AnalyticsData {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Heatmap: last 28 days
+  // Heatmap: last 91 days (13 weeks) for GitHub-style contribution graph
   const heatmap: { date: string; count: number; rate: number }[] = [];
-  for (let i = 27; i >= 0; i--) {
+  for (let i = 90; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
     const dateStr = d.toISOString().split('T')[0];

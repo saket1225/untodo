@@ -11,20 +11,58 @@ import { getLogicalDate } from '../../lib/date-utils';
 import { computeAnalytics, AnalyticsData } from '../../lib/insights';
 import { format } from 'date-fns';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import WeeklyReviewComponent from '../../engines/progress/components/WeeklyReview';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const BAR_MAX_HEIGHT = 120;
 
-// --- Heatmap Component ---
-function WeeklyHeatmap({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
-  // 4 weeks x 7 days grid
-  const weeks: typeof heatmap[] = [];
-  for (let i = 0; i < 4; i++) {
-    weeks.push(heatmap.slice(i * 7, (i + 1) * 7));
-  }
+// --- GitHub-style Contribution Graph ---
+function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
+  const graphData = useMemo(() => {
+    // Organize into weeks (columns) with days (rows), GitHub-style
+    const firstDate = new Date(heatmap[0].date + 'T12:00:00');
+    const firstDayOfWeek = (firstDate.getDay() + 6) % 7; // 0=Mon, 6=Sun
 
-  const getColor = (rate: number, count: number) => {
+    // Build padded data
+    const padded = [
+      ...Array(firstDayOfWeek).fill({ date: '', count: 0, rate: 0 }),
+      ...heatmap,
+    ];
+
+    // Split into weeks (columns)
+    const weeks: typeof heatmap[] = [];
+    for (let i = 0; i < padded.length; i += 7) {
+      const week = padded.slice(i, i + 7);
+      while (week.length < 7) week.push({ date: '', count: 0, rate: 0 });
+      weeks.push(week);
+    }
+
+    // Month labels: find first occurrence of each month
+    const monthLabels: { label: string; weekIndex: number }[] = [];
+    let lastMonth = -1;
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    weeks.forEach((week, wi) => {
+      for (const day of week) {
+        if (!day.date) continue;
+        const d = new Date(day.date + 'T12:00:00');
+        const month = d.getMonth();
+        if (month !== lastMonth) {
+          lastMonth = month;
+          monthLabels.push({ label: monthNames[month], weekIndex: wi });
+          break;
+        }
+      }
+    });
+
+    const totalCompleted = heatmap.reduce((s, d) => s + d.count, 0);
+    const activeDays = heatmap.filter(d => d.count > 0).length;
+
+    return { weeks, monthLabels, totalCompleted, activeDays };
+  }, [heatmap]);
+
+  const getColor = (rate: number, count: number, date: string) => {
+    if (!date) return 'transparent';
     if (count === 0) return Colors.dark.border;
     if (rate >= 0.9) return Colors.dark.success;
     if (rate >= 0.7) return '#4ADE80AA';
@@ -33,31 +71,63 @@ function WeeklyHeatmap({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
     return Colors.dark.surfaceHover;
   };
 
+  const numWeeks = graphData.weeks.length;
+  const cellSize = Math.min(Math.floor((SCREEN_WIDTH - Spacing.lg * 2 - 20 - numWeeks * 2) / numWeeks), 14);
+  const gap = 2;
+
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Activity (4 Weeks)</Text>
+      <View style={styles.heatmapHeader}>
+        <Text style={styles.sectionTitle}>Activity</Text>
+        <Text style={styles.heatmapSummary}>
+          {graphData.totalCompleted} done in {graphData.activeDays} day{graphData.activeDays !== 1 ? 's' : ''}
+        </Text>
+      </View>
+
+      {/* Month labels */}
+      <View style={[styles.monthLabelsRow, { marginLeft: 20 }]}>
+        {graphData.weeks.map((_, wi) => {
+          const label = graphData.monthLabels.find(m => m.weekIndex === wi);
+          return (
+            <Text
+              key={wi}
+              style={[styles.monthLabel, { width: cellSize + gap }]}
+              numberOfLines={1}
+            >
+              {label ? label.label : ''}
+            </Text>
+          );
+        })}
+      </View>
+
       <View style={styles.heatmapContainer}>
-        <View style={styles.heatmapDayLabels}>
-          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-            <Text key={i} style={styles.heatmapDayLabel}>{d}</Text>
+        {/* Day labels */}
+        <View style={[styles.heatmapDayLabels, { gap }]}>
+          {['M', '', 'W', '', 'F', '', ''].map((d, i) => (
+            <Text key={i} style={[styles.heatmapDayLabel, { height: cellSize, lineHeight: cellSize }]}>{d}</Text>
           ))}
         </View>
-        <View style={styles.heatmapGrid}>
-          {weeks.map((week, wi) => (
-            <View key={wi} style={styles.heatmapWeek}>
+
+        {/* Grid */}
+        <View style={[styles.heatmapGrid, { gap }]}>
+          {graphData.weeks.map((week, wi) => (
+            <View key={wi} style={[styles.heatmapWeek, { gap }]}>
               {week.map((day, di) => (
                 <View
                   key={di}
-                  style={[
-                    styles.heatmapCell,
-                    { backgroundColor: getColor(day.rate, day.count) },
-                  ]}
+                  style={{
+                    width: cellSize,
+                    height: cellSize,
+                    backgroundColor: getColor(day.rate, day.count, day.date),
+                    borderRadius: 2,
+                  }}
                 />
               ))}
             </View>
           ))}
         </View>
       </View>
+
       <View style={styles.heatmapLegend}>
         <Text style={styles.heatmapLegendText}>Less</Text>
         {[Colors.dark.border, '#4ADE8033', '#4ADE8066', '#4ADE80AA', Colors.dark.success].map((c, i) => (
@@ -468,43 +538,6 @@ const DayRow = memo(function DayRow({ day }: { day: DaySummary }) {
   );
 });
 
-function WeeklyReviewSection() {
-  const reviews = useProgressStore(s => s.weeklyReviews);
-  const now = new Date();
-  const day = now.getDay();
-  const diff = day === 0 ? 6 : day - 1;
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - diff);
-  weekStart.setHours(0, 0, 0, 0);
-  const weekStartStr = weekStart.toISOString().split('T')[0];
-  const currentReview = reviews.find(r => r.weekStart === weekStartStr);
-
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Weekly Review</Text>
-      {currentReview ? (
-        <View style={styles.reviewCard}>
-          <Text style={styles.reviewText}>{currentReview.review}</Text>
-          <View style={styles.reviewStats}>
-            <Text style={styles.reviewStatText}>
-              {Math.round(currentReview.completionRate * 100)}% completion
-            </Text>
-            <Text style={styles.reviewStatText}>
-              {currentReview.totalCompleted}/{currentReview.totalTasks} tasks
-            </Text>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.reviewPlaceholder}>
-          <Text style={styles.reviewPlaceholderText}>
-            Silicon will write your weekly review on Sunday
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
 function ProgressEmptyHero() {
   const todos = useTodoStore(s => s.todos);
   if (todos.length > 0) return null;
@@ -630,14 +663,14 @@ function ProgressScreenContent() {
         ) : (
           <>
             <TodaySummaryCard />
-            <WeeklyHeatmap heatmap={analytics.heatmap} />
+            <ContributionGraph heatmap={analytics.heatmap} />
+            <WeeklyReviewComponent />
             <AnalyticsSummary analytics={analytics} />
             <CategoryBreakdown data={analytics.categoryBreakdown} />
             <TaskCompletionStreak />
             <WeeklyOverview />
             <Streaks />
             <DailyHistory />
-            <WeeklyReviewSection />
             <ShareSection analytics={analytics} />
           </>
         )}
@@ -769,34 +802,47 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
 
-  // Heatmap
+  // Contribution Graph (GitHub-style)
+  heatmapHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: Spacing.md,
+  },
+  heatmapSummary: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+  },
+  monthLabelsRow: {
+    flexDirection: 'row',
+    marginBottom: 2,
+  },
+  monthLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 9,
+  },
   heatmapContainer: {
     flexDirection: 'row',
-    gap: Spacing.sm,
+    gap: 4,
   },
   heatmapDayLabels: {
-    justifyContent: 'space-between',
-    paddingVertical: 2,
+    width: 16,
+    justifyContent: 'flex-start',
   },
   heatmapDayLabel: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 10,
-    height: 18,
-    lineHeight: 18,
+    fontSize: 9,
+    textAlign: 'right',
   },
   heatmapGrid: {
     flexDirection: 'row',
-    gap: 4,
     flex: 1,
   },
   heatmapWeek: {
-    flex: 1,
-    gap: 4,
-  },
-  heatmapCell: {
-    height: 18,
-    borderRadius: 3,
+    flexDirection: 'column',
   },
   heatmapLegend: {
     flexDirection: 'row',
@@ -1156,53 +1202,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     minWidth: 36,
     textAlign: 'right',
-  },
-
-  // Weekly review
-  reviewCard: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  reviewText: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: Spacing.md,
-  },
-  reviewStats: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
-    paddingTop: Spacing.sm,
-  },
-  reviewStatText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-  },
-  reviewPlaceholder: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.lg,
-    alignItems: 'center',
-  },
-  reviewPlaceholderText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 14,
-    textAlign: 'center',
   },
 
   // Share

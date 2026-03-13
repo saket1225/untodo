@@ -11,6 +11,7 @@ import {
   mergeTodos,
   bulkSyncTodosToFirestore,
 } from '../../lib/firebase-sync';
+import { refreshNotifications } from '../notifications/service';
 
 interface TodoStore {
   todos: Todo[];
@@ -72,6 +73,16 @@ function debouncedSyncTodo(todo: Todo) {
   }, 500);
 }
 
+// Debounced notification refresh
+let _notifRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
+function debouncedNotifRefresh() {
+  if (_notifRefreshTimeout) clearTimeout(_notifRefreshTimeout);
+  _notifRefreshTimeout = setTimeout(() => {
+    _notifRefreshTimeout = null;
+    refreshNotifications().catch(() => {});
+  }, 2000);
+}
+
 // Debounced toggle: prevent rapid-fire toggles
 let _toggleTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
@@ -115,6 +126,7 @@ export const useTodoStore = create<TodoStore>()(
         };
         set(state => ({ todos: [...state.todos, newTodo] }));
         debouncedSyncTodo(newTodo);
+        debouncedNotifRefresh();
       },
 
       toggleTodo: (id: string) => {
@@ -126,6 +138,7 @@ export const useTodoStore = create<TodoStore>()(
         }));
         const todo = get().todos.find(t => t.id === id);
         if (todo) debouncedToggleSync(todo);
+        debouncedNotifRefresh();
       },
 
       deleteTodo: (id: string) => {
