@@ -1,4 +1,4 @@
-import { useState, memo, useMemo } from 'react';
+import { useState, memo, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, LayoutAnimation } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { format, addDays } from 'date-fns';
@@ -18,6 +18,10 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(todo.title);
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  useEffect(() => {
+    setTitle(todo.title);
+  }, [todo.title]);
 
   const today = useMemo(() => getLogicalDate(), []);
 
@@ -291,10 +295,10 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   sectionLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 10,
-    letterSpacing: 1.5,
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 13,
+    letterSpacing: 1,
     marginBottom: Spacing.sm,
     marginTop: Spacing.md,
   },
@@ -330,7 +334,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    paddingVertical: 14,
+    paddingVertical: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.dark.border,
   },
@@ -366,9 +370,9 @@ const styles = StyleSheet.create({
   editInput: {
     flex: 1,
     backgroundColor: Colors.dark.background,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
     color: Colors.dark.text,
     fontFamily: Fonts.body,
     fontSize: 15,
@@ -378,8 +382,8 @@ const styles = StyleSheet.create({
   saveBtn: {
     backgroundColor: Colors.dark.accent,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   saveBtnText: {
     color: Colors.dark.background,

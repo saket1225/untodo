@@ -43,3 +43,21 @@ export const Fonts = {
 export const Spacing = {
   xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48,
 };
+
+export const Typography = {
+  heading: { fontFamily: Fonts.accentItalic, fontSize: 32 },
+  subheading: { fontFamily: Fonts.headingMedium, fontSize: 20 },
+  sectionTitle: { fontFamily: Fonts.headingMedium, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' as const },
+  body: { fontFamily: Fonts.body, fontSize: 15 },
+  bodyMedium: { fontFamily: Fonts.bodyMedium, fontSize: 15 },
+  caption: { fontFamily: Fonts.body, fontSize: 12 },
+  tiny: { fontFamily: Fonts.body, fontSize: 10 },
+};
+
+export const BorderRadius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  pill: 100,
+};

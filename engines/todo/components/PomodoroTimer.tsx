@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
   },
   presetChip: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 20,
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
@@ -536,7 +536,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     width: 48,
     height: 36,
-    borderRadius: 10,
+    borderRadius: 12,
     textAlign: 'center',
     borderWidth: 1,
     borderColor: Colors.dark.border,
@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     width: 56,
     height: 44,
-    borderRadius: 10,
+    borderRadius: 12,
     textAlign: 'center',
     borderWidth: 1,
     borderColor: Colors.dark.border,
@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
   logButton: {
     backgroundColor: Colors.dark.accent,
     paddingHorizontal: Spacing.xl,
-    paddingVertical: 14,
+    paddingVertical: Spacing.md,
     borderRadius: 12,
   },
   logButtonText: {
@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
   lostFocusButton: {
     marginTop: Spacing.xl,
     paddingHorizontal: 28,
-    paddingVertical: 14,
+    paddingVertical: Spacing.md,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.dark.border,

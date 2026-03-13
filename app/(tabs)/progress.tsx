@@ -20,6 +20,7 @@ const BAR_MAX_HEIGHT = 120;
 // --- GitHub-style Contribution Graph ---
 function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
   const graphData = useMemo(() => {
+    if (heatmap.length === 0) return { weeks: [], monthLabels: [], totalCompleted: 0, activeDays: 0 };
     // Organize into weeks (columns) with days (rows), GitHub-style
     const firstDate = new Date(heatmap[0].date + 'T12:00:00');
     const firstDayOfWeek = (firstDate.getDay() + 6) % 7; // 0=Mon, 6=Sun
@@ -70,6 +71,8 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
     if (rate >= 0.2) return '#4ADE8033';
     return Colors.dark.surfaceHover;
   };
+
+  if (graphData.weeks.length === 0) return null;
 
   const numWeeks = graphData.weeks.length;
   const cellSize = Math.min(Math.floor((SCREEN_WIDTH - Spacing.lg * 2 - 20 - numWeeks * 2) / numWeeks), 14);
@@ -594,13 +597,17 @@ function ShareSection({ analytics }: { analytics: AnalyticsData }) {
   };
 
   const weekPct = Math.round(weekStats.completionRate * 100);
-  const weekPomoMins = todos.reduce((sum, t) => {
-    const d = new Date(t.logicalDate + 'T12:00:00');
-    const now = new Date();
-    const dayDiff = Math.floor((now.getTime() - d.getTime()) / 86400000);
-    if (dayDiff <= 7) return sum + (t.pomodoroMinutesLogged || 0);
-    return sum;
-  }, 0);
+  const weekPomoMins = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    return todos.reduce((sum, t) => {
+      const d = new Date(t.logicalDate + 'T12:00:00');
+      if (d >= weekAgo && d <= today) return sum + (t.pomodoroMinutesLogged || 0);
+      return sum;
+    }, 0);
+  }, [todos]);
 
   return (
     <View style={styles.section}>
@@ -930,7 +937,7 @@ const styles = StyleSheet.create({
   streakCard: {
     flex: 1,
     backgroundColor: Colors.dark.surface,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: Spacing.md,
@@ -1135,7 +1142,7 @@ const styles = StyleSheet.create({
   habitRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.sm + 2,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.dark.border,
   },
@@ -1159,7 +1166,7 @@ const styles = StyleSheet.create({
 
   // Daily history
   dayRow: {
-    paddingVertical: Spacing.sm + 4,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.dark.border,
   },
@@ -1167,7 +1174,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: Spacing.xs + 2,
+    marginBottom: Spacing.sm,
   },
   dayDate: {
     color: Colors.dark.text,

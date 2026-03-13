@@ -327,7 +327,7 @@ const streakStyles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     marginHorizontal: Spacing.lg,
     backgroundColor: Colors.dark.timer + '15',
-    borderRadius: 10,
+    borderRadius: 12,
     marginTop: Spacing.xs,
   },
   bannerWarning: {
@@ -1421,7 +1421,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingVertical: 14,
+    paddingVertical: Spacing.md,
     marginTop: Spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.dark.border,
@@ -1476,7 +1476,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.dark.border,
   },
@@ -1669,7 +1669,7 @@ const styles = StyleSheet.create({
   modalPrimaryBtn: {
     backgroundColor: Colors.dark.accent,
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
     width: '100%',
     alignItems: 'center',
@@ -1687,7 +1687,7 @@ const styles = StyleSheet.create({
   },
   modalSecondaryBtn: {
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
     width: '100%',
     alignItems: 'center',
@@ -1699,7 +1699,7 @@ const styles = StyleSheet.create({
   },
   modalOutlineBtn: {
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
     width: '100%',
     alignItems: 'center',
@@ -1720,7 +1720,7 @@ const styles = StyleSheet.create({
   reviewItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.dark.border,
     gap: Spacing.md,

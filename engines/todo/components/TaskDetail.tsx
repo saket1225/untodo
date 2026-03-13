@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, memo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { format } from 'date-fns';
@@ -21,6 +21,14 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
   const [noteText, setNoteText] = useState(todo.notes || '');
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [subtaskTitle, setSubtaskTitle] = useState('');
+
+  useEffect(() => {
+    setTitle(todo.title);
+  }, [todo.title]);
+
+  useEffect(() => {
+    setNoteText(todo.notes || '');
+  }, [todo.notes]);
 
   const addSubtask = useTodoStore(s => s.addSubtask);
   const toggleSubtask = useTodoStore(s => s.toggleSubtask);
@@ -370,9 +378,9 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.headingMedium,
     fontSize: 20,
     backgroundColor: Colors.dark.background,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: Colors.dark.border,
   },
@@ -383,9 +391,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   sectionLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 13,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: Spacing.sm,
@@ -393,9 +401,9 @@ const styles = StyleSheet.create({
   },
   notesInput: {
     backgroundColor: Colors.dark.background,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
     color: Colors.dark.text,
     fontFamily: Fonts.body,
     fontSize: 14,
@@ -465,7 +473,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    paddingVertical: 6,
+    paddingVertical: Spacing.sm,
     paddingLeft: 4,
   },
   subtaskCheck: {
@@ -527,9 +535,9 @@ const styles = StyleSheet.create({
   editInput: {
     flex: 1,
     backgroundColor: Colors.dark.background,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
     color: Colors.dark.text,
     fontFamily: Fonts.body,
     fontSize: 15,
@@ -539,8 +547,8 @@ const styles = StyleSheet.create({
   saveBtn: {
     backgroundColor: Colors.dark.accent,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   saveBtnText: {
     color: Colors.dark.background,
@@ -550,7 +558,7 @@ const styles = StyleSheet.create({
   pomodoroBtn: {
     backgroundColor: Colors.dark.accent,
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: Spacing.md,
     alignItems: 'center',
     marginTop: Spacing.lg,
   },
@@ -563,7 +571,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    paddingVertical: 14,
+    paddingVertical: Spacing.md,
     borderTopWidth: 1,
     borderTopColor: Colors.dark.border,
     marginTop: Spacing.sm,

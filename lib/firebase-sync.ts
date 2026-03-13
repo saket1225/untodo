@@ -140,15 +140,19 @@ export async function syncWallpaperConfigToFirestore(username: string, config: W
 
 export async function bulkSyncTodosToFirestore(username: string, todos: Todo[]): Promise<void> {
   if (!username || todos.length === 0) return;
+  const BATCH_LIMIT = 500;
   try {
     setSyncing(true);
-    const batch = writeBatch(db);
-    for (const todo of todos) {
-      const ref = doc(db, `users/${username}/todos/${todo.id}`);
-      const { syncStatus, ...data } = todo;
-      batch.set(ref, data);
+    for (let i = 0; i < todos.length; i += BATCH_LIMIT) {
+      const chunk = todos.slice(i, i + BATCH_LIMIT);
+      const batch = writeBatch(db);
+      for (const todo of chunk) {
+        const ref = doc(db, `users/${username}/todos/${todo.id}`);
+        const { syncStatus, ...data } = todo;
+        batch.set(ref, data);
+      }
+      await batch.commit();
     }
-    await batch.commit();
   } catch (e) {
     console.warn('Firestore bulk sync failed:', e);
   } finally {
