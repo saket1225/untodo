@@ -26,6 +26,9 @@ interface Props {
   onDelete: () => void;
   onPress: () => void;
   onLongPress?: () => void;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
 }
 
 function formatTrackingTime(totalSeconds: number): string {
@@ -129,7 +132,7 @@ function CheckboxConfetti({ visible }: { visible: boolean }) {
   );
 }
 
-function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props) {
+function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, selectionMode, isSelected, onSelect }: Props) {
   const translateX = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
@@ -243,6 +246,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
   const pomodoroMins = todo.pomodoroMinutesLogged || 0;
   const subtasks = todo.subtasks || [];
   const subtasksDone = subtasks.filter(s => s.completed).length;
+  const subtaskProgress = subtasks.length > 0 ? subtasksDone / subtasks.length : 0;
 
   const completeBackgroundOpacity = translateX.interpolate({
     inputRange: [0, SWIPE_COMPLETE_THRESHOLD],
@@ -272,24 +276,40 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
           styles.container,
           { transform: [{ translateX }, { scale: scaleAnim }] },
           priorityColor ? { borderLeftWidth: 3, borderLeftColor: priorityColor } : { borderLeftWidth: 3, borderLeftColor: 'transparent' },
-          isTracking && { borderColor: Colors.dark.timer, borderWidth: 1 },
-          todo.completed && { opacity: 0.4 },
+          todo.priority === 'high' && !selectionMode && styles.highPriorityContainer,
+          todo.priority === 'medium' && !selectionMode && styles.mediumPriorityContainer,
+          isTracking && !selectionMode && { borderColor: Colors.dark.timer, borderWidth: 1 },
+          todo.completed && !selectionMode && { opacity: 0.4 },
+          selectionMode && isSelected && styles.selectedContainer,
         ]}
         {...panResponder.panHandlers}
       >
-        {/* Checkbox */}
-        <TouchableOpacity style={styles.checkbox} onPress={handleToggle}>
-          <View style={[styles.checkboxInner, todo.completed && styles.checkboxChecked]}>
-            {todo.completed && <Text style={styles.checkmark}>✓</Text>}
-          </View>
-          <CheckboxConfetti visible={showConfetti} />
-        </TouchableOpacity>
+        {/* Checkbox / Selection */}
+        {selectionMode ? (
+          <TouchableOpacity style={styles.checkbox} onPress={onSelect}>
+            <View style={[styles.selectionCircle, isSelected && styles.selectionCircleActive]}>
+              {isSelected && <Text style={styles.selectionCheck}>✓</Text>}
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.checkbox} onPress={handleToggle}>
+            <View style={[
+              styles.checkboxInner,
+              todo.completed && styles.checkboxChecked,
+              !todo.completed && todo.priority === 'high' && { borderColor: PRIORITY_CONFIG.high.color },
+              !todo.completed && todo.priority === 'medium' && { borderColor: PRIORITY_CONFIG.medium.color },
+            ]}>
+              {todo.completed && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <CheckboxConfetti visible={showConfetti} />
+          </TouchableOpacity>
+        )}
 
         {/* Content */}
         <TouchableOpacity
           style={styles.content}
-          onPress={onPress}
-          onLongPress={onLongPress}
+          onPress={selectionMode ? onSelect : onPress}
+          onLongPress={selectionMode ? undefined : onLongPress}
           activeOpacity={0.7}
           delayLongPress={400}
         >
@@ -304,7 +324,11 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
               <View style={[styles.categoryDot, { backgroundColor: categoryInfo.color }]} />
             )}
             <Text
-              style={[styles.title, todo.completed && styles.titleCompleted]}
+              style={[
+                styles.title,
+                todo.completed && styles.titleCompleted,
+                !todo.completed && todo.priority === 'high' && styles.highPriorityTitle,
+              ]}
               numberOfLines={2}
               ellipsizeMode="tail"
             >
@@ -318,7 +342,14 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
               <Text style={styles.metaText}>↻</Text>
             )}
             {subtasks.length > 0 && (
-              <Text style={styles.metaText}>{subtasksDone}/{subtasks.length}</Text>
+              <View style={styles.subtaskMeta}>
+                <Text style={[styles.metaText, subtasksDone === subtasks.length && { color: Colors.dark.success }]}>
+                  {subtasksDone}/{subtasks.length}
+                </Text>
+                <View style={styles.subtaskProgressBar}>
+                  <View style={[styles.subtaskProgressFill, { width: `${subtaskProgress * 100}%` }]} />
+                </View>
+              </View>
             )}
             {pomodoroMins > 0 && (
               <Text style={styles.pomodoroText}>{pomodoroMins}m</Text>
@@ -364,10 +395,13 @@ const TodoItem = memo(TodoItemInner, (prev, next) => {
     prev.todo.pomodoroMinutesLogged === next.todo.pomodoroMinutesLogged &&
     prev.todo.notes === next.todo.notes &&
     prev.todo.subtasks?.length === next.todo.subtasks?.length &&
+    prev.todo.subtasks?.filter(s => s.completed).length === next.todo.subtasks?.filter(s => s.completed).length &&
     prev.todo.carriedOverFrom === next.todo.carriedOverFrom &&
     prev.todo.recurrence?.type === next.todo.recurrence?.type &&
     prev.todo.timeTracking?.startedAt === next.todo.timeTracking?.startedAt &&
-    prev.todo.timeTracking?.totalSeconds === next.todo.timeTracking?.totalSeconds
+    prev.todo.timeTracking?.totalSeconds === next.todo.timeTracking?.totalSeconds &&
+    prev.selectionMode === next.selectionMode &&
+    prev.isSelected === next.isSelected
   );
 });
 
@@ -421,6 +455,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     gap: Spacing.sm,
   },
+  highPriorityContainer: {
+    backgroundColor: '#EF44440A',
+    borderLeftWidth: 3,
+    borderLeftColor: '#EF4444',
+  },
+  mediumPriorityContainer: {
+    backgroundColor: '#FBBF240A',
+  },
+  selectedContainer: {
+    backgroundColor: Colors.dark.accent + '12',
+  },
+  highPriorityTitle: {
+    fontFamily: Fonts.bodyMedium,
+  },
   checkbox: {
     padding: 2,
     position: 'relative',
@@ -433,6 +481,24 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  selectionCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: Colors.dark.textTertiary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectionCircleActive: {
+    backgroundColor: Colors.dark.accent,
+    borderColor: Colors.dark.accent,
+  },
+  selectionCheck: {
+    color: Colors.dark.background,
+    fontSize: 13,
+    fontWeight: '700',
   },
   checkboxInner: {
     width: 22,
@@ -510,6 +576,22 @@ const styles = StyleSheet.create({
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 11,
+  },
+  subtaskMeta: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  subtaskProgressBar: {
+    width: 28,
+    height: 2,
+    backgroundColor: Colors.dark.border,
+    borderRadius: 1,
+    overflow: 'hidden',
+  },
+  subtaskProgressFill: {
+    height: '100%',
+    backgroundColor: Colors.dark.success,
+    borderRadius: 1,
   },
   pomodoroText: {
     color: Colors.dark.timer,
