@@ -90,12 +90,17 @@ function SettingsScreenContent() {
   const appVersion = Constants.expoConfig?.version || '1.0.0';
 
   useEffect(() => {
-    getSiliconConnection().then(conn => {
-      if (conn) {
-        setSilicon(conn);
-        setPairingCode(conn.pairingCode);
-      }
-    });
+    const checkConnection = () => {
+      getSiliconConnection().then(conn => {
+        if (conn) {
+          setSilicon(conn);
+          setPairingCode(conn.pairingCode);
+        }
+      });
+    };
+    checkConnection();
+    const interval = setInterval(checkConnection, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
