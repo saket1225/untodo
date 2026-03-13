@@ -27,6 +27,7 @@ export const useWallpaperStore = create<WallpaperStore>()(
         showDaysLeft: true,
         wallpaperEnabled: false,
         lastWallpaperDate: null,
+        preset: 'full' as const,
       },
       updateConfig: (updates) => {
         set((s) => ({ config: { ...s.config, ...updates } }));
@@ -60,6 +61,7 @@ export const useWallpaperStore = create<WallpaperStore>()(
               showDaysLeft: config.showDaysLeft ?? true,
               wallpaperEnabled: config.wallpaperEnabled ?? false,
               lastWallpaperDate: config.lastWallpaperDate ?? null,
+              preset: config.preset ?? 'full',
             },
           };
         }

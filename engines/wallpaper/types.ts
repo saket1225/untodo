@@ -1,3 +1,5 @@
+export type WallpaperPreset = 'minimal' | 'countdown' | 'full';
+
 export interface WallpaperConfig {
   enabled: boolean;
   dotSize: number;
@@ -12,6 +14,7 @@ export interface WallpaperConfig {
   showDaysLeft: boolean;
   wallpaperEnabled: boolean;
   lastWallpaperDate: string | null;
+  preset: WallpaperPreset;
 }
 
 export interface DayData {

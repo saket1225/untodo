@@ -1249,7 +1249,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   list: {
-    paddingBottom: Spacing.xxl,
+    paddingBottom: 120,
   },
   empty: {
     alignItems: 'center',

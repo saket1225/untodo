@@ -23,13 +23,15 @@ export default function TodoInput({ onAdd, autoFocus, viewingDate }: Props) {
   const [showTemplates, setShowTemplates] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const flashAnim = useRef(new Animated.Value(0)).current;
+  const hasAutoFocused = useRef(false);
   const getAllTemplates = useTemplateStore(s => s.getAllTemplates);
   const addCustomTemplate = useTemplateStore(s => s.addCustomTemplate);
   const deleteTemplate = useTemplateStore(s => s.deleteTemplate);
   const allTodos = useTodoStore(s => s.todos);
 
   useEffect(() => {
-    if (autoFocus) {
+    if (autoFocus && !hasAutoFocused.current) {
+      hasAutoFocused.current = true;
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, [autoFocus]);

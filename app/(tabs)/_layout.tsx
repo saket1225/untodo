@@ -43,6 +43,7 @@ export default function TabLayout() {
         tabBarStyle: styles.tabBar,
         tabBarShowLabel: false,
         animation: 'fade',
+        sceneStyle: { backgroundColor: '#0A0A0A' },
       }}
     >
       <Tabs.Screen
