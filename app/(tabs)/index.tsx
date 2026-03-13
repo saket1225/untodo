@@ -16,62 +16,9 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { Todo, Category, CATEGORIES, Priority } from '../../engines/todo/types';
 import { onSyncStateChange } from '../../lib/firebase-sync';
 import { useKeyboardShortcuts } from '../../lib/useKeyboardShortcuts';
-import { generateDailyInsight } from '../../lib/insights';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_HEIGHT = 72; // Approximate fixed height for getItemLayout
-
-const MORNING_MSGS = [
-  'What will you conquer today?',
-  'Make today count.',
-  'Do the hard thing first.',
-  'Today is yours.',
-  'Build momentum early.',
-];
-const AFTERNOON_MSGS = [
-  'Stay locked in.',
-  'Focus on what matters.',
-  'One task at a time.',
-  'Keep the momentum.',
-  'Ship something today.',
-];
-const EVENING_MSGS = [
-  'Wrap up strong.',
-  'Small steps, big results.',
-  'Progress over perfection.',
-  'Finish what you started.',
-  'Almost there.',
-];
-const NIGHT_MSGS = [
-  'Night owl mode.',
-  'Rest is productive too.',
-  'Consistency beats intensity.',
-  'Discipline is freedom.',
-  'Tomorrow starts with tonight.',
-];
-
-function getTimeBasedGreeting(): { prefix: string; message: string } {
-  const hour = new Date().getHours();
-  const dayOfYear = Math.floor(
-    (new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
-  );
-  if (hour < 12) {
-    return { prefix: 'Good morning', message: MORNING_MSGS[dayOfYear % MORNING_MSGS.length] };
-  } else if (hour < 17) {
-    return { prefix: 'Good afternoon', message: AFTERNOON_MSGS[dayOfYear % AFTERNOON_MSGS.length] };
-  } else if (hour < 21) {
-    return { prefix: 'Good evening', message: EVENING_MSGS[dayOfYear % EVENING_MSGS.length] };
-  } else {
-    return { prefix: 'Night owl mode', message: NIGHT_MSGS[dayOfYear % NIGHT_MSGS.length] };
-  }
-}
-
-function formatEstimatedTime(minutes: number): string {
-  if (minutes < 60) return `${minutes}m remaining`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m > 0 ? `${h}h ${m}m remaining` : `${h}h remaining`;
-}
 
 // --- Confetti Celebration Component ---
 function ConfettiCelebration({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
@@ -209,6 +156,7 @@ function TodayScreenContent() {
 
   // Category filter
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   // All todos for the viewing date (sorted)
   const dateTodos = useMemo(() => {
@@ -248,15 +196,8 @@ function TodayScreenContent() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [lastCelebratedCount, setLastCelebratedCount] = useState(0);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [insightDismissed, setInsightDismissed] = useState(false);
   const syncFromFirestore = useTodoStore(s => s.syncFromFirestore);
   const spawnRecurringTasks = useTodoStore(s => s.spawnRecurringTasks);
-
-  // Daily insight
-  const dailyInsight = useMemo(() => {
-    if (insightDismissed || !isToday) return null;
-    return generateDailyInsight(allTodos);
-  }, [allTodos, insightDismissed, isToday]);
 
   // Swipe gesture for day navigation
   const swipeAnim = useRef(new RNAnimated.Value(0)).current;
@@ -386,18 +327,6 @@ function TodayScreenContent() {
     setLastCelebratedCount(0);
   }, [viewingDate]);
 
-  // Total pomodoro minutes for viewed date
-  const totalPomodoroMinutes = useMemo(
-    () => dateTodos.reduce((s, t) => s + (t.pomodoroMinutesLogged || 0), 0),
-    [dateTodos]
-  );
-
-  // Total estimated time remaining (incomplete tasks)
-  const totalEstimatedMinutes = useMemo(
-    () => dateTodos.filter(t => !t.completed).reduce((s, t) => s + (t.estimatedMinutes || 0), 0),
-    [dateTodos]
-  );
-
   // Check for carry-over tasks on mount
   useEffect(() => {
     if (checkedCarryOver) return;
@@ -430,8 +359,6 @@ function TodayScreenContent() {
     const incomplete = dateTodos.filter(t => !t.completed);
     return incomplete.length > 0 ? incomplete[0] : null;
   }, [dateTodos]);
-
-  const greeting = useMemo(() => getTimeBasedGreeting(), [logicalDate]);
 
   // Carry-over candidates count
   const yesterdayStr = useMemo(() => {
@@ -563,18 +490,18 @@ function TodayScreenContent() {
           )}
         </View>
         <View style={styles.headerRight}>
-          {isToday && !focusMode && (
+          {activeCats.length > 0 && (
             <TouchableOpacity
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setFocusMode(true);
+                setShowFilters(prev => !prev);
               }}
-              style={styles.focusBtn}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Enter focus mode"
+              style={styles.searchIconBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel={showFilters ? 'Hide filters' : 'Show filters'}
               accessibilityRole="button"
             >
-              <Text style={styles.focusBtnText}>Focus</Text>
+              <Text style={[styles.searchIconText, showFilters && { color: Colors.dark.text }]}>☰</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -586,11 +513,8 @@ function TodayScreenContent() {
           >
             <Text style={styles.searchIconText}>{searchExpanded ? '✕' : '⌕'}</Text>
           </TouchableOpacity>
-          {totalPomodoroMinutes > 0 && (
-            <Text style={styles.pomodoroTotal} accessibilityLabel={`${totalPomodoroMinutes} focus minutes`}>⏱ {totalPomodoroMinutes}m</Text>
-          )}
           <Text style={styles.countText} accessibilityLabel={`${completed} of ${total} tasks done`}>
-            {completed}/{total} done
+            {completed}/{total}
           </Text>
         </View>
       </View>
@@ -686,32 +610,6 @@ function TodayScreenContent() {
         </TouchableOpacity>
       )}
 
-      {/* Greeting (only on today) */}
-      {isToday && !focusMode && (
-        <>
-          <Text style={styles.greetingPrefix}>{greeting.prefix}</Text>
-          <Text style={styles.greeting}>{greeting.message}</Text>
-        </>
-      )}
-
-      {/* Daily Insight Banner */}
-      {dailyInsight && !focusMode && (
-        <View style={styles.insightBanner}>
-          <Text style={styles.insightText}>{dailyInsight}</Text>
-          <TouchableOpacity
-            onPress={() => setInsightDismissed(true)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.insightDismiss}>✕</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Estimated time remaining */}
-      {totalEstimatedMinutes > 0 && !focusMode && (
-        <Text style={styles.estimatedTimeHeader}>{formatEstimatedTime(totalEstimatedMinutes)}</Text>
-      )}
-
       {/* Progress bar */}
       {total > 0 && !focusMode && (
         <View style={styles.progressBar}>
@@ -719,8 +617,8 @@ function TodayScreenContent() {
         </View>
       )}
 
-      {/* Category filter chips */}
-      {activeCats.length > 0 && !focusMode && (
+      {/* Category filter chips - only visible when showFilters is true */}
+      {showFilters && activeCats.length > 0 && !focusMode && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -941,27 +839,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 14,
   },
-  pomodoroTotal: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-  },
-
-  // Focus mode button
-  focusBtn: {
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  focusBtnText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 12,
-  },
-
   // Focus mode view
   focusModeContainer: {
     flex: 1,
@@ -1146,57 +1023,6 @@ const styles = StyleSheet.create({
     color: Colors.dark.background,
     fontFamily: Fonts.bodyMedium,
     fontSize: 13,
-  },
-
-  greetingPrefix: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 15,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: 2,
-  },
-  greeting: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 14,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-  },
-
-  // Insight banner
-  insightBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 2,
-  },
-  insightText: {
-    flex: 1,
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  insightDismiss: {
-    color: Colors.dark.textTertiary,
-    fontSize: 12,
-    marginLeft: Spacing.sm,
-    padding: 4,
-  },
-
-  // Estimated time
-  estimatedTimeHeader: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xs,
   },
 
   progressBar: {

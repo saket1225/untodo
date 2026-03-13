@@ -21,6 +21,7 @@ export default function TodoInput({ onAdd, autoFocus, viewingDate }: Props) {
   const [category, setCategory] = useState<Category>(null);
   const [showCategories, setShowCategories] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const flashAnim = useRef(new Animated.Value(0)).current;
   const hasAutoFocused = useRef(false);
@@ -99,18 +100,20 @@ export default function TodoInput({ onAdd, autoFocus, viewingDate }: Props) {
     <View>
       <Animated.View style={[styles.flashOverlay, { opacity: flashAnim }]} pointerEvents="none" />
       <View style={styles.container}>
-        {/* Priority toggle */}
-        <TouchableOpacity
-          style={styles.priorityBtn}
-          onPress={cyclePriority}
-          accessibilityLabel={`Priority: ${priorityLabel}`}
-          accessibilityRole="button"
-          accessibilityHint="Cycle through priority levels"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <View style={[styles.priorityDot, { backgroundColor: priorityColor }]} />
-          <Text style={[styles.priorityText, { color: priorityColor }]}>{priorityLabel}</Text>
-        </TouchableOpacity>
+        {/* Priority toggle - only when focused */}
+        {isFocused && (
+          <TouchableOpacity
+            style={styles.priorityBtn}
+            onPress={cyclePriority}
+            accessibilityLabel={`Priority: ${priorityLabel}`}
+            accessibilityRole="button"
+            accessibilityHint="Cycle through priority levels"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View style={[styles.priorityDot, { backgroundColor: priorityColor }]} />
+            <Text style={[styles.priorityText, { color: priorityColor }]}>{priorityLabel}</Text>
+          </TouchableOpacity>
+        )}
 
         <TextInput
           ref={inputRef}
@@ -120,41 +123,31 @@ export default function TodoInput({ onAdd, autoFocus, viewingDate }: Props) {
           value={text}
           onChangeText={setText}
           onSubmitEditing={handleAdd}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => { if (!text.trim()) setIsFocused(false); }}
           returnKeyType="done"
           accessibilityLabel="Task title"
           accessibilityHint="Type a task name and press done to add"
         />
 
-        {/* Template button */}
-        <TouchableOpacity
-          style={styles.templateBtn}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShowTemplates(true);
-          }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Task templates"
-          accessibilityRole="button"
-        >
-          <Text style={styles.templateBtnText}>⊞</Text>
-        </TouchableOpacity>
-
-        {/* Category toggle */}
-        <TouchableOpacity
-          style={[styles.catBtn, selectedCat && { borderColor: selectedCat.color }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShowCategories(!showCategories);
-          }}
-          accessibilityLabel={`Category: ${selectedCat ? selectedCat.label : 'None'}`}
-          accessibilityRole="button"
-          accessibilityHint="Open category picker"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={[styles.catBtnText, selectedCat && { color: selectedCat.color }]}>
-            {selectedCat ? selectedCat.label.charAt(0) : '#'}
-          </Text>
-        </TouchableOpacity>
+        {/* Category toggle - only when focused */}
+        {isFocused && (
+          <TouchableOpacity
+            style={[styles.catBtn, selectedCat && { borderColor: selectedCat.color }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowCategories(!showCategories);
+            }}
+            accessibilityLabel={`Category: ${selectedCat ? selectedCat.label : 'None'}`}
+            accessibilityRole="button"
+            accessibilityHint="Open category picker"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={[styles.catBtnText, selectedCat && { color: selectedCat.color }]}>
+              {selectedCat ? selectedCat.label.charAt(0) : '#'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.addButton, !text.trim() && styles.addButtonDisabled]}

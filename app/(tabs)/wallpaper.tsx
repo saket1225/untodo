@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, Switch, TextInput, StyleSheet
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
+import * as IntentLauncher from 'expo-intent-launcher';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useWallpaperStore } from '../../engines/wallpaper/store';
@@ -499,6 +500,51 @@ function WallpaperScreenContent() {
     }
   }, [updateConfig]);
 
+  const handleSetWallpaper = useCallback(async () => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Allow gallery access to save and set wallpapers.');
+        return;
+      }
+
+      if (viewShotRef.current?.capture) {
+        const uri = await viewShotRef.current.capture();
+        const asset = await MediaLibrary.createAssetAsync(uri);
+        updateConfig({ lastWallpaperDate: getLogicalDate() });
+
+        if (Platform.OS === 'android') {
+          try {
+            const contentUri = `content://media/external/images/media/${asset.id}`;
+            await IntentLauncher.startActivityAsync(
+              'android.intent.action.ATTACH_DATA',
+              {
+                data: contentUri,
+                type: 'image/*',
+                flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+                extra: { 'mimeType': 'image/png' },
+              }
+            );
+          } catch {
+            // Fallback: open wallpaper settings
+            try {
+              await IntentLauncher.startActivityAsync(
+                'android.intent.action.SET_WALLPAPER'
+              );
+            } catch {
+              Alert.alert('Wallpaper Saved', 'Image saved to gallery. Set it as wallpaper from your gallery app.');
+            }
+          }
+        } else {
+          Alert.alert('Wallpaper Saved', 'Image saved to gallery. Set it as wallpaper from your Photos app.');
+        }
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Failed to set wallpaper.');
+    }
+  }, [updateConfig]);
+
   const handleShare = useCallback(async () => {
     try {
       if (viewShotRef.current?.capture) {
@@ -577,24 +623,33 @@ function WallpaperScreenContent() {
         )}
 
         {/* Action Buttons */}
-        <View style={styles.actionRow}>
+        <TouchableOpacity
+          style={styles.setWallpaperBtn}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            handleSetWallpaper();
+          }}
+        >
+          <Text style={styles.setWallpaperBtnText}>Set as Wallpaper</Text>
+        </TouchableOpacity>
+        <View style={styles.secondaryActionRow}>
           <TouchableOpacity
-            style={styles.saveBtn}
+            style={styles.secondaryBtn}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               handleSaveWallpaper(false);
             }}
           >
-            <Text style={styles.saveBtnText}>Save to Gallery</Text>
+            <Text style={styles.secondaryBtnText}>Save to Gallery</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.shareBtn}
+            style={styles.secondaryBtn}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               handleShare();
             }}
           >
-            <Text style={styles.shareBtnText}>Share</Text>
+            <Text style={styles.secondaryBtnText}>Share</Text>
           </TouchableOpacity>
         </View>
 
@@ -900,41 +955,41 @@ const styles = StyleSheet.create({
   },
 
   // Action buttons
-  actionRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.xl,
-  },
-  saveBtn: {
-    flex: 1,
+  setWallpaperBtn: {
     backgroundColor: Colors.dark.accent,
     borderRadius: 14,
     paddingVertical: 18,
     alignItems: 'center',
+    marginBottom: Spacing.sm,
     shadowColor: '#fff',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 4,
   },
-  saveBtnText: {
+  setWallpaperBtnText: {
     color: Colors.dark.background,
     fontFamily: Fonts.bodyMedium,
     fontSize: 16,
   },
-  shareBtn: {
+  secondaryActionRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xl,
+  },
+  secondaryBtn: {
+    flex: 1,
     backgroundColor: Colors.dark.surface,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.dark.border,
-    paddingVertical: 18,
-    paddingHorizontal: Spacing.xl,
+    paddingVertical: 14,
     alignItems: 'center',
   },
-  shareBtnText: {
-    color: Colors.dark.text,
+  secondaryBtnText: {
+    color: Colors.dark.textSecondary,
     fontFamily: Fonts.bodyMedium,
-    fontSize: 16,
+    fontSize: 14,
   },
 
   // Sections
