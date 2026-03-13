@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect, memo } from 'react';
+import { useState, useRef, useEffect, memo, useMemo } from 'react';
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, ScrollView, Animated, Modal, Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { format, addDays } from 'date-fns';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Priority, Category, CATEGORIES, PRIORITY_CONFIG, Recurrence } from '../types';
 import { useTemplateStore, TaskTemplate, TemplateTask } from '../templates';
@@ -8,7 +9,7 @@ import { useTodoStore } from '../store';
 import { getLogicalDate } from '../../../lib/date-utils';
 
 interface Props {
-  onAdd: (title: string, priority?: Priority, category?: Category, recurrence?: Recurrence) => void;
+  onAdd: (title: string, priority?: Priority, category?: Category, recurrence?: Recurrence, date?: string) => void;
   autoFocus?: boolean;
   viewingDate?: string;
 }
@@ -22,6 +23,8 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
   const [showCategories, setShowCategories] = useState(false);
   const [recurrence, setRecurrence] = useState<Recurrence | undefined>(undefined);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<string | undefined>(undefined);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const flashAnim = useRef(new Animated.Value(0)).current;
@@ -30,6 +33,16 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
   const addCustomTemplate = useTemplateStore(s => s.addCustomTemplate);
   const deleteTemplate = useTemplateStore(s => s.deleteTemplate);
   const allTodos = useTodoStore(s => s.todos);
+
+  const today = useMemo(() => getLogicalDate(), []);
+  const dateLabel = useMemo(() => {
+    if (!scheduledDate) return undefined;
+    if (scheduledDate === today) return undefined;
+    const todayDate = new Date(today + 'T12:00:00');
+    const tmrw = format(addDays(todayDate, 1), 'yyyy-MM-dd');
+    if (scheduledDate === tmrw) return 'Tomorrow';
+    return format(new Date(scheduledDate + 'T12:00:00'), 'MMM d');
+  }, [scheduledDate, today]);
 
   useEffect(() => {
     if (autoFocus && !hasAutoFocused.current) {
@@ -75,11 +88,13 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const { title, quickPriority, quickCategory } = parseShortcuts(trimmed);
     if (!title) return;
-    onAdd(title, quickPriority, quickCategory, recurrence);
+    onAdd(title, quickPriority, quickCategory, recurrence, scheduledDate);
     setText('');
     setPriority(null);
     setCategory(null);
     setRecurrence(undefined);
+    setScheduledDate(undefined);
+    setShowDatePicker(false);
     setShowCategories(false);
     flashAnim.setValue(1);
     Animated.timing(flashAnim, { toValue: 0, duration: 400, useNativeDriver: true }).start();
@@ -200,6 +215,23 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
           </TouchableOpacity>
         )}
 
+        {/* Date picker toggle - only when focused */}
+        {isFocused && (
+          <TouchableOpacity
+            style={[styles.dateBtn, scheduledDate && styles.dateBtnActive]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowDatePicker(!showDatePicker);
+            }}
+            accessibilityLabel={dateLabel ? `Scheduled for ${dateLabel}` : 'Schedule for a date'}
+            accessibilityRole="button"
+            accessibilityHint="Open date picker"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={[styles.dateBtnText, scheduledDate && styles.dateBtnTextActive]}>{'📅'}</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={[styles.addButton, !text.trim() && styles.addButtonDisabled]}
           onPress={handleAdd}
@@ -254,6 +286,92 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
             </TouchableOpacity>
           ))}
         </ScrollView>
+      )}
+
+      {/* Scheduled date indicator */}
+      {dateLabel && !showDatePicker && (
+        <Text style={styles.scheduledLabel}>Scheduled for {dateLabel}</Text>
+      )}
+
+      {/* Date picker */}
+      {showDatePicker && (
+        <View style={styles.datePickerContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateQuickOptions}>
+            <TouchableOpacity
+              style={[styles.dateChip, !scheduledDate && styles.dateChipActive]}
+              onPress={() => { setScheduledDate(undefined); setShowDatePicker(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+            >
+              <Text style={[styles.dateChipText, !scheduledDate && styles.dateChipTextActive]}>Today</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dateChip, scheduledDate === format(addDays(new Date(today + 'T12:00:00'), 1), 'yyyy-MM-dd') && styles.dateChipActive]}
+              onPress={() => {
+                const d = format(addDays(new Date(today + 'T12:00:00'), 1), 'yyyy-MM-dd');
+                setScheduledDate(d); setShowDatePicker(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+            >
+              <Text style={[styles.dateChipText, scheduledDate === format(addDays(new Date(today + 'T12:00:00'), 1), 'yyyy-MM-dd') && styles.dateChipTextActive]}>Tomorrow</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dateChip, scheduledDate === format(addDays(new Date(today + 'T12:00:00'), 2), 'yyyy-MM-dd') && styles.dateChipActive]}
+              onPress={() => {
+                const d = format(addDays(new Date(today + 'T12:00:00'), 2), 'yyyy-MM-dd');
+                setScheduledDate(d); setShowDatePicker(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+            >
+              <Text style={[styles.dateChipText, scheduledDate === format(addDays(new Date(today + 'T12:00:00'), 2), 'yyyy-MM-dd') && styles.dateChipTextActive]}>In 2 days</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dateChip, scheduledDate === format(addDays(new Date(today + 'T12:00:00'), 3), 'yyyy-MM-dd') && styles.dateChipActive]}
+              onPress={() => {
+                const d = format(addDays(new Date(today + 'T12:00:00'), 3), 'yyyy-MM-dd');
+                setScheduledDate(d); setShowDatePicker(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+            >
+              <Text style={[styles.dateChipText, scheduledDate === format(addDays(new Date(today + 'T12:00:00'), 3), 'yyyy-MM-dd') && styles.dateChipTextActive]}>In 3 days</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dateChip, (() => { const todayDate = new Date(today + 'T12:00:00'); const dayOfWeek = todayDate.getDay(); const daysUntilMon = dayOfWeek === 0 ? 1 : 8 - dayOfWeek; return scheduledDate === format(addDays(todayDate, daysUntilMon), 'yyyy-MM-dd'); })() && styles.dateChipActive]}
+              onPress={() => {
+                const todayDate = new Date(today + 'T12:00:00');
+                const dayOfWeek = todayDate.getDay();
+                const daysUntilMon = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+                const d = format(addDays(todayDate, daysUntilMon), 'yyyy-MM-dd');
+                setScheduledDate(d); setShowDatePicker(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+            >
+              <Text style={[styles.dateChipText, (() => { const todayDate = new Date(today + 'T12:00:00'); const dayOfWeek = todayDate.getDay(); const daysUntilMon = dayOfWeek === 0 ? 1 : 8 - dayOfWeek; return scheduledDate === format(addDays(todayDate, daysUntilMon), 'yyyy-MM-dd'); })() && styles.dateChipTextActive]}>Next week</Text>
+            </TouchableOpacity>
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateDayGrid}>
+            {Array.from({ length: 14 }, (_, i) => {
+              const d = addDays(new Date(today + 'T12:00:00'), i);
+              const dateStr = format(d, 'yyyy-MM-dd');
+              const dayName = format(d, 'EEE');
+              const dayNum = d.getDate();
+              const isSelected = scheduledDate === dateStr;
+              const isToday = i === 0;
+              return (
+                <TouchableOpacity
+                  key={dateStr}
+                  style={[styles.dateDayCell, isSelected && styles.dateDayCellActive]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    if (isToday) {
+                      setScheduledDate(undefined);
+                    } else {
+                      setScheduledDate(dateStr);
+                    }
+                    setShowDatePicker(false);
+                  }}
+                >
+                  <Text style={[styles.dateDayName, isSelected && styles.dateDayTextActive, isToday && !isSelected && styles.dateDayToday]}>{dayName}</Text>
+                  <Text style={[styles.dateDayNum, isSelected && styles.dateDayTextActive, isToday && !isSelected && styles.dateDayToday]}>{dayNum}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
       )}
 
       {/* Template picker modal */}
@@ -458,6 +576,98 @@ const styles = StyleSheet.create({
   },
   catChipTextActive: {
     color: Colors.dark.background,
+  },
+  // Date picker
+  dateBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dateBtnActive: {
+    backgroundColor: Colors.dark.accent,
+    borderColor: Colors.dark.accent,
+  },
+  dateBtnText: {
+    fontSize: 16,
+  },
+  dateBtnTextActive: {
+    fontSize: 16,
+  },
+  scheduledLabel: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    paddingHorizontal: Spacing.lg,
+    marginTop: -Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  datePickerContainer: {
+    paddingBottom: Spacing.sm,
+  },
+  dateQuickOptions: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+    paddingBottom: Spacing.sm,
+  },
+  dateChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  dateChipActive: {
+    backgroundColor: Colors.dark.accent,
+    borderColor: Colors.dark.accent,
+  },
+  dateChipText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+  },
+  dateChipTextActive: {
+    color: Colors.dark.background,
+  },
+  dateDayGrid: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.xs,
+  },
+  dateDayCell: {
+    width: 44,
+    height: 56,
+    borderRadius: 10,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
+  },
+  dateDayCellActive: {
+    backgroundColor: Colors.dark.accent,
+    borderColor: Colors.dark.accent,
+  },
+  dateDayName: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    color: Colors.dark.textTertiary,
+  },
+  dateDayNum: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 14,
+    color: Colors.dark.textSecondary,
+  },
+  dateDayTextActive: {
+    color: Colors.dark.background,
+  },
+  dateDayToday: {
+    color: Colors.dark.accent,
   },
   // Template modal
   templateOverlay: {

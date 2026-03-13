@@ -23,6 +23,7 @@ interface TodoStore {
   getTodayTodos: () => Todo[];
   getTodosForDate: (date: string) => Todo[];
   carryOverTodos: () => void;
+  autoCarryOldTodos: () => number;
   logPomodoroMinutes: (id: string, minutes: number) => void;
   addSubtask: (todoId: string, title: string) => void;
   toggleSubtask: (todoId: string, subtaskId: string) => void;
@@ -31,6 +32,7 @@ interface TodoStore {
   startTimeTracking: (id: string) => void;
   stopTimeTracking: (id: string) => void;
   addSampleTasks: () => void;
+  restoreTodo: (todo: Todo) => void;
   spawnRecurringTasks: () => void;
 }
 
@@ -150,6 +152,11 @@ export const useTodoStore = create<TodoStore>()(
         if (username) syncDeleteTodoFromFirestore(username, id).catch(() => {});
       },
 
+      restoreTodo: (todo: Todo) => {
+        set(state => ({ todos: [...state.todos, todo] }));
+        debouncedSyncTodo(todo);
+      },
+
       updateTodo: (id: string, updates: Partial<Todo>) => {
         const now = nowISO();
         set(state => ({
@@ -213,13 +220,64 @@ export const useTodoStore = create<TodoStore>()(
           return { todos: [...state.todos, ...carried] };
         });
 
-        const username = getUsername();
-        if (username) {
-          const carried = get().todos.filter(
-            t => t.logicalDate === logicalDate && t.carriedOverFrom
-          );
-          bulkSyncTodosToFirestore(username, carried).catch(() => {});
+        try {
+          const username = getUsername();
+          if (username) {
+            const carried = get().todos.filter(
+              t => t.logicalDate === logicalDate && t.carriedOverFrom
+            );
+            bulkSyncTodosToFirestore(username, carried).catch(() => {});
+          }
+        } catch {
+          // Fail silently — carry-over data stays local
         }
+      },
+
+      autoCarryOldTodos: () => {
+        const logicalDate = getLogicalDate();
+        const now = nowISO();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Find all incomplete tasks from 2+ days ago that haven't been carried over to today
+        const todayTodos = get().todos.filter(t => t.logicalDate === logicalDate);
+        const alreadyCarriedIds = new Set(
+          todayTodos.filter(t => t.carriedOverFrom).map(t => t.title)
+        );
+
+        const twoDaysAgo = new Date(today);
+        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+        const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0];
+
+        const oldIncomplete = get().todos.filter(
+          t => t.logicalDate <= twoDaysAgoStr && !t.completed && !alreadyCarriedIds.has(t.title)
+        );
+
+        if (oldIncomplete.length === 0) return 0;
+
+        const carried = oldIncomplete.map((t, i) => ({
+          ...t,
+          id: makeId(),
+          logicalDate,
+          carriedOverFrom: t.logicalDate,
+          order: todayTodos.length + i,
+          createdAt: now,
+          updatedAt: now,
+          syncStatus: 'pending' as SyncStatus,
+        }));
+
+        set(state => ({ todos: [...state.todos, ...carried] }));
+
+        try {
+          const username = getUsername();
+          if (username) {
+            bulkSyncTodosToFirestore(username, carried).catch(() => {});
+          }
+        } catch {
+          // Fail silently
+        }
+
+        return carried.length;
       },
 
       logPomodoroMinutes: (id: string, minutes: number) => {
@@ -384,9 +442,13 @@ export const useTodoStore = create<TodoStore>()(
 
         if (newTodos.length > 0) {
           set(state => ({ todos: [...state.todos, ...newTodos] }));
-          const username = getUsername();
-          if (username) {
-            bulkSyncTodosToFirestore(username, newTodos).catch(() => {});
+          try {
+            const username = getUsername();
+            if (username) {
+              bulkSyncTodosToFirestore(username, newTodos).catch(() => {});
+            }
+          } catch {
+            // Fail silently — recurring tasks stay local
           }
         }
       },
@@ -452,21 +514,26 @@ export const useTodoStore = create<TodoStore>()(
       storage: createJSONStorage(() => AsyncStorage),
       version: 1,
       migrate: (persisted: any, version: number) => {
-        if (version === 0 || !version) {
-          const state = persisted as { todos?: any[] };
-          const todos = (state.todos || []).map((t: any) => ({
-            ...t,
-            updatedAt: t.updatedAt || t.createdAt || new Date().toISOString(),
-            priority: t.priority !== undefined ? t.priority : null,
-            category: t.category !== undefined ? t.category : null,
-            pomodoroMinutesLogged: t.pomodoroMinutesLogged ?? 0,
-            subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
-            notes: t.notes ?? '',
-            syncStatus: t.syncStatus || 'pending',
-          }));
-          return { ...state, todos };
+        try {
+          if (version === 0 || !version) {
+            const state = persisted as { todos?: any[] };
+            const todos = (state.todos || []).map((t: any) => ({
+              ...t,
+              updatedAt: t.updatedAt || t.createdAt || new Date().toISOString(),
+              priority: t.priority !== undefined ? t.priority : null,
+              category: t.category !== undefined ? t.category : null,
+              pomodoroMinutesLogged: t.pomodoroMinutesLogged ?? 0,
+              subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
+              notes: t.notes ?? '',
+              syncStatus: t.syncStatus || 'pending',
+            }));
+            return { ...state, todos };
+          }
+          return persisted as TodoStore;
+        } catch {
+          // If migration fails on corrupted data, return a safe default
+          return { todos: [], ...(persisted as object) };
         }
-        return persisted as TodoStore;
       },
     }
   )

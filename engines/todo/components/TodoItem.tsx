@@ -296,7 +296,8 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
           <View style={styles.titleRow}>
             {todo.carriedOverFrom && (
               <View style={styles.carriedOverBadge}>
-                <Text style={styles.carriedOverArrow}>↩</Text>
+                <Text style={styles.carriedOverArrow}>↗</Text>
+                <Text style={styles.carriedOverText}>carried</Text>
               </View>
             )}
             {categoryInfo && (
@@ -469,10 +470,18 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 4,
     paddingVertical: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   carriedOverArrow: {
     color: Colors.dark.timer,
     fontSize: 11,
+  },
+  carriedOverText: {
+    color: Colors.dark.timer,
+    fontSize: 9,
+    fontFamily: Fonts.body,
   },
   categoryDot: {
     width: 7,

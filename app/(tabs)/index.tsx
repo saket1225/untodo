@@ -12,7 +12,9 @@ import TodoInput from '../../engines/todo/components/TodoInput';
 import TodoItem from '../../engines/todo/components/TodoItem';
 import PomodoroTimer from '../../engines/todo/components/PomodoroTimer';
 import QuickActions from '../../engines/todo/components/QuickActions';
+import TaskDetail from '../../engines/todo/components/TaskDetail';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import UndoToast, { showUndoToast } from '../../components/UndoToast';
 import { Todo, Category, CATEGORIES, Priority, Recurrence } from '../../engines/todo/types';
 import { onSyncStateChange } from '../../lib/firebase-sync';
 import { useKeyboardShortcuts } from '../../lib/useKeyboardShortcuts';
@@ -263,9 +265,11 @@ function TodayScreenContent() {
   const addTodo = useTodoStore(s => s.addTodo);
   const toggleTodo = useTodoStore(s => s.toggleTodo);
   const deleteTodo = useTodoStore(s => s.deleteTodo);
+  const restoreTodo = useTodoStore(s => s.restoreTodo);
   const updateTodo = useTodoStore(s => s.updateTodo);
   const reorderTodos = useTodoStore(s => s.reorderTodos);
   const carryOverTodos = useTodoStore(s => s.carryOverTodos);
+  const autoCarryOldTodos = useTodoStore(s => s.autoCarryOldTodos);
 
   // Date navigation
   const [viewingDate, setViewingDate] = useState(logicalDate);
@@ -326,6 +330,7 @@ function TodayScreenContent() {
 
   const [pomodoroTodo, setPomodoroTodo] = useState<Todo | null>(null);
   const [quickActionTodo, setQuickActionTodo] = useState<Todo | null>(null);
+  const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
   const [showCarryOver, setShowCarryOver] = useState(false);
   const [checkedCarryOver, setCheckedCarryOver] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -399,7 +404,7 @@ function TodayScreenContent() {
     },
     onDeleteSelected: () => {
       if (selectedIndex >= 0 && selectedIndex < todos.length) {
-        deleteTodo(todos[selectedIndex].id);
+        handleDelete(todos[selectedIndex]);
         setSelectedIndex(prev => Math.min(prev, todos.length - 2));
       }
     },
@@ -469,6 +474,10 @@ function TodayScreenContent() {
     if (checkedCarryOver) return;
     setCheckedCarryOver(true);
 
+    // Auto-carry tasks from 2+ days ago without asking
+    autoCarryOldTodos();
+
+    // Show modal only for yesterday's incomplete tasks
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split('T')[0];
@@ -483,12 +492,21 @@ function TodayScreenContent() {
   }, []);
 
   const handleToggle = useCallback((id: string) => {
+    const todo = allTodos.find(t => t.id === id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     toggleTodo(id);
-  }, [toggleTodo]);
+    // Show undo toast only when completing (not uncompleting)
+    if (todo && !todo.completed) {
+      showUndoToast({
+        id,
+        message: 'Task completed.',
+        onUndo: () => toggleTodo(id),
+      });
+    }
+  }, [toggleTodo, allTodos]);
 
-  const handleAdd = useCallback((title: string, priority?: Priority, category?: Category, recurrence?: Recurrence) => {
-    addTodo(title, priority ?? null, category ?? null, viewingDate, recurrence);
+  const handleAdd = useCallback((title: string, priority?: Priority, category?: Category, recurrence?: Recurrence, date?: string) => {
+    addTodo(title, priority ?? null, category ?? null, date || viewingDate, recurrence);
   }, [addTodo, viewingDate]);
 
   // Carry-over candidates count
@@ -568,18 +586,27 @@ function TodayScreenContent() {
     setDragOrder([]);
   }, [dragOrder, reorderTodos]);
 
+  const handleDelete = useCallback((todo: Todo) => {
+    deleteTodo(todo.id);
+    showUndoToast({
+      id: todo.id,
+      message: 'Task deleted.',
+      onUndo: () => restoreTodo(todo),
+    });
+  }, [deleteTodo, restoreTodo]);
+
   const renderItem = useCallback(({ item, index }: { item: Todo; index: number }) => (
     <TodoItem
       todo={item}
       onToggle={() => handleToggle(item.id)}
-      onDelete={() => deleteTodo(item.id)}
-      onPress={() => setPomodoroTodo(item)}
+      onDelete={() => handleDelete(item)}
+      onPress={() => setDetailTodo(item)}
       onLongPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setQuickActionTodo(item);
       }}
     />
-  ), [handleToggle, deleteTodo]);
+  ), [handleToggle, handleDelete]);
 
   const getItemLayout = useCallback((_: any, index: number) => ({
     length: ITEM_HEIGHT,
@@ -825,8 +852,8 @@ function TodayScreenContent() {
                   key={item.id}
                   todo={item}
                   onToggle={() => handleToggle(item.id)}
-                  onDelete={() => deleteTodo(item.id)}
-                  onPress={() => setPomodoroTodo(item)}
+                  onDelete={() => handleDelete(item)}
+                  onPress={() => setDetailTodo(item)}
                   onLongPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     setQuickActionTodo(item);
@@ -882,6 +909,18 @@ function TodayScreenContent() {
         />
       )}
 
+      {/* Task detail */}
+      {detailTodo && (
+        <TaskDetail
+          todo={detailTodo}
+          visible={!!detailTodo}
+          onClose={() => setDetailTodo(null)}
+          onUpdate={updateTodo}
+          onDelete={(id) => { deleteTodo(id); setDetailTodo(null); }}
+          onStartPomodoro={(todo) => { setDetailTodo(null); setPomodoroTodo(todo); }}
+        />
+      )}
+
       {/* Quick actions */}
       {quickActionTodo && (
         <QuickActions
@@ -889,7 +928,18 @@ function TodayScreenContent() {
           visible={!!quickActionTodo}
           onClose={() => setQuickActionTodo(null)}
           onUpdate={updateTodo}
-          onDelete={(id) => { deleteTodo(id); setQuickActionTodo(null); }}
+          onDelete={(id) => {
+            const todo = allTodos.find(t => t.id === id);
+            deleteTodo(id);
+            setQuickActionTodo(null);
+            if (todo) {
+              showUndoToast({
+                id,
+                message: 'Task deleted.',
+                onUndo: () => restoreTodo(todo),
+              });
+            }
+          }}
         />
       )}
 
@@ -898,6 +948,9 @@ function TodayScreenContent() {
         visible={showCelebration}
         onDismiss={() => setShowCelebration(false)}
       />
+
+      {/* Undo toast */}
+      <UndoToast />
     </SafeAreaView>
   );
 }

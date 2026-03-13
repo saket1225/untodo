@@ -63,30 +63,35 @@ export async function cancelAll(): Promise<void> {
 }
 
 function getTaskStats() {
-  const todos = useTodoStore.getState().todos;
-  const today = getLogicalDate();
-  const todayTodos = todos.filter(t => t.logicalDate === today);
-  const total = todayTodos.length;
-  const completed = todayTodos.filter(t => t.completed).length;
-  const remaining = total - completed;
-  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  try {
+    const todos = useTodoStore.getState().todos;
+    const today = getLogicalDate();
+    const todayTodos = todos.filter(t => t.logicalDate === today);
+    const total = todayTodos.length;
+    const completed = todayTodos.filter(t => t.completed).length;
+    const remaining = total - completed;
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const carriedOver = todayTodos.filter(t => t.carriedOverFrom).length;
 
-  // Calculate streak
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  let streak = 0;
-  for (let i = 1; i < 365; i++) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
-    const dayTodos = todos.filter(t => t.logicalDate === dateStr);
-    const dayTotal = dayTodos.length;
-    const dayCompleted = dayTodos.filter(t => t.completed).length;
-    if (dayTotal > 0 && dayCompleted / dayTotal >= 0.5) streak++;
-    else if (dayTotal > 0) break;
+    // Calculate streak
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    let streak = 0;
+    for (let i = 1; i < 365; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayTodos = todos.filter(t => t.logicalDate === dateStr);
+      const dayTotal = dayTodos.length;
+      const dayCompleted = dayTodos.filter(t => t.completed).length;
+      if (dayTotal > 0 && dayCompleted / dayTotal >= 0.5) streak++;
+      else if (dayTotal > 0) break;
+    }
+
+    return { total, completed, remaining, pct, streak, carriedOver };
+  } catch {
+    return { total: 0, completed: 0, remaining: 0, pct: 0, streak: 0, carriedOver: 0 };
   }
-
-  return { total, completed, remaining, pct, streak };
 }
 
 export async function setupDefaultNotifications(): Promise<void> {
@@ -94,29 +99,34 @@ export async function setupDefaultNotifications(): Promise<void> {
   if (!granted) return;
 
   const store = useNotificationStore.getState();
-  const { total, completed, remaining, pct, streak } = getTaskStats();
+  const { total, completed, remaining, pct, streak, carriedOver } = getTaskStats();
 
   await cancelAll();
 
   if (store.preferences.morningReminder) {
     const dayOfMonth = new Date().getDate();
+    const carriedSuffix = carriedOver > 0
+      ? ` (${carriedOver} carried over)`
+      : '';
     const morningMessages = [
       {
         title: 'Rise and conquer',
         body: total > 0
-          ? `${total} task${total !== 1 ? 's' : ''} lined up for today.`
+          ? `${total} task${total !== 1 ? 's' : ''} lined up for today.${carriedSuffix}`
           : 'Start your day — add your first task.',
       },
       {
         title: streak > 2 ? `${streak}-day streak` : 'New day, fresh start',
         body: streak > 2
           ? `Don't break the chain. What's the plan today?`
-          : 'What will you accomplish today?',
+          : carriedOver > 0
+            ? `${carriedOver} task${carriedOver !== 1 ? 's' : ''} carried over. Time to tackle them.`
+            : 'What will you accomplish today?',
       },
       {
         title: 'Time to focus',
         body: total > 0
-          ? `You've got ${total} task${total !== 1 ? 's' : ''} waiting.`
+          ? `You've got ${total} task${total !== 1 ? 's' : ''} waiting.${carriedSuffix}`
           : 'Open untodo and set your intentions.',
       },
     ];
