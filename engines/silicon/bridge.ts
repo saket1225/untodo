@@ -44,7 +44,7 @@ export async function disconnectSilicon(): Promise<void> {
 async function processCommand(command: SiliconCommand, username: string): Promise<void> {
   let result: Record<string, any> = {};
   let status: 'success' | 'error' = 'success';
-  const cmdRef = doc(db, 'silicon_commands', username, 'commands', command.id);
+  const cmdRef = doc(db, 'users', username, 'silicon_commands', command.id);
 
   try {
     // Mark as processing
@@ -154,7 +154,7 @@ async function processCommand(command: SiliconCommand, username: string): Promis
 
   // Write response and mark done — wrap in try/catch to avoid crashing
   try {
-    const responseRef = doc(db, 'silicon_responses', username, 'responses', command.id);
+    const responseRef = doc(db, 'users', username, 'silicon_responses', command.id);
     await setDoc(responseRef, {
       commandId: command.id,
       result,
@@ -169,7 +169,7 @@ async function processCommand(command: SiliconCommand, username: string): Promis
 }
 
 export function startSiliconListener(username: string): () => void {
-  const commandsRef = collection(db, 'silicon_commands', username, 'commands');
+  const commandsRef = collection(db, 'users', username, 'silicon_commands');
   const q = query(commandsRef, where('status', '==', 'pending'));
 
   const unsubscribe = onSnapshot(q, (snapshot) => {
