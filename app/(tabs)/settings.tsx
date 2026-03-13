@@ -350,6 +350,8 @@ function SettingsScreenContent() {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setShowCode(!showCode);
                 }}
+                accessibilityLabel={showCode ? 'Hide pairing code' : 'Show pairing code'}
+                accessibilityRole="button"
               >
                 <Text style={styles.showCodeBtnText}>{showCode ? 'Hide code' : 'Show pairing code'}</Text>
               </TouchableOpacity>
@@ -421,6 +423,8 @@ function SettingsScreenContent() {
                   setShowCode(!showCode);
                 }}
                 activeOpacity={0.7}
+                accessibilityLabel={showCode ? 'Hide pairing code' : 'Reveal pairing code'}
+                accessibilityRole="button"
               >
                 <Text style={styles.revealCodeBtnText}>
                   {showCode ? 'Hide code' : 'Tap to reveal code'}

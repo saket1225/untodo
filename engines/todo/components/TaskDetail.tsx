@@ -127,8 +127,10 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
                   setEditingTitle(true);
                 }}
                 activeOpacity={0.7}
+                accessibilityLabel="Edit task title"
+                accessibilityRole="button"
               >
-                <Text style={styles.taskTitle}>{todo.title}</Text>
+                <Text style={styles.taskTitle} numberOfLines={3}>{todo.title}</Text>
               </TouchableOpacity>
             )}
 
@@ -257,13 +259,23 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
               <View style={styles.subtaskList}>
                 {subtasks.map(s => (
                   <View key={s.id} style={styles.subtaskRow}>
-                    <TouchableOpacity onPress={() => toggleSubtask(todo.id, s.id)}>
+                    <TouchableOpacity
+                      onPress={() => toggleSubtask(todo.id, s.id)}
+                      accessibilityLabel={s.completed ? `Mark "${s.title}" incomplete` : `Complete "${s.title}"`}
+                      accessibilityRole="checkbox"
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
                       <View style={[styles.subtaskCheck, s.completed && styles.subtaskCheckDone]}>
                         {s.completed && <Text style={styles.subtaskCheckmark}>✓</Text>}
                       </View>
                     </TouchableOpacity>
-                    <Text style={[styles.subtaskText, s.completed && styles.subtaskTextDone]}>{s.title}</Text>
-                    <TouchableOpacity onPress={() => deleteSubtask(todo.id, s.id)}>
+                    <Text style={[styles.subtaskText, s.completed && styles.subtaskTextDone]} numberOfLines={2}>{s.title}</Text>
+                    <TouchableOpacity
+                      onPress={() => deleteSubtask(todo.id, s.id)}
+                      accessibilityLabel={`Delete subtask "${s.title}"`}
+                      accessibilityRole="button"
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                       <Text style={styles.subtaskDelete}>✕</Text>
                     </TouchableOpacity>
                   </View>
@@ -287,7 +299,12 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity style={styles.addSubtaskBtn} onPress={() => setAddingSubtask(true)}>
+              <TouchableOpacity
+                style={styles.addSubtaskBtn}
+                onPress={() => setAddingSubtask(true)}
+                accessibilityLabel="Add subtask"
+                accessibilityRole="button"
+              >
                 <Text style={styles.addSubtaskIcon}>+</Text>
                 <Text style={styles.addSubtaskText}>Add subtask</Text>
               </TouchableOpacity>

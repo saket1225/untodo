@@ -32,7 +32,12 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           <Text style={styles.message}>
             {this.props.fallbackMessage || 'An unexpected error occurred.'}
           </Text>
-          <TouchableOpacity style={styles.button} onPress={this.handleRetry}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={this.handleRetry}
+            accessibilityLabel="Try again"
+            accessibilityRole="button"
+          >
             <Text style={styles.buttonText}>Try Again</Text>
           </TouchableOpacity>
         </View>

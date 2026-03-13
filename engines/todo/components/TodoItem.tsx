@@ -286,13 +286,25 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, selecti
       >
         {/* Checkbox / Selection */}
         {selectionMode ? (
-          <TouchableOpacity style={styles.checkbox} onPress={onSelect}>
+          <TouchableOpacity
+            style={styles.checkbox}
+            onPress={onSelect}
+            accessibilityLabel={isSelected ? 'Deselect task' : 'Select task'}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isSelected }}
+          >
             <View style={[styles.selectionCircle, isSelected && styles.selectionCircleActive]}>
               {isSelected && <Text style={styles.selectionCheck}>✓</Text>}
             </View>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.checkbox} onPress={handleToggle}>
+          <TouchableOpacity
+            style={styles.checkbox}
+            onPress={handleToggle}
+            accessibilityLabel={todo.completed ? `Mark "${todo.title}" incomplete` : `Complete "${todo.title}"`}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: todo.completed }}
+          >
             <View style={[
               styles.checkboxInner,
               todo.completed && styles.checkboxChecked,
@@ -355,8 +367,8 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, selecti
               <Text style={styles.pomodoroText}>{pomodoroMins}m</Text>
             )}
             {(isTracking || totalSeconds > 0) && (
-              isTracking ? (
-                <LiveTimer startedAt={todo.timeTracking!.startedAt!} baseSeconds={totalSeconds} />
+              isTracking && todo.timeTracking?.startedAt ? (
+                <LiveTimer startedAt={todo.timeTracking.startedAt} baseSeconds={totalSeconds} />
               ) : (
                 <Text style={styles.trackingTimeIdle}>{formatTrackingTime(totalSeconds)}</Text>
               )
@@ -372,7 +384,9 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, selecti
           <TouchableOpacity
             style={[styles.trackingBtn, isTracking && styles.trackingBtnActive]}
             onPress={toggleTracking}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel={isTracking ? 'Stop time tracking' : 'Start time tracking'}
+            accessibilityRole="button"
           >
             <Text style={[styles.trackingBtnText, isTracking && styles.trackingBtnTextActive]}>
               {isTracking ? '⏸' : '▶'}

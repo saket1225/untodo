@@ -57,7 +57,12 @@ export default function UndoToast() {
   return (
     <Animated.View style={[styles.container, { transform: [{ translateY }], opacity }]}>
       <Text style={styles.message}>{action.message}</Text>
-      <TouchableOpacity onPress={handleUndo} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+      <TouchableOpacity
+        onPress={handleUndo}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        accessibilityLabel="Undo action"
+        accessibilityRole="button"
+      >
         <Text style={styles.undoButton}>Undo</Text>
       </TouchableOpacity>
     </Animated.View>
