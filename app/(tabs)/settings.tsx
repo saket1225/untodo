@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Switch, StyleSheet, Alert } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Switch, StyleSheet, Alert, Animated as RNAnimated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -23,6 +23,26 @@ function SectionCard({ children, style }: { children: React.ReactNode; style?: a
     <View style={[styles.sectionCard, style]}>
       {children}
     </View>
+  );
+}
+
+// Pulsing dot animation for "listening" state
+function PulsingDot() {
+  const pulse = useRef(new RNAnimated.Value(0.4)).current;
+
+  useEffect(() => {
+    const anim = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+        RNAnimated.timing(pulse, { toValue: 0.4, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, []);
+
+  return (
+    <RNAnimated.View style={[styles.pulsingDot, { opacity: pulse }]} />
   );
 }
 
@@ -56,6 +76,7 @@ function SettingsScreenContent() {
     if (!pairingCode) return;
     try {
       await Clipboard.setStringAsync(pairingCode);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {}
@@ -66,6 +87,7 @@ function SettingsScreenContent() {
     const msg = `Connect to my untodo app. Username: ${username}, Pairing code: ${pairingCode}. Docs: https://untodo-docs.vercel.app/`;
     try {
       await Clipboard.setStringAsync(msg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {}
@@ -80,9 +102,22 @@ function SettingsScreenContent() {
   };
 
   const handleDisconnect = async () => {
-    await disconnectSilicon();
-    setSilicon(null);
-    setPairingCode(null);
+    Alert.alert(
+      'Disconnect Silicon?',
+      'Are you sure you want to disconnect Silicon? You\'ll need to pair again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Disconnect',
+          style: 'destructive',
+          onPress: async () => {
+            await disconnectSilicon();
+            setSilicon(null);
+            setPairingCode(null);
+          },
+        },
+      ]
+    );
   };
 
   const handleNotifToggle = async (key: 'morningReminder' | 'afternoonCheck' | 'eveningReminder', value: boolean) => {
@@ -120,13 +155,15 @@ function SettingsScreenContent() {
     );
   };
 
+  const isConnected = silicon?.connected;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.heading} accessibilityRole="header">Settings</Text>
 
         {/* Account */}
-        <Text style={styles.sectionHeader}>ACCOUNT</Text>
+        <Text style={styles.sectionHeaderText}>ACCOUNT</Text>
         <SectionCard>
           <View style={styles.cardRow}>
             <Text style={styles.cardRowLabel}>Username</Text>
@@ -135,7 +172,7 @@ function SettingsScreenContent() {
         </SectionCard>
 
         {/* Preferences */}
-        <Text style={styles.sectionHeader}>PREFERENCES</Text>
+        <Text style={styles.sectionHeaderText}>PREFERENCES</Text>
         <SectionCard>
           <View style={styles.cardRow}>
             <Text style={styles.cardRowLabel}>Day resets at</Text>
@@ -175,7 +212,7 @@ function SettingsScreenContent() {
         </SectionCard>
 
         {/* Notifications */}
-        <Text style={styles.sectionHeader}>NOTIFICATIONS</Text>
+        <Text style={styles.sectionHeaderText}>NOTIFICATIONS</Text>
         <SectionCard>
           <View style={styles.notifRow}>
             <View style={styles.notifInfo}>
@@ -223,15 +260,22 @@ function SettingsScreenContent() {
           </View>
         </SectionCard>
 
-        {/* Silicon Connection */}
-        <Text style={styles.sectionHeader}>SILICON</Text>
+        {/* Silicon Connection - Guided Flow */}
+        <Text style={styles.sectionHeaderText}>SILICON</Text>
         <SectionCard style={styles.siliconCard}>
-          {silicon?.connected ? (
+          {isConnected ? (
             <>
-              <View style={styles.statusRow}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusText}>Connected (real-time)</Text>
+              {/* Connected state */}
+              <View style={styles.flowStep}>
+                <View style={styles.stepBadgeConnected}>
+                  <Text style={styles.stepBadgeText}>✓</Text>
+                </View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Connected</Text>
+                  <Text style={styles.stepDesc}>Silicon is syncing in real-time</Text>
+                </View>
               </View>
+
               {silicon.lastSync && (
                 <Text style={styles.hint}>
                   Last activity: {new Date(silicon.lastSync).toLocaleString()}
@@ -240,10 +284,8 @@ function SettingsScreenContent() {
 
               {pairingCode && (
                 <View style={styles.codeContainer}>
-                  <Text style={styles.codeLabel}>Pairing Code</Text>
-                  <TouchableOpacity onPress={handleCopyCode} activeOpacity={0.7}>
-                    <Text style={styles.codeValue}>{pairingCode}</Text>
-                  </TouchableOpacity>
+                  <Text style={styles.codeLabelSmall}>Pairing Code</Text>
+                  <Text style={styles.codeValueSmall}>{pairingCode}</Text>
                 </View>
               )}
 
@@ -261,41 +303,53 @@ function SettingsScreenContent() {
             </>
           ) : (
             <>
-              <View style={styles.statusRow}>
-                <View style={[styles.statusDot, { backgroundColor: Colors.dark.textTertiary }]} />
-                <Text style={styles.statusText}>Not connected</Text>
-              </View>
-
-              {pairingCode && (
-                <View style={styles.codeContainer}>
-                  <Text style={styles.codeLabel}>Pairing Code</Text>
-                  <TouchableOpacity onPress={handleCopyCode} activeOpacity={0.7}>
-                    <Text style={styles.codeValue}>{pairingCode}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.copyBtn} onPress={handleCopyCode}>
-                    <Text style={styles.copyBtnText}>{copied ? 'Copied' : 'Copy Code'}</Text>
-                  </TouchableOpacity>
+              {/* Step 1: Instructions */}
+              <View style={styles.flowStep}>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepBadgeText}>1</Text>
                 </View>
-              )}
-
-              <View style={styles.instructionBlock}>
-                <Text style={styles.instructionText}>
-                  Send this to your Silicon instance:
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Send to Silicon</Text>
+                  <Text style={styles.stepDesc}>Copy and send this message to your Silicon instance</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.messageBlock} onPress={handleCopyMessage} activeOpacity={0.7}>
+                <Text style={styles.messageText}>
+                  Connect to my untodo app. Username: {username}, Pairing code: {pairingCode}
                 </Text>
-                <TouchableOpacity style={styles.messageBlock} onPress={handleCopyMessage} activeOpacity={0.7}>
-                  <Text style={styles.messageText}>
-                    Connect to my untodo app. Username: {username}, Pairing code: {pairingCode}. Docs: https://untodo-docs.vercel.app/
-                  </Text>
-                  <Text style={styles.tapToCopy}>Tap to copy</Text>
+                <Text style={styles.tapToCopy}>{copied ? 'Copied!' : 'Tap to copy'}</Text>
+              </TouchableOpacity>
+
+              {/* Step 2: Pairing Code */}
+              <View style={[styles.flowStep, { marginTop: Spacing.lg }]}>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepBadgeText}>2</Text>
+                </View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Your Pairing Code</Text>
+                  <Text style={styles.stepDesc}>Silicon will use this to find you</Text>
+                </View>
+              </View>
+              <View style={styles.codeContainer}>
+                <TouchableOpacity onPress={handleCopyCode} activeOpacity={0.7}>
+                  <Text style={styles.codeValue}>{pairingCode}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.copyBtn} onPress={handleCopyCode}>
+                  <Text style={styles.copyBtnText}>{copied ? 'Copied!' : 'Copy Code'}</Text>
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.capabilitiesBlock}>
-                <Text style={styles.capabilitiesTitle}>What Silicon can do</Text>
-                <Text style={styles.capabilityItem}>  Add and manage your tasks remotely</Text>
-                <Text style={styles.capabilityItem}>  Write daily summaries and weekly reviews</Text>
-                <Text style={styles.capabilityItem}>  Track your progress and send nudges</Text>
-                <Text style={styles.capabilityItem}>  Control app settings</Text>
+              {/* Step 3: Listening */}
+              <View style={[styles.flowStep, { marginTop: Spacing.lg }]}>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepBadgeText}>3</Text>
+                </View>
+                <View style={styles.stepContent}>
+                  <View style={styles.listeningRow}>
+                    <PulsingDot />
+                    <Text style={styles.listeningText}>Listening for Silicon...</Text>
+                  </View>
+                </View>
               </View>
 
               <TouchableOpacity
@@ -307,14 +361,14 @@ function SettingsScreenContent() {
                 accessibilityLabel="Connect to Silicon"
                 accessibilityRole="button"
               >
-                <Text style={styles.actionBtnText}>Connect</Text>
+                <Text style={styles.actionBtnText}>Connect Manually</Text>
               </TouchableOpacity>
             </>
           )}
         </SectionCard>
 
         {/* Danger Zone */}
-        <Text style={[styles.sectionHeader, { color: Colors.dark.error }]}>DANGER ZONE</Text>
+        <Text style={[styles.sectionHeaderText, { color: Colors.dark.error }]}>DANGER ZONE</Text>
         <SectionCard>
           <TouchableOpacity
             style={styles.dangerRow}
@@ -362,7 +416,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     marginBottom: Spacing.lg,
   },
-  sectionHeader: {
+  sectionHeaderText: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.bodyMedium,
     fontSize: 11,
@@ -382,6 +436,7 @@ const styles = StyleSheet.create({
   siliconCard: {
     borderColor: Colors.dark.textTertiary + '44',
     padding: Spacing.lg,
+    overflow: 'visible',
   },
   cardRow: {
     flexDirection: 'row',
@@ -440,6 +495,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 13,
     marginTop: Spacing.sm,
+    marginBottom: Spacing.sm,
   },
   // Notifications
   notifRow: {
@@ -463,22 +519,66 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  statusRow: {
+
+  // Silicon guided flow
+  flowStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  stepBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.dark.background,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepBadgeConnected: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.dark.success,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepBadgeText: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 12,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepTitle: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 15,
+  },
+  stepDesc: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  listeningRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    marginBottom: Spacing.sm,
   },
-  statusDot: {
+  listeningText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+  },
+  pulsingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: Colors.dark.success,
-  },
-  statusText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
   },
   codeContainer: {
     alignItems: 'center',
@@ -487,20 +587,26 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.background,
     borderRadius: 12,
   },
-  codeLabel: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: Spacing.sm,
-  },
   codeValue: {
     color: Colors.dark.accent,
     fontFamily: Fonts.accent,
     fontSize: 48,
     letterSpacing: 8,
     marginBottom: Spacing.md,
+  },
+  codeLabelSmall: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: Spacing.xs,
+  },
+  codeValueSmall: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.accent,
+    fontSize: 28,
+    letterSpacing: 6,
   },
   copyBtn: {
     backgroundColor: Colors.dark.surface,
@@ -514,15 +620,6 @@ const styles = StyleSheet.create({
     color: Colors.dark.text,
     fontFamily: Fonts.bodyMedium,
     fontSize: 13,
-  },
-  instructionBlock: {
-    marginBottom: Spacing.lg,
-  },
-  instructionText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    marginBottom: Spacing.sm,
   },
   messageBlock: {
     backgroundColor: Colors.dark.background,
@@ -542,26 +639,12 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     textAlign: 'right',
   },
-  capabilitiesBlock: {
-    marginBottom: Spacing.lg,
-  },
-  capabilitiesTitle: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 13,
-    marginBottom: Spacing.sm,
-  },
-  capabilityItem: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    lineHeight: 22,
-  },
   actionBtn: {
     backgroundColor: Colors.dark.accent,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
+    marginTop: Spacing.md,
   },
   actionBtnText: {
     color: Colors.dark.background,

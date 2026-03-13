@@ -97,6 +97,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
         <View style={styles.sheet} onStartShouldSetResponder={() => true}>
           <View style={styles.handle} />
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" bounces={false}>
           <Text style={styles.taskTitle} numberOfLines={1}>{todo.title}</Text>
 
           {/* Edit title */}
@@ -308,6 +309,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
             <Text style={[styles.actionIcon, { color: Colors.dark.error }]}>✕</Text>
             <Text style={[styles.actionText, { color: Colors.dark.error }]}>Delete</Text>
           </TouchableOpacity>
+          </ScrollView>
         </View>
       </TouchableOpacity>
     </Modal>
@@ -377,7 +379,7 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
   },
   catScroll: {
-    maxHeight: 40,
+    flexGrow: 0,
   },
   catChip: {
     paddingHorizontal: 12,

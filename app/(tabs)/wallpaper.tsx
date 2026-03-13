@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useWallpaperStore } from '../../engines/wallpaper/store';
 import { useTodoStore } from '../../engines/todo/store';
-import { DayData, WallpaperPreset, DotColorTheme } from '../../engines/wallpaper/types';
+import { DayData, WallpaperPreset, WallpaperStyle } from '../../engines/wallpaper/types';
 import { getLogicalDate } from '../../lib/date-utils';
 import ErrorBoundary from '../../components/ErrorBoundary';
 
@@ -50,44 +50,124 @@ function getDailyQuote(customQuote: string): string {
   return QUOTE_POOL[dayOfYear % QUOTE_POOL.length];
 }
 
-// ─── Color Themes ───────────────────────────────────────────────────────────────
+// ─── Wallpaper Styles ───────────────────────────────────────────────────────────
 
-const DOT_THEMES: Record<DotColorTheme, { label: string; completed: (rate: number) => string; today: string; todayGlow: string }> = {
-  classic: {
-    label: 'Classic',
-    completed: (rate) => {
+interface StyleTheme {
+  label: string;
+  desc: string;
+  bg: string;
+  dotCompleted: (rate: number) => string;
+  dotToday: string;
+  dotTodayGlow: string;
+  dotFuture: string;
+  dotEmpty: string;
+  textPrimary: string;
+  textSecondary: string;
+  textTertiary: string;
+  fontOverride?: string; // monospace override for terminal
+  gridLines?: boolean; // blueprint grid lines
+}
+
+const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
+  minimal: {
+    label: 'Minimal',
+    desc: 'Clean & dark',
+    bg: '#080808',
+    dotCompleted: (rate) => {
       const v = Math.round(100 + 155 * rate);
       return `rgb(${v}, ${v}, ${v})`;
     },
-    today: '#FFFFFF',
-    todayGlow: 'rgba(255, 255, 255, 0.4)',
+    dotToday: '#FFFFFF',
+    dotTodayGlow: 'rgba(255, 255, 255, 0.4)',
+    dotFuture: 'rgba(255, 255, 255, 0.04)',
+    dotEmpty: 'rgba(255, 255, 255, 0.08)',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#666666',
+    textTertiary: '#444444',
   },
-  green: {
+  terminal: {
     label: 'Terminal',
-    completed: (rate) => {
+    desc: 'Hacker vibes',
+    bg: '#0A0A0A',
+    dotCompleted: (rate) => {
       const v = Math.round(60 + 195 * rate);
-      return `rgb(0, ${v}, ${Math.round(v * 0.4)})`;
+      return `rgb(0, ${v}, ${Math.round(v * 0.3)})`;
     },
-    today: '#00FF66',
-    todayGlow: 'rgba(0, 255, 102, 0.4)',
+    dotToday: '#00FF41',
+    dotTodayGlow: 'rgba(0, 255, 65, 0.5)',
+    dotFuture: 'rgba(0, 255, 65, 0.03)',
+    dotEmpty: 'rgba(0, 255, 65, 0.06)',
+    textPrimary: '#00FF41',
+    textSecondary: '#00AA2A',
+    textTertiary: '#005515',
+    fontOverride: 'monospace',
   },
-  blue: {
-    label: 'Ocean',
-    completed: (rate) => {
-      const b = Math.round(100 + 155 * rate);
-      return `rgb(${Math.round(b * 0.4)}, ${Math.round(b * 0.7)}, ${b})`;
+  gradient: {
+    label: 'Gradient',
+    desc: 'Subtle depth',
+    bg: '#0D0D1A',
+    dotCompleted: (rate) => {
+      const r = Math.round(80 + 100 * rate);
+      const g = Math.round(80 + 120 * rate);
+      const b = Math.round(120 + 135 * rate);
+      return `rgb(${r}, ${g}, ${b})`;
     },
-    today: '#4488FF',
-    todayGlow: 'rgba(68, 136, 255, 0.4)',
+    dotToday: '#8B9CF7',
+    dotTodayGlow: 'rgba(139, 156, 247, 0.5)',
+    dotFuture: 'rgba(139, 156, 247, 0.04)',
+    dotEmpty: 'rgba(139, 156, 247, 0.08)',
+    textPrimary: '#C8D0F7',
+    textSecondary: '#5B6399',
+    textTertiary: '#363B5E',
   },
-  warm: {
-    label: 'Amber',
-    completed: (rate) => {
+  neon: {
+    label: 'Neon',
+    desc: 'Glow effect',
+    bg: '#050510',
+    dotCompleted: (rate) => {
       const v = Math.round(100 + 155 * rate);
-      return `rgb(${v}, ${Math.round(v * 0.7)}, ${Math.round(v * 0.2)})`;
+      return `rgb(${Math.round(v * 0.9)}, ${Math.round(v * 0.2)}, ${v})`;
     },
-    today: '#FFB020',
-    todayGlow: 'rgba(255, 176, 32, 0.4)',
+    dotToday: '#FF44FF',
+    dotTodayGlow: 'rgba(255, 68, 255, 0.6)',
+    dotFuture: 'rgba(255, 68, 255, 0.03)',
+    dotEmpty: 'rgba(255, 68, 255, 0.06)',
+    textPrimary: '#FF44FF',
+    textSecondary: '#882288',
+    textTertiary: '#441144',
+  },
+  paper: {
+    label: 'Paper',
+    desc: 'Light & clean',
+    bg: '#F5F0E8',
+    dotCompleted: (rate) => {
+      const v = Math.round(180 - 150 * rate);
+      return `rgb(${v}, ${v - 10}, ${v - 20})`;
+    },
+    dotToday: '#1A1A1A',
+    dotTodayGlow: 'rgba(26, 26, 26, 0.3)',
+    dotFuture: 'rgba(0, 0, 0, 0.04)',
+    dotEmpty: 'rgba(0, 0, 0, 0.08)',
+    textPrimary: '#1A1A1A',
+    textSecondary: '#888880',
+    textTertiary: '#BBB8B0',
+  },
+  blueprint: {
+    label: 'Blueprint',
+    desc: 'Technical grid',
+    bg: '#0A1628',
+    dotCompleted: (rate) => {
+      const v = Math.round(80 + 175 * rate);
+      return `rgb(${Math.round(v * 0.4)}, ${Math.round(v * 0.7)}, ${v})`;
+    },
+    dotToday: '#5CACEE',
+    dotTodayGlow: 'rgba(92, 172, 238, 0.5)',
+    dotFuture: 'rgba(92, 172, 238, 0.04)',
+    dotEmpty: 'rgba(92, 172, 238, 0.08)',
+    textPrimary: '#5CACEE',
+    textSecondary: '#2E6898',
+    textTertiary: '#1A3D5C',
+    gridLines: true,
   },
 };
 
@@ -190,7 +270,6 @@ function computeStreak(todos: any[]): number {
   let streak = 0;
   const current = new Date(today + 'T12:00:00');
 
-  // Check today first — if no completed tasks today, start from yesterday
   const todayEntry = dateSet.get(today);
   if (!todayEntry || todayEntry.completed === 0) {
     current.setDate(current.getDate() - 1);
@@ -228,30 +307,40 @@ function computeWeekCompletionRate(todos: any[]): number {
 
 // ─── Dot Grid ───────────────────────────────────────────────────────────────────
 
-function getDotColor(day: DayData, theme: DotColorTheme): string {
-  const t = DOT_THEMES[theme];
-  if (day.isToday) return t.today;
-  if (day.isFuture) return 'rgba(255, 255, 255, 0.04)';
-  if (day.completionRate === 0) return 'rgba(255, 255, 255, 0.08)';
-  return t.completed(day.completionRate);
+function getDotColor(day: DayData, style: StyleTheme): string {
+  if (day.isToday) return style.dotToday;
+  if (day.isFuture) return style.dotFuture;
+  if (day.completionRate === 0) return style.dotEmpty;
+  return style.dotCompleted(day.completionRate);
 }
 
-function DotGrid({ config, days }: { config: import('../../engines/wallpaper/types').WallpaperConfig; days: DayData[] }) {
-  const { dotSize, spacing, cols, colorTheme } = config;
+function DotGrid({ config, days, style }: { config: import('../../engines/wallpaper/types').WallpaperConfig; days: DayData[]; style: StyleTheme }) {
+  const { dotSize, spacing, cols } = config;
   const totalWidth = cols * (dotSize * 2 + spacing) - spacing;
-  const availableWidth = PREVIEW_WIDTH - Spacing.md * 2 - 8; // account for frame border
+  const availableWidth = PREVIEW_WIDTH - Spacing.md * 2 - 8;
   const scale = Math.min(1, availableWidth / totalWidth);
   const finalDot = dotSize * scale;
   const finalSpacing = spacing * scale;
   const finalWidth = cols * (finalDot * 2 + finalSpacing) - finalSpacing;
-  const theme: DotColorTheme = colorTheme || 'classic';
+  const isNeon = config.wallpaperStyle === 'neon';
 
   return (
     <View style={{ alignItems: 'center', paddingVertical: Spacing.sm }}>
+      {style.gridLines && (
+        <View style={{
+          position: 'absolute',
+          width: finalWidth + 20,
+          height: '100%',
+          borderWidth: 0.5,
+          borderColor: 'rgba(92, 172, 238, 0.08)',
+          borderRadius: 2,
+        }} />
+      )}
       <View style={{ width: finalWidth, flexDirection: 'row', flexWrap: 'wrap', gap: finalSpacing }}>
         {days.map((day, i) => {
           const isToday = day.isToday;
-          const color = getDotColor(day, theme);
+          const color = getDotColor(day, style);
+          const hasGlow = isToday || (isNeon && day.completionRate > 0 && !day.isFuture);
           return (
             <View
               key={i}
@@ -260,12 +349,12 @@ function DotGrid({ config, days }: { config: import('../../engines/wallpaper/typ
                 height: finalDot * 2,
                 borderRadius: finalDot,
                 backgroundColor: color,
-                ...(isToday ? {
-                  shadowColor: DOT_THEMES[theme].todayGlow,
+                ...(hasGlow ? {
+                  shadowColor: isToday ? style.dotTodayGlow : color,
                   shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 1,
-                  shadowRadius: finalDot * 2,
-                  elevation: 8,
+                  shadowOpacity: isToday ? 1 : 0.6,
+                  shadowRadius: isToday ? finalDot * 2 : finalDot,
+                  elevation: isToday ? 8 : 4,
                 } : {}),
               }}
             />
@@ -352,7 +441,7 @@ function CollapsibleSection({ title, children, defaultOpen = true }: {
 
 // ─── Date Input ─────────────────────────────────────────────────────────────────
 
-function DateInput({ value, onChange, error }: { value: string; onChange: (v: string) => void; error: string | null }) {
+function DateInput({ value, onChange, error, label }: { value: string; onChange: (v: string) => void; error: string | null; label?: string }) {
   const [year, setYear] = useState(() => value.split('-')[0] || '2028');
   const [month, setMonth] = useState(() => value.split('-')[1] || '01');
   const [day, setDay] = useState(() => value.split('-')[2] || '12');
@@ -374,6 +463,7 @@ function DateInput({ value, onChange, error }: { value: string; onChange: (v: st
 
   return (
     <View>
+      {label && <Text style={styles.inputLabel}>{label}</Text>}
       <View style={styles.dateInputRow}>
         <View style={styles.dateField}>
           <Text style={styles.dateFieldLabel}>Year</Text>
@@ -425,7 +515,8 @@ function WallpaperScreenContent() {
   const viewShotRef = useRef<ViewShot>(null);
   const [savedToast, setSavedToast] = useState(false);
 
-  const startDate = new Date(2026, 2, 10); // March 10, 2026
+  const activeStyle = WALLPAPER_STYLES[config.wallpaperStyle || 'minimal'];
+  const startDate = new Date((config.startDate || '2026-03-10') + 'T00:00:00');
   const goalDate = config.goalDate || '2028-01-12';
   const goalDateValid = isValidDateStr(goalDate);
 
@@ -438,7 +529,7 @@ function WallpaperScreenContent() {
     } catch {
       return [];
     }
-  }, [todos, goalDate]);
+  }, [todos, goalDate, config.startDate]);
 
   const daysLeft = goalDateValid ? getDaysLeft(goalDate) : 0;
   const dayNumber = getDayNumber(startDate);
@@ -449,6 +540,10 @@ function WallpaperScreenContent() {
     ? 'Invalid date (use YYYY-MM-DD)'
     : goalInPast
     ? 'Goal date has passed'
+    : null;
+
+  const startDateError = config.startDate && config.startDate.length >= 10 && !isValidDateStr(config.startDate)
+    ? 'Invalid date'
     : null;
 
   const displayNumber = config.showDaysLeft ? daysLeft : dayNumber;
@@ -521,12 +616,11 @@ function WallpaperScreenContent() {
               {
                 data: contentUri,
                 type: 'image/*',
-                flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+                flags: 1,
                 extra: { 'mimeType': 'image/png' },
               }
             );
           } catch {
-            // Fallback: open wallpaper settings
             try {
               await IntentLauncher.startActivityAsync(
                 'android.intent.action.SET_WALLPAPER'
@@ -572,41 +666,92 @@ function WallpaperScreenContent() {
         <View style={styles.phoneFrame}>
           <View style={styles.phoneNotch} />
           <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1, result: 'tmpfile' }}>
-            <View style={styles.preview}>
-              {/* Subtle vignette gradient overlay */}
-              <View style={styles.vignetteTop} />
-              <View style={styles.vignetteBottom} />
+            <View style={[styles.preview, { backgroundColor: activeStyle.bg }]}>
+              {/* Gradient overlay for gradient style */}
+              {config.wallpaperStyle === 'gradient' && (
+                <>
+                  <View style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, height: '40%',
+                    backgroundColor: 'rgba(20, 20, 50, 0.4)',
+                  }} />
+                  <View style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%',
+                    backgroundColor: 'rgba(10, 10, 30, 0.6)',
+                  }} />
+                </>
+              )}
+
+              {/* Blueprint grid lines */}
+              {config.wallpaperStyle === 'blueprint' && (
+                <View style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  borderWidth: 0,
+                  overflow: 'hidden',
+                }}>
+                  {Array.from({ length: 20 }).map((_, i) => (
+                    <View key={`h${i}`} style={{
+                      position: 'absolute',
+                      top: `${(i + 1) * 5}%`,
+                      left: 0, right: 0,
+                      height: 0.5,
+                      backgroundColor: 'rgba(92, 172, 238, 0.05)',
+                    }} />
+                  ))}
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <View key={`v${i}`} style={{
+                      position: 'absolute',
+                      left: `${(i + 1) * 8.33}%`,
+                      top: 0, bottom: 0,
+                      width: 0.5,
+                      backgroundColor: 'rgba(92, 172, 238, 0.05)',
+                    }} />
+                  ))}
+                </View>
+              )}
 
               {/* Content */}
               <View style={styles.previewContent}>
                 {config.showDayCount && (
                   <Text style={[
                     styles.previewDayCount,
-                    { color: DOT_THEMES[config.colorTheme || 'classic'].today },
+                    { color: activeStyle.textPrimary },
+                    activeStyle.fontOverride === 'monospace' && { fontFamily: 'monospace' },
                   ]}>
                     {displayNumber}
                   </Text>
                 )}
                 {config.showDayCount && (
-                  <Text style={styles.previewDayLabel}>{displayLabel}</Text>
+                  <Text style={[
+                    styles.previewDayLabel,
+                    { color: activeStyle.textSecondary },
+                    activeStyle.fontOverride === 'monospace' && { fontFamily: 'monospace' },
+                  ]}>{displayLabel}</Text>
                 )}
 
                 {/* Stats line (only in stats preset) */}
                 {isStats && (
                   <View style={styles.statsRow}>
-                    <Text style={styles.statItem}>{weekRate}% this week</Text>
-                    <Text style={styles.statDivider}>·</Text>
-                    <Text style={styles.statItem}>{streak}d streak</Text>
+                    <Text style={[styles.statItem, { color: activeStyle.textSecondary }]}>{weekRate}% this week</Text>
+                    <Text style={[styles.statDivider, { color: activeStyle.textTertiary }]}>·</Text>
+                    <Text style={[styles.statItem, { color: activeStyle.textSecondary }]}>{streak}d streak</Text>
                   </View>
                 )}
 
-                <DotGrid config={config} days={days} />
+                <DotGrid config={config} days={days} style={activeStyle} />
 
                 {config.showQuote && (
-                  <Text style={styles.previewQuote}>{quote}</Text>
+                  <Text style={[
+                    styles.previewQuote,
+                    { color: activeStyle.textTertiary },
+                    activeStyle.fontOverride === 'monospace' && { fontFamily: 'monospace', fontStyle: 'normal' },
+                  ]}>{quote}</Text>
                 )}
                 {config.showStreak && !isStats && (
-                  <Text style={styles.previewStreak}>
+                  <Text style={[
+                    styles.previewStreak,
+                    { color: activeStyle.textTertiary },
+                    activeStyle.fontOverride === 'monospace' && { fontFamily: 'monospace' },
+                  ]}>
                     {streak} day streak · day {dayNumber}
                   </Text>
                 )}
@@ -618,7 +763,7 @@ function WallpaperScreenContent() {
         {/* Toast */}
         {savedToast && (
           <View style={styles.toast}>
-            <Text style={styles.toastText}>✓ Wallpaper saved! Set it from your gallery.</Text>
+            <Text style={styles.toastText}>Wallpaper saved</Text>
           </View>
         )}
 
@@ -663,6 +808,37 @@ function WallpaperScreenContent() {
 
         {/* ── STYLE section ── */}
         <CollapsibleSection title="Style">
+          {/* Wallpaper style varieties */}
+          <Text style={styles.inputLabel}>Vibe</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.md }}>
+            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+              {(Object.keys(WALLPAPER_STYLES) as WallpaperStyle[]).map(key => {
+                const s = WALLPAPER_STYLES[key];
+                const active = (config.wallpaperStyle || 'minimal') === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.vibeChip, active && styles.vibeChipActive]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      updateConfig({ wallpaperStyle: key });
+                    }}
+                  >
+                    <View style={[styles.vibePreview, { backgroundColor: s.bg }]}>
+                      <View style={[styles.vibeDot, { backgroundColor: s.dotToday }]} />
+                      <View style={[styles.vibeDot, { backgroundColor: s.dotCompleted(0.7), opacity: 0.8 }]} />
+                      <View style={[styles.vibeDot, { backgroundColor: s.dotCompleted(0.4), opacity: 0.5 }]} />
+                    </View>
+                    <Text style={[styles.vibeLabel, active && styles.vibeLabelActive]}>{s.label}</Text>
+                    <Text style={[styles.vibeDesc, active && styles.vibeDescActive]}>{s.desc}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+
+          {/* Layout presets */}
+          <Text style={styles.inputLabel}>Layout</Text>
           <View style={styles.presetRow}>
             {PRESETS.map(p => (
               <TouchableOpacity
@@ -674,28 +850,6 @@ function WallpaperScreenContent() {
                 <Text style={[styles.presetDesc, config.preset === p.key && styles.presetDescActive]}>{p.desc}</Text>
               </TouchableOpacity>
             ))}
-          </View>
-
-          {/* Color themes */}
-          <Text style={[styles.inputLabel, { marginTop: Spacing.lg }]}>Dot Color</Text>
-          <View style={styles.themeRow}>
-            {(Object.keys(DOT_THEMES) as DotColorTheme[]).map(key => {
-              const active = (config.colorTheme || 'classic') === key;
-              const theme = DOT_THEMES[key];
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.themeChip, active && styles.themeChipActive]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    updateConfig({ colorTheme: key });
-                  }}
-                >
-                  <View style={[styles.themeDot, { backgroundColor: theme.completed(1) }]} />
-                  <Text style={[styles.themeLabel, active && styles.themeLabelActive]}>{theme.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
           </View>
         </CollapsibleSection>
 
@@ -769,10 +923,19 @@ function WallpaperScreenContent() {
           </View>
         </CollapsibleSection>
 
-        {/* ── GOAL section ── */}
-        <CollapsibleSection title="Goal" defaultOpen={false}>
+        {/* ── DATES section ── */}
+        <CollapsibleSection title="Dates" defaultOpen={false}>
+          <DateInput
+            label="Start Date"
+            value={config.startDate || '2026-03-10'}
+            onChange={v => updateConfig({ startDate: v })}
+            error={startDateError}
+          />
+
+          <View style={{ height: Spacing.lg }} />
+
           <View style={styles.inputRow}>
-            <Text style={styles.inputLabel}>Title</Text>
+            <Text style={styles.inputLabel}>Goal Title</Text>
             <TextInput
               style={styles.input}
               value={config.goalTitle}
@@ -781,8 +944,8 @@ function WallpaperScreenContent() {
               placeholderTextColor={Colors.dark.textTertiary}
             />
           </View>
-          <Text style={styles.inputLabel}>Date</Text>
           <DateInput
+            label="Goal Date"
             value={config.goalDate}
             onChange={v => updateConfig({ goalDate: v })}
             error={dateError}
@@ -801,6 +964,7 @@ function WallpaperScreenContent() {
                   showDayCount: true, showStreak: true, cols: 25,
                   goalTitle: '20', goalDate: '2028-01-12', showDaysLeft: true,
                   preset: 'full', colorTheme: 'classic', customQuote: '',
+                  wallpaperStyle: 'minimal', startDate: '2026-03-10',
                 }),
               },
             ]);
@@ -862,29 +1026,9 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   preview: {
-    width: PREVIEW_WIDTH - 6, // account for border
+    width: PREVIEW_WIDTH - 6,
     height: PREVIEW_HEIGHT,
     backgroundColor: '#080808',
-  },
-  vignetteTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: 'transparent',
-    // Subtle gradient effect via layered opacity
-    borderBottomWidth: 0,
-    opacity: 0.3,
-  },
-  vignetteBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: 'transparent',
-    opacity: 0.3,
   },
   previewContent: {
     flex: 1,
@@ -898,7 +1042,6 @@ const styles = StyleSheet.create({
     marginBottom: -8,
   },
   previewDayLabel: {
-    color: '#666666',
     fontFamily: Fonts.headingMedium,
     fontSize: 13,
     letterSpacing: 1.5,
@@ -906,7 +1049,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   previewQuote: {
-    color: '#444444',
     fontFamily: Fonts.accentItalic,
     fontSize: 12,
     textAlign: 'center',
@@ -915,7 +1057,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   previewStreak: {
-    color: '#3A3A3A',
     fontFamily: Fonts.body,
     fontSize: 11,
     marginTop: Spacing.sm,
@@ -929,13 +1070,11 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   statItem: {
-    color: '#555555',
     fontFamily: Fonts.bodyMedium,
     fontSize: 12,
     letterSpacing: 0.5,
   },
   statDivider: {
-    color: '#333333',
     fontSize: 12,
   },
 
@@ -1015,6 +1154,53 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
+  // Vibe/Style chips
+  vibeChip: {
+    width: 88,
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    backgroundColor: Colors.dark.surface,
+  },
+  vibeChipActive: {
+    borderColor: Colors.dark.accent,
+  },
+  vibePreview: {
+    width: 56,
+    height: 36,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  vibeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  vibeLabel: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 11,
+  },
+  vibeLabelActive: {
+    color: Colors.dark.accent,
+  },
+  vibeDesc: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 9,
+    marginTop: 1,
+  },
+  vibeDescActive: {
+    color: Colors.dark.textSecondary,
+  },
+
   // Presets
   presetRow: {
     flexDirection: 'row',
@@ -1050,41 +1236,6 @@ const styles = StyleSheet.create({
   presetDescActive: {
     color: Colors.dark.background,
     opacity: 0.7,
-  },
-
-  // Color themes
-  themeRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.sm,
-  },
-  themeChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    paddingVertical: 10,
-  },
-  themeChipActive: {
-    borderColor: Colors.dark.textSecondary,
-  },
-  themeDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  themeLabel: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-  },
-  themeLabelActive: {
-    color: Colors.dark.text,
   },
 
   // Controls

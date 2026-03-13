@@ -186,7 +186,6 @@ function TodayScreenContent() {
       .slice(0, 15);
   }, [allTodos, searchQuery]);
 
-  const [focusMode, setFocusMode] = useState(false);
   const [pomodoroTodo, setPomodoroTodo] = useState<Todo | null>(null);
   const [quickActionTodo, setQuickActionTodo] = useState<Todo | null>(null);
   const [showCarryOver, setShowCarryOver] = useState(false);
@@ -266,7 +265,7 @@ function TodayScreenContent() {
         setSelectedIndex(prev => Math.min(prev, todos.length - 2));
       }
     },
-  }, !focusMode);
+  }, true);
 
   // Drag reorder state
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -353,12 +352,6 @@ function TodayScreenContent() {
   const handleAdd = useCallback((title: string, priority?: Priority, category?: Category) => {
     addTodo(title, priority ?? null, category ?? null, viewingDate);
   }, [addTodo, viewingDate]);
-
-  // Focus mode: top priority incomplete task
-  const focusTask = useMemo(() => {
-    const incomplete = dateTodos.filter(t => !t.completed);
-    return incomplete.length > 0 ? incomplete[0] : null;
-  }, [dateTodos]);
 
   // Carry-over candidates count
   const yesterdayStr = useMemo(() => {
@@ -519,65 +512,8 @@ function TodayScreenContent() {
         </View>
       </View>
 
-      {/* Focus Mode */}
-      {focusMode && (
-        <View style={styles.focusModeContainer}>
-          <TouchableOpacity
-            style={styles.focusExitBtn}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setFocusMode(false);
-            }}
-            accessibilityLabel="Exit focus mode"
-            accessibilityRole="button"
-          >
-            <Text style={styles.focusExitText}>Exit Focus</Text>
-          </TouchableOpacity>
-          {focusTask ? (
-            <View style={styles.focusTaskCard}>
-              <Text style={styles.focusLabel}>CURRENT TASK</Text>
-              <Text style={styles.focusTaskTitle}>{focusTask.title}</Text>
-              {focusTask.category && (
-                <Text style={styles.focusTaskMeta}>
-                  {CATEGORIES.find(c => c.key === focusTask.category)?.label}
-                </Text>
-              )}
-              <View style={styles.focusActions}>
-                <TouchableOpacity
-                  style={styles.focusStartBtn}
-                  onPress={() => setPomodoroTodo(focusTask)}
-                  accessibilityLabel="Start pomodoro timer"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.focusStartBtnText}>Start Pomodoro</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.focusCompleteBtn}
-                  onPress={() => {
-                    handleToggle(focusTask.id);
-                  }}
-                  accessibilityLabel="Mark task complete"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.focusCompleteBtnText}>Mark Complete</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.focusProgress}>
-                {completed}/{total} tasks done today
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.focusTaskCard}>
-              <Text style={styles.focusLabel}>ALL DONE</Text>
-              <Text style={styles.focusTaskTitle}>No more tasks!</Text>
-              <Text style={styles.focusTaskMeta}>You've completed everything for today.</Text>
-            </View>
-          )}
-        </View>
-      )}
-
       {/* Search bar (collapsible) */}
-      {searchExpanded && !focusMode && (
+      {searchExpanded && (
         <View style={styles.searchContainer}>
           <TextInput
             ref={searchInputRef}
@@ -599,7 +535,7 @@ function TodayScreenContent() {
       )}
 
       {/* Back to Today pill */}
-      {!isToday && !focusMode && (
+      {!isToday && (
         <TouchableOpacity
           style={styles.backToTodayPill}
           onPress={goToToday}
@@ -611,14 +547,14 @@ function TodayScreenContent() {
       )}
 
       {/* Progress bar */}
-      {total > 0 && !focusMode && (
+      {total > 0 && (
         <View style={styles.progressBar}>
           <RNAnimated.View style={[styles.progressFill, { width: progressWidth }]} />
         </View>
       )}
 
       {/* Category filter chips - only visible when showFilters is true */}
-      {showFilters && activeCats.length > 0 && !focusMode && (
+      {showFilters && activeCats.length > 0 && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -667,17 +603,17 @@ function TodayScreenContent() {
       )}
 
       {/* Input */}
-      {!focusMode && <TodoInput onAdd={handleAdd} autoFocus={isToday} viewingDate={viewingDate} />}
+      <TodoInput onAdd={handleAdd} autoFocus={isToday} viewingDate={viewingDate} />
 
       {/* Initial loading */}
-      {initialLoading && total === 0 && !focusMode && (
+      {initialLoading && total === 0 && (
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Syncing...</Text>
         </View>
       )}
 
       {/* Todo list with swipe gesture */}
-      {!focusMode && <RNAnimated.View
+      <RNAnimated.View
         style={{ flex: 1, transform: [{ translateX: swipeAnim }] }}
         {...swipePanResponder.panHandlers}
       >
@@ -718,7 +654,7 @@ function TodayScreenContent() {
           </View>
         }
       />
-      </RNAnimated.View>}
+      </RNAnimated.View>
 
       {/* Carry-over modal */}
       {showCarryOver && (
@@ -839,99 +775,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 14,
   },
-  // Focus mode view
-  focusModeContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-  },
-  focusExitBtn: {
-    position: 'absolute',
-    top: Spacing.md,
-    right: 0,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  focusExitText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-  },
-  focusTaskCard: {
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-  },
-  focusLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 11,
-    letterSpacing: 2,
-    marginBottom: Spacing.lg,
-  },
-  focusTaskTitle: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 32,
-    textAlign: 'center',
-    marginBottom: Spacing.md,
-    lineHeight: 40,
-  },
-  focusTaskMeta: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    marginBottom: Spacing.xl,
-  },
-  focusActions: {
-    gap: Spacing.md,
-    width: '100%',
-    alignItems: 'center',
-  },
-  focusStartBtn: {
-    backgroundColor: Colors.dark.accent,
-    borderRadius: 14,
-    paddingVertical: 18,
-    paddingHorizontal: Spacing.xxl,
-    width: '100%',
-    alignItems: 'center',
-    shadowColor: '#fff',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  focusStartBtnText: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 18,
-  },
-  focusCompleteBtn: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: Spacing.xxl,
-    width: '100%',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    backgroundColor: Colors.dark.surface,
-  },
-  focusCompleteBtnText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
-  },
-  focusProgress: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    marginTop: Spacing.xl,
-  },
-
   // Search
   searchIconBtn: {
     padding: 4,

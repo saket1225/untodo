@@ -22,10 +22,13 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
       ]}>
         {icons[label] || '●'}
       </Text>
-      <Text style={[styles.label, {
-        color: focused ? Colors.dark.accent : Colors.dark.textTertiary,
-        fontFamily: focused ? Fonts.bodyMedium : Fonts.body,
-      }]}>
+      <Text
+        numberOfLines={1}
+        style={[styles.label, {
+          color: focused ? Colors.dark.accent : Colors.dark.textTertiary,
+          fontFamily: focused ? Fonts.bodyMedium : Fonts.body,
+        }]}
+      >
         {label}
       </Text>
     </View>
@@ -108,6 +111,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
   label: {
-    fontSize: 11,
+    fontSize: 10,
+    maxWidth: 70,
   },
 });

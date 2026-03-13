@@ -2,6 +2,8 @@ export type WallpaperPreset = 'minimal' | 'countdown' | 'full' | 'stats';
 
 export type DotColorTheme = 'classic' | 'green' | 'blue' | 'warm';
 
+export type WallpaperStyle = 'minimal' | 'terminal' | 'gradient' | 'neon' | 'paper' | 'blueprint';
+
 export interface WallpaperConfig {
   enabled: boolean;
   dotSize: number;
@@ -19,6 +21,8 @@ export interface WallpaperConfig {
   preset: WallpaperPreset;
   colorTheme: DotColorTheme;
   customQuote: string;
+  wallpaperStyle: WallpaperStyle;
+  startDate: string; // YYYY-MM-DD
 }
 
 export interface DayData {
