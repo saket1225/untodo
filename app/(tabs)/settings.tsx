@@ -18,6 +18,14 @@ import { setupDefaultNotifications } from '../../engines/notifications/service';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import Constants from 'expo-constants';
 
+function SectionCard({ children, style }: { children: React.ReactNode; style?: any }) {
+  return (
+    <View style={[styles.sectionCard, style]}>
+      {children}
+    </View>
+  );
+}
+
 function SettingsScreenContent() {
   const [resetHour, setResetHour] = useState(5);
   const [silicon, setSilicon] = useState<SiliconConnection | null>(null);
@@ -80,7 +88,6 @@ function SettingsScreenContent() {
   const handleNotifToggle = async (key: 'morningReminder' | 'afternoonCheck' | 'eveningReminder', value: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     updateNotifPref(key, value);
-    // Re-schedule all notifications with updated preferences
     setTimeout(() => setupDefaultNotifications(), 100);
   };
 
@@ -118,50 +125,58 @@ function SettingsScreenContent() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.heading} accessibilityRole="header">Settings</Text>
 
-        {/* Username */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <Text style={styles.usernameValue} accessibilityLabel={`Username: ${username}`}>@{username}</Text>
-        </View>
-
-        {/* Day Reset Time */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Day Reset Time</Text>
-          <View style={styles.row}>
-            <TouchableOpacity
-              style={styles.ctrlBtn}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setResetHour(h => Math.max(0, h - 1));
-              }}
-              accessibilityLabel="Decrease reset hour"
-              accessibilityRole="button"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.ctrlBtnText}>-</Text>
-            </TouchableOpacity>
-            <Text style={styles.timeValue} accessibilityLabel={`Reset time: ${String(resetHour).padStart(2, '0')}:00`}>{String(resetHour).padStart(2, '0')}:00</Text>
-            <TouchableOpacity
-              style={styles.ctrlBtn}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setResetHour(h => Math.min(12, h + 1));
-              }}
-              accessibilityLabel="Increase reset hour"
-              accessibilityRole="button"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.ctrlBtnText}>+</Text>
-            </TouchableOpacity>
+        {/* Account */}
+        <Text style={styles.sectionHeader}>ACCOUNT</Text>
+        <SectionCard>
+          <View style={styles.cardRow}>
+            <Text style={styles.cardRowLabel}>Username</Text>
+            <Text style={styles.usernameValue} accessibilityLabel={`Username: ${username}`}>@{username}</Text>
           </View>
-          <Text style={styles.hint}>
-            New day starts at {String(resetHour).padStart(2, '0')}:00 AM
-          </Text>
-        </View>
+        </SectionCard>
+
+        {/* Preferences */}
+        <Text style={styles.sectionHeader}>PREFERENCES</Text>
+        <SectionCard>
+          <View style={styles.cardRow}>
+            <Text style={styles.cardRowLabel}>Day resets at</Text>
+            <View style={styles.resetTimeRow}>
+              <TouchableOpacity
+                style={styles.ctrlBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setResetHour(h => Math.max(0, h - 1));
+                }}
+                accessibilityLabel="Decrease reset hour"
+                accessibilityRole="button"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.ctrlBtnText}>-</Text>
+              </TouchableOpacity>
+              <Text style={styles.timeValue} accessibilityLabel={`Reset time: ${String(resetHour).padStart(2, '0')}:00`}>{String(resetHour).padStart(2, '0')}:00</Text>
+              <TouchableOpacity
+                style={styles.ctrlBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setResetHour(h => Math.min(12, h + 1));
+                }}
+                accessibilityLabel="Increase reset hour"
+                accessibilityRole="button"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.ctrlBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <View style={styles.cardDivider} />
+          <View style={styles.cardRow}>
+            <Text style={styles.cardRowLabel}>Theme</Text>
+            <Text style={styles.cardRowValue}>Dark</Text>
+          </View>
+        </SectionCard>
 
         {/* Notifications */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
+        <Text style={styles.sectionHeader}>NOTIFICATIONS</Text>
+        <SectionCard>
           <View style={styles.notifRow}>
             <View style={styles.notifInfo}>
               <Text style={styles.notifLabel}>Morning motivation</Text>
@@ -176,6 +191,7 @@ function SettingsScreenContent() {
               accessibilityRole="switch"
             />
           </View>
+          <View style={styles.cardDivider} />
           <View style={styles.notifRow}>
             <View style={styles.notifInfo}>
               <Text style={styles.notifLabel}>Afternoon check</Text>
@@ -190,6 +206,7 @@ function SettingsScreenContent() {
               accessibilityRole="switch"
             />
           </View>
+          <View style={styles.cardDivider} />
           <View style={styles.notifRow}>
             <View style={styles.notifInfo}>
               <Text style={styles.notifLabel}>Evening reminder</Text>
@@ -204,18 +221,11 @@ function SettingsScreenContent() {
               accessibilityRole="switch"
             />
           </View>
-        </View>
-
-        {/* Theme */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Theme</Text>
-          <Text style={styles.hint}>Dark mode only (for now)</Text>
-        </View>
+        </SectionCard>
 
         {/* Silicon Connection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Silicon</Text>
-
+        <Text style={styles.sectionHeader}>SILICON</Text>
+        <SectionCard style={styles.siliconCard}>
           {silicon?.connected ? (
             <>
               <View style={styles.statusRow}>
@@ -229,7 +239,7 @@ function SettingsScreenContent() {
               )}
 
               {pairingCode && (
-                <View style={[styles.codeContainer, { marginTop: Spacing.md }]}>
+                <View style={styles.codeContainer}>
                   <Text style={styles.codeLabel}>Pairing Code</Text>
                   <TouchableOpacity onPress={handleCopyCode} activeOpacity={0.7}>
                     <Text style={styles.codeValue}>{pairingCode}</Text>
@@ -301,13 +311,13 @@ function SettingsScreenContent() {
               </TouchableOpacity>
             </>
           )}
-        </View>
+        </SectionCard>
 
         {/* Danger Zone */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Danger Zone</Text>
+        <Text style={[styles.sectionHeader, { color: Colors.dark.error }]}>DANGER ZONE</Text>
+        <SectionCard>
           <TouchableOpacity
-            style={styles.dangerBtn}
+            style={styles.dangerRow}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
               handleResetAllData();
@@ -316,9 +326,10 @@ function SettingsScreenContent() {
             accessibilityRole="button"
             accessibilityHint="Permanently deletes all tasks, progress, and settings"
           >
-            <Text style={styles.dangerBtnText}>Reset All Data</Text>
+            <Text style={styles.dangerRowText}>Reset All Data</Text>
+            <Text style={styles.dangerRowArrow}>→</Text>
           </TouchableOpacity>
-        </View>
+        </SectionCard>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>untodo v{appVersion}</Text>
@@ -349,48 +360,80 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.accentItalic,
     fontSize: 36,
     paddingTop: Spacing.lg,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
-  section: {
-    marginBottom: Spacing.xl,
-  },
-  sectionTitle: {
-    color: Colors.dark.text,
+  sectionHeader: {
+    color: Colors.dark.textTertiary,
     fontFamily: Fonts.bodyMedium,
-    fontSize: 16,
-    marginBottom: Spacing.md,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.xs,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  ctrlBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+  sectionCard: {
     backgroundColor: Colors.dark.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.dark.border,
+    marginBottom: Spacing.md,
+    overflow: 'hidden',
+  },
+  siliconCard: {
+    borderColor: Colors.dark.textTertiary + '44',
+    padding: Spacing.lg,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 14,
+  },
+  cardRowLabel: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.body,
+    fontSize: 15,
+  },
+  cardRowValue: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: 15,
+  },
+  cardDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.dark.border,
+    marginLeft: Spacing.md,
+  },
+  resetTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  ctrlBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: Colors.dark.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   ctrlBtnText: {
     color: Colors.dark.text,
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: Fonts.body,
   },
   timeValue: {
     color: Colors.dark.text,
     fontFamily: Fonts.accent,
-    fontSize: 32,
-    minWidth: 80,
+    fontSize: 20,
+    minWidth: 56,
     textAlign: 'center',
   },
   usernameValue: {
     color: Colors.dark.accent,
     fontFamily: Fonts.accent,
-    fontSize: 24,
+    fontSize: 20,
   },
   hint: {
     color: Colors.dark.textTertiary,
@@ -403,16 +446,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: Spacing.sm + 2,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
   },
   notifInfo: {
     flex: 1,
   },
   notifLabel: {
     color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
+    fontFamily: Fonts.body,
     fontSize: 15,
   },
   notifTime: {
@@ -442,15 +484,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.lg,
     marginBottom: Spacing.sm,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.dark.background,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
   },
   codeLabel: {
     color: Colors.dark.textSecondary,
     fontFamily: Fonts.body,
-    fontSize: 12,
+    fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: Spacing.sm,
@@ -463,7 +503,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   copyBtn: {
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.dark.surface,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     borderRadius: 8,
@@ -485,10 +525,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   messageBlock: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.dark.background,
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
     padding: Spacing.md,
   },
   messageText: {
@@ -520,16 +558,13 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   actionBtn: {
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
+    backgroundColor: Colors.dark.accent,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
-    marginBottom: Spacing.md,
   },
   actionBtnText: {
-    color: Colors.dark.text,
+    color: Colors.dark.background,
     fontFamily: Fonts.bodyMedium,
     fontSize: 14,
   },
@@ -546,8 +581,26 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyMedium,
     fontSize: 14,
   },
+  dangerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 14,
+  },
+  dangerRowText: {
+    color: Colors.dark.error,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 15,
+  },
+  dangerRowArrow: {
+    color: Colors.dark.error,
+    fontSize: 16,
+    opacity: 0.5,
+  },
   footer: {
     marginTop: Spacing.xl,
+    alignItems: 'center',
   },
   footerText: {
     color: Colors.dark.textTertiary,

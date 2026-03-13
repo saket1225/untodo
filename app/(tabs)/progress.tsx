@@ -254,9 +254,12 @@ function TaskCompletionStreak() {
       <Text style={styles.sectionTitle}>Your Streak</Text>
       <View style={styles.streakCardRow}>
         <View style={styles.streakCard}>
-          <Text style={styles.streakBigNum}>{streak}</Text>
+          <View style={styles.streakNumRow}>
+            <Text style={styles.streakFlameIcon}>{streak > 0 ? '🔥' : '💤'}</Text>
+            <Text style={styles.streakBigNum}>{streak}</Text>
+          </View>
           <Text style={styles.streakCardLabel}>day streak</Text>
-          <Text style={styles.streakCardSub}>({'>'}50% completion)</Text>
+          <Text style={styles.streakCardSub}>{'>'}50% completion</Text>
         </View>
         {bestDay && (
           <View style={styles.streakCard}>
@@ -378,7 +381,7 @@ function Streaks() {
       <Text style={styles.sectionTitle}>Habit Streaks</Text>
       {active.map(h => (
         <View key={h.id} style={styles.habitRow}>
-          <Text style={styles.streakFlame}>*</Text>
+          <Text style={styles.streakFlame}>🔥</Text>
           <Text style={styles.streakName}>{h.name}</Text>
           <Text style={styles.streakCount}>{h.streak}d</Text>
         </View>
@@ -838,6 +841,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+  },
+  streakNumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  streakFlameIcon: {
+    fontSize: 28,
   },
   streakBigNum: {
     color: Colors.dark.text,

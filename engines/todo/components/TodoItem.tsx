@@ -74,7 +74,6 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
       Animated.timing(scaleAnim, { toValue: 0.95, duration: 80, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4 }),
     ]).start();
-    // Stop tracking if completing
     if (!todo.completed && isTracking) {
       stopTimeTracking(todo.id);
     }
@@ -94,7 +93,6 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
   const pomodoroMins = todo.pomodoroMinutesLogged || 0;
   const subtasks = todo.subtasks || [];
   const subtasksDone = subtasks.filter(s => s.completed).length;
-  const hasNotes = !!(todo.notes && todo.notes.trim());
 
   return (
     <View style={styles.wrapper}>
@@ -110,11 +108,14 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
         ]}
         {...panResponder.panHandlers}
       >
+        {/* Checkbox */}
         <TouchableOpacity style={styles.checkbox} onPress={handleToggle}>
           <View style={[styles.checkboxInner, todo.completed && styles.checkboxChecked]}>
             {todo.completed && <Text style={styles.checkmark}>✓</Text>}
           </View>
         </TouchableOpacity>
+
+        {/* Content */}
         <TouchableOpacity
           style={styles.content}
           onPress={onPress}
@@ -124,7 +125,10 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
         >
           <View style={styles.titleRow}>
             {todo.carriedOverFrom && (
-              <Text style={styles.carriedOverArrow}>↩ </Text>
+              <Text style={styles.carriedOverArrow}>↩</Text>
+            )}
+            {categoryInfo && (
+              <View style={[styles.categoryDot, { backgroundColor: categoryInfo.color }]} />
             )}
             <Text
               style={[styles.title, todo.completed && styles.titleCompleted]}
@@ -134,46 +138,32 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
               {todo.title}
             </Text>
           </View>
+
+          {/* Right-side metadata */}
           <View style={styles.metaRow}>
-            {todo.carriedOverFrom && (
-              <Text style={styles.carriedOver}>carried over</Text>
-            )}
             {todo.recurrence && (
-              <Text style={styles.recurringIcon}>↻</Text>
-            )}
-            {categoryInfo && (
-              <View style={[styles.categoryChip, { backgroundColor: categoryInfo.color + '22', borderColor: categoryInfo.color + '44' }]}>
-                <Text style={[styles.categoryChipText, { color: categoryInfo.color }]}>
-                  {categoryInfo.label}
-                </Text>
-              </View>
+              <Text style={styles.metaText}>↻</Text>
             )}
             {subtasks.length > 0 && (
-              <View style={styles.subtaskMeta}>
-                <Text style={styles.subtaskText}>{subtasksDone}/{subtasks.length}</Text>
-              </View>
-            )}
-            {hasNotes && (
-              <Text style={styles.noteIcon}>📝</Text>
+              <Text style={styles.metaText}>{subtasksDone}/{subtasks.length}</Text>
             )}
             {pomodoroMins > 0 && (
-              <View style={styles.pomodoroMeta}>
-                <Text style={styles.pomodoroIcon}>⏱</Text>
-                <Text style={styles.pomodoroText}>{pomodoroMins}m</Text>
-              </View>
+              <Text style={styles.pomodoroText}>{pomodoroMins}m</Text>
             )}
             {(isTracking || totalSeconds > 0) && (
-              <View style={styles.trackingMeta}>
-                {isTracking ? (
-                  <LiveTimer startedAt={todo.timeTracking!.startedAt!} baseSeconds={totalSeconds} />
-                ) : (
-                  <Text style={styles.trackingTimeIdle}>{formatTrackingTime(totalSeconds)}</Text>
-                )}
-              </View>
+              isTracking ? (
+                <LiveTimer startedAt={todo.timeTracking!.startedAt!} baseSeconds={totalSeconds} />
+              ) : (
+                <Text style={styles.trackingTimeIdle}>{formatTrackingTime(totalSeconds)}</Text>
+              )
+            )}
+            {todo.estimatedMinutes != null && todo.estimatedMinutes > 0 && (
+              <Text style={styles.estimate}>~{todo.estimatedMinutes}m</Text>
             )}
           </View>
         </TouchableOpacity>
-        {/* Time tracking play/pause */}
+
+        {/* Time tracking button */}
         {!todo.completed && (
           <TouchableOpacity
             style={[styles.trackingBtn, isTracking && styles.trackingBtnActive]}
@@ -184,9 +174,6 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
               {isTracking ? '⏸' : '▶'}
             </Text>
           </TouchableOpacity>
-        )}
-        {todo.estimatedMinutes != null && todo.estimatedMinutes > 0 && (
-          <Text style={styles.estimate}>{todo.estimatedMinutes}m</Text>
         )}
       </Animated.View>
     </View>
@@ -217,7 +204,8 @@ const styles = StyleSheet.create({
   wrapper: {
     position: 'relative',
     marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.dark.border,
   },
   deleteBackground: {
     position: 'absolute',
@@ -226,7 +214,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     backgroundColor: Colors.dark.error,
-    borderRadius: 12,
+    borderRadius: 0,
     justifyContent: 'center',
     alignItems: 'flex-end',
     paddingRight: Spacing.lg,
@@ -239,10 +227,10 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    padding: Spacing.md,
-    gap: Spacing.md,
+    backgroundColor: Colors.dark.background,
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.sm,
+    gap: Spacing.sm,
   },
   checkbox: {
     padding: 2,
@@ -250,7 +238,7 @@ const styles = StyleSheet.create({
   checkboxInner: {
     width: 22,
     height: 22,
-    borderRadius: 6,
+    borderRadius: 11,
     borderWidth: 2,
     borderColor: Colors.dark.textTertiary,
     justifyContent: 'center',
@@ -262,82 +250,54 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     color: Colors.dark.background,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
   content: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    gap: 6,
   },
   carriedOverArrow: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.body,
-    fontSize: 14,
+    color: Colors.dark.textTertiary,
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  categoryDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
   title: {
     color: Colors.dark.text,
     fontFamily: Fonts.body,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 21,
     flex: 1,
   },
   titleCompleted: {
     textDecorationLine: 'line-through',
     color: Colors.dark.textTertiary,
+    opacity: 0.6,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    marginTop: 2,
-    flexWrap: 'wrap',
+    gap: 8,
+    flexShrink: 0,
   },
-  recurringIcon: {
-    color: Colors.dark.textSecondary,
-    fontSize: 13,
+  metaText: {
+    color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-  },
-  carriedOver: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-  },
-  categoryChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  categoryChipText: {
-    fontFamily: Fonts.body,
-    fontSize: 10,
-  },
-  subtaskMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.dark.background,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 8,
-  },
-  subtaskText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 10,
-  },
-  noteIcon: {
-    fontSize: 10,
-  },
-  pomodoroMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  pomodoroIcon: {
-    fontSize: 10,
+    fontSize: 11,
   },
   pomodoroText: {
     color: Colors.dark.timer,
@@ -345,35 +305,30 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   estimate: {
-    color: Colors.dark.textSecondary,
+    color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 13,
+    fontSize: 11,
   },
   // Time tracking
   trackingBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: Colors.dark.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
   trackingBtnActive: {
     backgroundColor: Colors.dark.timer + '22',
+    borderWidth: 1,
     borderColor: Colors.dark.timer,
   },
   trackingBtnText: {
-    fontSize: 10,
-    color: Colors.dark.textSecondary,
+    fontSize: 9,
+    color: Colors.dark.textTertiary,
   },
   trackingBtnTextActive: {
     color: Colors.dark.timer,
-  },
-  trackingMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   trackingTime: {
     color: Colors.dark.timer,

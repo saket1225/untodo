@@ -317,7 +317,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'flex-end',
   },
   sheet: {

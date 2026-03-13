@@ -1076,6 +1076,7 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingBottom: 120,
+    paddingTop: Spacing.xs,
   },
   empty: {
     alignItems: 'center',

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
+
 import { Colors, Fonts } from '../../lib/theme';
 import { useUserStore } from '../../engines/user/store';
 import { startSiliconListener } from '../../engines/silicon/bridge';
@@ -14,7 +15,11 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   };
   return (
     <View style={styles.tabIcon}>
-      <Text style={[styles.icon, { color: focused ? Colors.dark.accent : Colors.dark.textTertiary }]}>
+      <Text style={[
+        styles.icon,
+        { color: focused ? Colors.dark.accent : Colors.dark.textTertiary },
+        focused && styles.iconFocused,
+      ]}>
         {icons[label] || '●'}
       </Text>
       <Text style={[styles.label, {
@@ -78,22 +83,29 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: Colors.dark.surface,
     borderTopColor: Colors.dark.border,
-    borderTopWidth: 1,
-    height: 80,
-    paddingBottom: 20,
-    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    height: 88,
+    paddingBottom: 24,
+    paddingTop: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 12,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 16,
   },
   tabIcon: {
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+    gap: 5,
+    paddingTop: 2,
   },
   icon: {
     fontSize: 20,
+    opacity: 0.5,
+  },
+  iconFocused: {
+    opacity: 1,
+    fontSize: 22,
   },
   label: {
     fontSize: 11,
