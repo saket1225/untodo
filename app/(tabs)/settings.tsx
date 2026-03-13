@@ -7,7 +7,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import {
   generatePairingCode,
-  saveSiliconConnection,
   getSiliconConnection,
   disconnectSilicon,
 } from '../../engines/silicon/bridge';
@@ -93,13 +92,6 @@ function SettingsScreenContent() {
     } catch {}
   };
 
-  const handleConnect = async () => {
-    const code = pairingCode || generatePairingCode();
-    await saveSiliconConnection(code);
-    const conn = await getSiliconConnection();
-    setSilicon(conn);
-    setPairingCode(code);
-  };
 
   const handleDisconnect = async () => {
     Alert.alert(
@@ -352,17 +344,7 @@ function SettingsScreenContent() {
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  handleConnect();
-                }}
-                accessibilityLabel="Connect to Silicon"
-                accessibilityRole="button"
-              >
-                <Text style={styles.actionBtnText}>Connect Manually</Text>
-              </TouchableOpacity>
+
             </>
           )}
         </SectionCard>
@@ -638,18 +620,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: Spacing.sm,
     textAlign: 'right',
-  },
-  actionBtn: {
-    backgroundColor: Colors.dark.accent,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: Spacing.md,
-  },
-  actionBtnText: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 14,
   },
   dangerBtn: {
     borderWidth: 1,
