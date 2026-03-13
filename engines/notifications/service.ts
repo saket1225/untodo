@@ -172,12 +172,21 @@ export async function setupDefaultNotifications(): Promise<void> {
     await scheduleDailyReminder(21, 0, title, body, 'evening-reminder');
   }
 
+  // Persistent progress notification
+  if (store.preferences.progressNotification) {
+    await updateProgressNotification();
+  }
+
   store.setInitialized();
 }
 
 export async function refreshNotifications(): Promise<void> {
   const store = useNotificationStore.getState();
   if (!store.initialized) return;
+  // Update persistent progress notification if enabled
+  if (store.preferences.progressNotification) {
+    updateProgressNotification().catch(() => {});
+  }
   await setupDefaultNotifications();
 }
 
@@ -192,4 +201,37 @@ export async function sendPomodoroEndNotification(): Promise<void> {
       trigger: null,
     });
   } catch {}
+}
+
+export async function updateProgressNotification(): Promise<void> {
+  try {
+    const granted = await requestPermissions();
+    if (!granted) return;
+
+    const { total, completed, streak } = getTaskStats();
+    if (total === 0) {
+      // Dismiss if no tasks
+      await Notifications.dismissNotificationAsync('progress-summary');
+      return;
+    }
+
+    const streakText = streak > 0 ? ` · ${streak}d streak` : '';
+    const body = completed === total
+      ? `All ${total} tasks done!${streakText}`
+      : `${completed}/${total} tasks done${streakText}`;
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: 'progress-summary',
+      content: {
+        title: 'untodo',
+        body,
+        sound: false,
+        sticky: true,
+        priority: Notifications.AndroidNotificationPriority.LOW,
+      },
+      trigger: null,
+    });
+  } catch {
+    // Fail silently
+  }
 }

@@ -4,6 +4,7 @@ import {
   Animated as RNAnimated, RefreshControl, TextInput, Dimensions, PanResponder,
   LayoutAnimation, UIManager, Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -239,6 +240,7 @@ function EmptyState({ isToday, allCompleted }: { isToday: boolean; allCompleted:
         <Text style={styles.emptyIcon}>○</Text>
         <Text style={styles.emptyQuote}>Nothing on the plate.</Text>
         <Text style={styles.emptySubtext}>Add something worth doing.</Text>
+        <DailyQuote />
       </RNAnimated.View>
     );
   }
@@ -346,6 +348,189 @@ const streakStyles = StyleSheet.create({
   },
 });
 
+// --- Daily Motivational Quotes ---
+const DAILY_QUOTES = [
+  'Memento mori.',
+  'The obstacle is the way.',
+  'Discipline equals freedom.',
+  'Do the work.',
+  'Amor fati.',
+  'Less but better.',
+  'Ship it.',
+  'Be water.',
+  'Start before you\'re ready.',
+  'No shortcuts.',
+  'Trust the process.',
+  'Stay hungry.',
+  'Own your day.',
+  'Execute.',
+  'One thing at a time.',
+  'Progress, not perfection.',
+  'Show up daily.',
+  'Outwork everyone.',
+  'Build in silence.',
+  'Make it happen.',
+  'We suffer more in imagination than reality.',
+  'The best time to plant a tree was 20 years ago.',
+  'Action cures fear.',
+  'What stands in the way becomes the way.',
+  'You could leave life right now. Let that determine what you do.',
+  'Waste no more time arguing about what a good person should be. Be one.',
+  'It is not that we have a short time to live, but that we waste much of it.',
+  'He who has a why can bear almost any how.',
+  'The impediment to action advances action.',
+  'Begin at once to live.',
+];
+
+function getDailyQuoteIndex(): number {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  return Math.floor((now.getTime() - start.getTime()) / 86400000) % DAILY_QUOTES.length;
+}
+
+function DailyQuote() {
+  const [quoteIndex, setQuoteIndex] = useState(getDailyQuoteIndex);
+  const fadeAnim = useRef(new RNAnimated.Value(1)).current;
+
+  const handleTap = useCallback(() => {
+    RNAnimated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
+      setQuoteIndex(prev => (prev + 1) % DAILY_QUOTES.length);
+      RNAnimated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    });
+  }, []);
+
+  return (
+    <TouchableOpacity onPress={handleTap} activeOpacity={0.6} style={quoteStyles.container}>
+      <RNAnimated.Text style={[quoteStyles.text, { opacity: fadeAnim }]}>
+        "{DAILY_QUOTES[quoteIndex]}"
+      </RNAnimated.Text>
+    </TouchableOpacity>
+  );
+}
+
+const quoteStyles = StyleSheet.create({
+  container: {
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    alignItems: 'center',
+    marginTop: Spacing.md,
+  },
+  text: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
+    opacity: 0.6,
+  },
+});
+
+// --- Gesture Tutorial Overlay ---
+const GESTURE_TUTORIAL_KEY = 'untodo-gesture-tutorial-shown';
+
+function GestureTutorial({ onDismiss }: { onDismiss: () => void }) {
+  const fadeAnim = useRef(new RNAnimated.Value(0)).current;
+
+  useEffect(() => {
+    RNAnimated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, []);
+
+  const dismiss = useCallback(() => {
+    RNAnimated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+      onDismiss();
+    });
+  }, [onDismiss]);
+
+  return (
+    <RNAnimated.View style={[tutorialStyles.overlay, { opacity: fadeAnim }]}>
+      <TouchableOpacity style={tutorialStyles.touchArea} activeOpacity={1} onPress={dismiss}>
+        <View style={tutorialStyles.card}>
+          <Text style={tutorialStyles.title}>Quick gestures</Text>
+          <View style={tutorialStyles.row}>
+            <Text style={tutorialStyles.gesture}>Swipe right</Text>
+            <Text style={tutorialStyles.desc}>Complete task</Text>
+          </View>
+          <View style={tutorialStyles.row}>
+            <Text style={tutorialStyles.gesture}>Swipe left</Text>
+            <Text style={tutorialStyles.desc}>Delete task</Text>
+          </View>
+          <View style={tutorialStyles.row}>
+            <Text style={tutorialStyles.gesture}>Long press</Text>
+            <Text style={tutorialStyles.desc}>Quick actions</Text>
+          </View>
+          <View style={tutorialStyles.row}>
+            <Text style={tutorialStyles.gesture}>Tap</Text>
+            <Text style={tutorialStyles.desc}>Task details</Text>
+          </View>
+          <Text style={tutorialStyles.dismiss}>Tap anywhere to dismiss</Text>
+        </View>
+      </TouchableOpacity>
+    </RNAnimated.View>
+  );
+}
+
+const tutorialStyles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    zIndex: 90,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  touchArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  card: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.xl,
+    marginHorizontal: Spacing.xl,
+    width: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 24,
+    elevation: 24,
+  },
+  title: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 24,
+    textAlign: 'center',
+    marginBottom: Spacing.lg,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.dark.border,
+  },
+  gesture: {
+    color: Colors.dark.accent,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 15,
+  },
+  desc: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+  },
+  dismiss: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: Spacing.lg,
+  },
+});
+
 function getGreeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return 'Good morning';
@@ -436,12 +621,15 @@ function TodayScreenContent() {
   const [quickActionTodo, setQuickActionTodo] = useState<Todo | null>(null);
   const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
   const [showCarryOver, setShowCarryOver] = useState(false);
+  const [carryOverMode, setCarryOverMode] = useState<'prompt' | 'review'>('prompt');
+  const [carryOverSelected, setCarryOverSelected] = useState<Set<string>>(new Set());
   const [checkedCarryOver, setCheckedCarryOver] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [lastCelebratedCount, setLastCelebratedCount] = useState(0);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [showGestureTutorial, setShowGestureTutorial] = useState(false);
   const syncFromFirestore = useTodoStore(s => s.syncFromFirestore);
   const spawnRecurringTasks = useTodoStore(s => s.spawnRecurringTasks);
 
@@ -592,7 +780,23 @@ function TodayScreenContent() {
     const alreadyCarried = todayTodos.some(t => t.carriedOverFrom);
     if (yesterdayIncomplete.length > 0 && !alreadyCarried) {
       setShowCarryOver(true);
+      setCarryOverMode('prompt');
+      setCarryOverSelected(new Set(yesterdayIncomplete.map(t => t.id)));
     }
+  }, []);
+
+  // Gesture tutorial on first use
+  useEffect(() => {
+    AsyncStorage.getItem(GESTURE_TUTORIAL_KEY).then(val => {
+      if (!val) {
+        setShowGestureTutorial(true);
+      }
+    });
+  }, []);
+
+  const dismissGestureTutorial = useCallback(() => {
+    setShowGestureTutorial(false);
+    AsyncStorage.setItem(GESTURE_TUTORIAL_KEY, 'true');
   }, []);
 
   const handleToggle = useCallback((id: string) => {
@@ -620,10 +824,11 @@ function TodayScreenContent() {
     d.setDate(d.getDate() - 1);
     return d.toISOString().split('T')[0];
   }, []);
-  const carryOverCount = useMemo(
-    () => allTodos.filter(t => t.logicalDate === yesterdayStr && !t.completed).length,
+  const yesterdayIncomplete = useMemo(
+    () => allTodos.filter(t => t.logicalDate === yesterdayStr && !t.completed),
     [allTodos, yesterdayStr]
   );
+  const carryOverCount = yesterdayIncomplete.length;
 
   // Categories that exist in viewed date's tasks
   const activeCats = useMemo(() => {
@@ -785,7 +990,7 @@ function TodayScreenContent() {
             </TouchableOpacity>
             {total > 0 && (
               <Text style={styles.progressText} accessibilityLabel={`${completed} of ${total} tasks done`}>
-                {completed}/{total}
+                {completed}/{total}{total > 0 && completed === total ? ' ✓' : ''}
               </Text>
             )}
           </View>
@@ -943,39 +1148,42 @@ function TodayScreenContent() {
           ) : null
         }
         ListFooterComponent={
-          completedTodos.length > 0 ? (
-            <View>
-              <TouchableOpacity
-                style={styles.completedSectionHeader}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                  setCompletedCollapsed(prev => !prev);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.completedSectionText}>
-                  Completed ({completedTodos.length})
-                </Text>
-                <Text style={styles.completedSectionChevron}>
-                  {completedCollapsed ? '›' : '⌄'}
-                </Text>
-              </TouchableOpacity>
-              {!completedCollapsed && completedTodos.map(item => (
-                <TodoItem
-                  key={item.id}
-                  todo={item}
-                  onToggle={() => handleToggle(item.id)}
-                  onDelete={() => handleDelete(item)}
-                  onPress={() => setDetailTodo(item)}
-                  onLongPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    setQuickActionTodo(item);
+          <View>
+            {completedTodos.length > 0 && (
+              <View>
+                <TouchableOpacity
+                  style={styles.completedSectionHeader}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setCompletedCollapsed(prev => !prev);
                   }}
-                />
-              ))}
-            </View>
-          ) : null
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.completedSectionText}>
+                    Completed ({completedTodos.length})
+                  </Text>
+                  <Text style={styles.completedSectionChevron}>
+                    {completedCollapsed ? '›' : '⌄'}
+                  </Text>
+                </TouchableOpacity>
+                {!completedCollapsed && completedTodos.map(item => (
+                  <TodoItem
+                    key={item.id}
+                    todo={item}
+                    onToggle={() => handleToggle(item.id)}
+                    onDelete={() => handleDelete(item)}
+                    onPress={() => setDetailTodo(item)}
+                    onLongPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      setQuickActionTodo(item);
+                    }}
+                  />
+                ))}
+              </View>
+            )}
+            {isToday && total > 0 && <DailyQuote />}
+          </View>
         }
       />
       </RNAnimated.View>
@@ -986,29 +1194,97 @@ function TodayScreenContent() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Unfinished Business</Text>
-              <Text style={styles.modalText}>
-                You have {carryOverCount} unfinished task{carryOverCount !== 1 ? 's' : ''} from yesterday.
-              </Text>
-              <TouchableOpacity
-                style={styles.modalPrimaryBtn}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  carryOverTodos();
-                  setShowCarryOver(false);
-                }}
-                accessibilityLabel="Carry over all unfinished tasks"
-                accessibilityRole="button"
-              >
-                <Text style={styles.modalPrimaryBtnText}>Carry Over All</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalSecondaryBtn}
-                onPress={() => setShowCarryOver(false)}
-                accessibilityLabel="Start fresh without carrying over"
-                accessibilityRole="button"
-              >
-                <Text style={styles.modalSecondaryBtnText}>Start Fresh</Text>
-              </TouchableOpacity>
+              {carryOverMode === 'prompt' ? (
+                <>
+                  <Text style={styles.modalText}>
+                    You have {carryOverCount} unfinished task{carryOverCount !== 1 ? 's' : ''} from yesterday.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.modalPrimaryBtn}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      carryOverTodos();
+                      setShowCarryOver(false);
+                    }}
+                    accessibilityLabel="Carry over all unfinished tasks"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.modalPrimaryBtnText}>Carry All Forward</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalOutlineBtn}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setCarryOverMode('review');
+                    }}
+                    accessibilityLabel="Review tasks to carry over"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.modalOutlineBtnText}>Review</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalSecondaryBtn}
+                    onPress={() => setShowCarryOver(false)}
+                    accessibilityLabel="Start fresh without carrying over"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.modalSecondaryBtnText}>Dismiss</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.modalText}>Select tasks to carry forward:</Text>
+                  <ScrollView style={styles.reviewList}>
+                    {yesterdayIncomplete.map(task => {
+                      const selected = carryOverSelected.has(task.id);
+                      return (
+                        <TouchableOpacity
+                          key={task.id}
+                          style={styles.reviewItem}
+                          onPress={() => {
+                            Haptics.selectionAsync();
+                            setCarryOverSelected(prev => {
+                              const next = new Set(prev);
+                              if (next.has(task.id)) next.delete(task.id);
+                              else next.add(task.id);
+                              return next;
+                            });
+                          }}
+                        >
+                          <View style={[styles.reviewCheck, selected && styles.reviewCheckSelected]}>
+                            {selected && <Text style={styles.reviewCheckMark}>✓</Text>}
+                          </View>
+                          <Text style={styles.reviewItemText} numberOfLines={2}>{task.title}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  <TouchableOpacity
+                    style={[styles.modalPrimaryBtn, carryOverSelected.size === 0 && { opacity: 0.4 }]}
+                    disabled={carryOverSelected.size === 0}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      // Carry only selected tasks
+                      const now = new Date().toISOString();
+                      const selectedTasks = yesterdayIncomplete.filter(t => carryOverSelected.has(t.id));
+                      selectedTasks.forEach(t => {
+                        addTodo(t.title, t.priority, t.category, logicalDate, t.recurrence);
+                      });
+                      setShowCarryOver(false);
+                    }}
+                  >
+                    <Text style={styles.modalPrimaryBtnText}>
+                      Carry {carryOverSelected.size} Task{carryOverSelected.size !== 1 ? 's' : ''}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalSecondaryBtn}
+                    onPress={() => setCarryOverMode('prompt')}
+                  >
+                    <Text style={styles.modalSecondaryBtnText}>Back</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         </Modal>
@@ -1062,6 +1338,11 @@ function TodayScreenContent() {
         visible={showCelebration}
         onDismiss={() => setShowCelebration(false)}
       />
+
+      {/* Gesture tutorial */}
+      {showGestureTutorial && (
+        <GestureTutorial onDismiss={dismissGestureTutorial} />
+      )}
 
       {/* Undo toast */}
       <UndoToast />
@@ -1415,6 +1696,58 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 14,
+  },
+  modalOutlineBtn: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.xl,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  modalOutlineBtnText: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 15,
+  },
+  reviewList: {
+    maxHeight: 240,
+    width: '100%',
+    marginBottom: Spacing.md,
+  },
+  reviewItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.dark.border,
+    gap: Spacing.md,
+  },
+  reviewCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: Colors.dark.textTertiary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reviewCheckSelected: {
+    backgroundColor: Colors.dark.accent,
+    borderColor: Colors.dark.accent,
+  },
+  reviewCheckMark: {
+    color: Colors.dark.background,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reviewItemText: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    flex: 1,
   },
 
   // Celebration

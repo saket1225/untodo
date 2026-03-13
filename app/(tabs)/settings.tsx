@@ -145,7 +145,7 @@ function SettingsScreenContent() {
     );
   };
 
-  const handleNotifToggle = async (key: 'morningReminder' | 'afternoonCheck' | 'eveningReminder', value: boolean) => {
+  const handleNotifToggle = async (key: keyof typeof notifPrefs, value: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     updateNotifPref(key, value);
     setTimeout(() => setupDefaultNotifications(), 100);
@@ -299,6 +299,21 @@ function SettingsScreenContent() {
               trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
               thumbColor={notifPrefs.eveningReminder ? Colors.dark.accent : Colors.dark.textTertiary}
               accessibilityLabel="Evening reminder notification"
+              accessibilityRole="switch"
+            />
+          </View>
+          <View style={styles.cardDivider} />
+          <View style={styles.notifRow}>
+            <View style={styles.notifInfo}>
+              <Text style={styles.notifLabel}>Progress summary</Text>
+              <Text style={styles.notifTime}>Persistent · updates live</Text>
+            </View>
+            <Switch
+              value={notifPrefs.progressNotification}
+              onValueChange={v => handleNotifToggle('progressNotification', v)}
+              trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
+              thumbColor={notifPrefs.progressNotification ? Colors.dark.accent : Colors.dark.textTertiary}
+              accessibilityLabel="Progress summary notification"
               accessibilityRole="switch"
             />
           </View>
