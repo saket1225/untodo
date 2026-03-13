@@ -168,8 +168,8 @@ function TodaySummaryCard() {
   const progress = total > 0 ? completed / total : 0;
   const pct = Math.round(progress * 100);
 
-  const size = 100;
-  const strokeWidth = 8;
+  const size = 140;
+  const strokeWidth = 10;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference * (1 - progress);
@@ -659,8 +659,8 @@ const styles = StyleSheet.create({
   },
   todayRingContainer: {
     position: 'relative',
-    width: 100,
-    height: 100,
+    width: 140,
+    height: 140,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -672,8 +672,8 @@ const styles = StyleSheet.create({
   todayRingPct: {
     color: Colors.dark.text,
     fontFamily: Fonts.accent,
-    fontSize: 28,
-    lineHeight: 32,
+    fontSize: 36,
+    lineHeight: 40,
   },
   todayStats: {
     flex: 1,
@@ -961,12 +961,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     height: BAR_MAX_HEIGHT + 44,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.xs,
   },
   barCol: {
     flex: 1,
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   barPctLabel: {
     color: Colors.dark.textTertiary,
@@ -975,7 +976,7 @@ const styles = StyleSheet.create({
     height: 14,
   },
   barTrack: {
-    width: 24,
+    width: 28,
     height: BAR_MAX_HEIGHT,
     justifyContent: 'flex-end',
     borderRadius: 6,

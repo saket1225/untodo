@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, ScrollView, Animated, Modal, Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
@@ -15,7 +15,7 @@ interface Props {
 
 const PRIORITY_CYCLE: (Priority)[] = [null, 'low', 'medium', 'high'];
 
-export default function TodoInput({ onAdd, autoFocus, viewingDate }: Props) {
+function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
   const [text, setText] = useState('');
   const [priority, setPriority] = useState<Priority>(null);
   const [category, setCategory] = useState<Category>(null);
@@ -245,6 +245,9 @@ export default function TodoInput({ onAdd, autoFocus, viewingDate }: Props) {
     </View>
   );
 }
+
+const TodoInput = memo(TodoInputInner);
+export default TodoInput;
 
 const styles = StyleSheet.create({
   flashOverlay: {

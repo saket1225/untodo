@@ -686,8 +686,8 @@ function TodayScreenContent() {
         keyExtractor={item => item.id}
         renderItem={renderItem}
         getItemLayout={getItemLayout}
-        windowSize={10}
-        maxToRenderPerBatch={15}
+        windowSize={5}
+        maxToRenderPerBatch={10}
         removeClippedSubviews={true}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}

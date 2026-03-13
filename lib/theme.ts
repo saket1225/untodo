@@ -1,6 +1,6 @@
 export const Colors = {
   dark: {
-    background: '#0F0F0F',
+    background: '#0A0A0A',
     surface: '#1A1A1A',
     surfaceHover: '#252525',
     border: '#2A2A2A',
@@ -11,9 +11,9 @@ export const Colors = {
     success: '#4ADE80',
     error: '#EF4444',
     timer: '#F59E0B',
-    priorityHigh: '#F5F5F5',
+    priorityHigh: '#EF4444',
     priorityMedium: '#FBBF24',
-    priorityLow: '#555555',
+    priorityLow: '#60A5FA',
   },
   light: {
     background: '#FFFFFF',

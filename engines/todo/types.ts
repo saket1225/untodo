@@ -11,9 +11,9 @@ export const CATEGORIES: { key: Category; label: string; color: string }[] = [
 ];
 
 export const PRIORITY_CONFIG: Record<string, { label: string; color: string; sort: number }> = {
-  high: { label: 'High', color: '#F5F5F5', sort: 0 },
+  high: { label: 'High', color: '#EF4444', sort: 0 },
   medium: { label: 'Med', color: '#FBBF24', sort: 1 },
-  low: { label: 'Low', color: '#555555', sort: 2 },
+  low: { label: 'Low', color: '#60A5FA', sort: 2 },
 };
 
 export interface Subtask {

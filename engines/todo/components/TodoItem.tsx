@@ -103,8 +103,9 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
         style={[
           styles.container,
           { transform: [{ translateX }, { scale: scaleAnim }] },
-          priorityColor && { borderLeftWidth: 3, borderLeftColor: priorityColor },
+          priorityColor ? { borderLeftWidth: 3, borderLeftColor: priorityColor } : { borderLeftWidth: 3, borderLeftColor: 'transparent' },
           isTracking && { borderColor: Colors.dark.timer, borderWidth: 1 },
+          todo.completed && { opacity: 0.4 },
         ]}
         {...panResponder.panHandlers}
       >
@@ -286,7 +287,6 @@ const styles = StyleSheet.create({
   titleCompleted: {
     textDecorationLine: 'line-through',
     color: Colors.dark.textTertiary,
-    opacity: 0.6,
   },
   metaRow: {
     flexDirection: 'row',
