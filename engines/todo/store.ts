@@ -15,7 +15,7 @@ import { refreshNotifications } from '../notifications/service';
 
 interface TodoStore {
   todos: Todo[];
-  addTodo: (title: string, priority?: Priority, category?: Category, date?: string) => void;
+  addTodo: (title: string, priority?: Priority, category?: Category, date?: string, recurrence?: Recurrence) => void;
   toggleTodo: (id: string) => void;
   deleteTodo: (id: string) => void;
   updateTodo: (id: string, updates: Partial<Todo>) => void;
@@ -104,7 +104,7 @@ export const useTodoStore = create<TodoStore>()(
     (set, get) => ({
       todos: [],
 
-      addTodo: (title: string, priority?: Priority, category?: Category, date?: string) => {
+      addTodo: (title: string, priority?: Priority, category?: Category, date?: string, recurrence?: Recurrence) => {
         const logicalDate = date || getLogicalDate();
         const todayTodos = get().todos.filter(t => t.logicalDate === logicalDate);
         const now = nowISO();
@@ -123,6 +123,7 @@ export const useTodoStore = create<TodoStore>()(
           subtasks: [],
           notes: '',
           syncStatus: 'pending',
+          ...(recurrence ? { recurrence } : {}),
         };
         set(state => ({ todos: [...state.todos, newTodo] }));
         debouncedSyncTodo(newTodo);

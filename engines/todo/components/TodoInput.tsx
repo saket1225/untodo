@@ -2,13 +2,13 @@ import { useState, useRef, useEffect, memo } from 'react';
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, ScrollView, Animated, Modal, Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
-import { Priority, Category, CATEGORIES, PRIORITY_CONFIG } from '../types';
+import { Priority, Category, CATEGORIES, PRIORITY_CONFIG, Recurrence } from '../types';
 import { useTemplateStore, TaskTemplate, TemplateTask } from '../templates';
 import { useTodoStore } from '../store';
 import { getLogicalDate } from '../../../lib/date-utils';
 
 interface Props {
-  onAdd: (title: string, priority?: Priority, category?: Category) => void;
+  onAdd: (title: string, priority?: Priority, category?: Category, recurrence?: Recurrence) => void;
   autoFocus?: boolean;
   viewingDate?: string;
 }
@@ -20,6 +20,7 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
   const [priority, setPriority] = useState<Priority>(null);
   const [category, setCategory] = useState<Category>(null);
   const [showCategories, setShowCategories] = useState(false);
+  const [recurrence, setRecurrence] = useState<Recurrence | undefined>(undefined);
   const [showTemplates, setShowTemplates] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -74,10 +75,11 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const { title, quickPriority, quickCategory } = parseShortcuts(trimmed);
     if (!title) return;
-    onAdd(title, quickPriority, quickCategory);
+    onAdd(title, quickPriority, quickCategory, recurrence);
     setText('');
     setPriority(null);
     setCategory(null);
+    setRecurrence(undefined);
     setShowCategories(false);
     flashAnim.setValue(1);
     Animated.timing(flashAnim, { toValue: 0, duration: 400, useNativeDriver: true }).start();
@@ -163,6 +165,22 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
           accessibilityHint="Type a task name and press done to add"
         />
 
+        {/* Repeat toggle - only when focused */}
+        {isFocused && (
+          <TouchableOpacity
+            style={[styles.repeatBtn, recurrence && styles.repeatBtnActive]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setRecurrence(prev => prev ? undefined : { type: 'daily' });
+            }}
+            accessibilityLabel={recurrence ? `Recurring: ${recurrence.type}` : 'Set recurring'}
+            accessibilityRole="button"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={[styles.repeatBtnText, recurrence && styles.repeatBtnTextActive]}>↻</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Category toggle - only when focused */}
         {isFocused && (
           <TouchableOpacity
@@ -196,7 +214,7 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
 
       {/* Quick-add hint */}
       {isFocused && !text.trim() && (
-        <Text style={styles.quickAddHint}>! for high priority · #category</Text>
+        <Text style={styles.quickAddHint}>! for high priority · #category · ↻ repeat</Text>
       )}
 
       {/* Category chips */}
@@ -351,6 +369,27 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 16,
     color: Colors.dark.textSecondary,
+  },
+  repeatBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  repeatBtnActive: {
+    backgroundColor: Colors.dark.accent,
+    borderColor: Colors.dark.accent,
+  },
+  repeatBtnText: {
+    fontSize: 16,
+    color: Colors.dark.textTertiary,
+  },
+  repeatBtnTextActive: {
+    color: Colors.dark.background,
   },
   catBtn: {
     width: 36,

@@ -13,7 +13,7 @@ import TodoItem from '../../engines/todo/components/TodoItem';
 import PomodoroTimer from '../../engines/todo/components/PomodoroTimer';
 import QuickActions from '../../engines/todo/components/QuickActions';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import { Todo, Category, CATEGORIES, Priority } from '../../engines/todo/types';
+import { Todo, Category, CATEGORIES, Priority, Recurrence } from '../../engines/todo/types';
 import { onSyncStateChange } from '../../lib/firebase-sync';
 import { useKeyboardShortcuts } from '../../lib/useKeyboardShortcuts';
 
@@ -107,28 +107,41 @@ function SearchResults({
     return null;
   }
 
+  // Group results by date
+  const grouped = results.slice(0, 20).reduce<Record<string, Todo[]>>((acc, todo) => {
+    const date = todo.logicalDate;
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(todo);
+    return acc;
+  }, {});
+  const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
   return (
     <View style={styles.searchResults}>
       <ScrollView style={styles.searchScroll} keyboardShouldPersistTaps="handled">
-        {results.slice(0, 15).map((todo) => (
-          <TouchableOpacity
-            key={todo.id}
-            style={styles.searchResultItem}
-            onPress={() => onSelect(todo)}
-          >
-            <View style={styles.searchResultContent}>
-              <Text
-                style={[styles.searchResultTitle, todo.completed && styles.searchResultTitleDone]}
-                numberOfLines={1}
-              >
-                {todo.title}
-              </Text>
-              <Text style={styles.searchResultDate}>
-                {formatDisplayDate(todo.logicalDate)}
-              </Text>
+        {sortedDates.map(date => (
+          <View key={date}>
+            <View style={styles.searchDateHeader}>
+              <Text style={styles.searchDateHeaderText}>{formatDisplayDate(date)}</Text>
             </View>
-            {todo.completed && <Text style={styles.searchResultCheck}>✓</Text>}
-          </TouchableOpacity>
+            {grouped[date].map(todo => (
+              <TouchableOpacity
+                key={todo.id}
+                style={styles.searchResultItem}
+                onPress={() => onSelect(todo)}
+              >
+                <View style={styles.searchResultContent}>
+                  <Text
+                    style={[styles.searchResultTitle, todo.completed && styles.searchResultTitleDone]}
+                    numberOfLines={1}
+                  >
+                    {todo.title}
+                  </Text>
+                </View>
+                {todo.completed && <Text style={styles.searchResultCheck}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
         ))}
       </ScrollView>
     </View>
@@ -474,8 +487,8 @@ function TodayScreenContent() {
     toggleTodo(id);
   }, [toggleTodo]);
 
-  const handleAdd = useCallback((title: string, priority?: Priority, category?: Category) => {
-    addTodo(title, priority ?? null, category ?? null, viewingDate);
+  const handleAdd = useCallback((title: string, priority?: Priority, category?: Category, recurrence?: Recurrence) => {
+    addTodo(title, priority ?? null, category ?? null, viewingDate, recurrence);
   }, [addTodo, viewingDate]);
 
   // Carry-over candidates count
@@ -1042,6 +1055,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginLeft: Spacing.sm,
+  },
+  searchDateHeader: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    backgroundColor: Colors.dark.background,
+  },
+  searchDateHeaderText: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   searchNoResults: {
     color: Colors.dark.textTertiary,

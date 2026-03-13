@@ -273,7 +273,10 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
           <View style={styles.priorityRow}>
             <TouchableOpacity
               style={[styles.priorityChip, !todo.recurrence && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
-              onPress={() => { onUpdate(todo.id, { recurrence: undefined }); }}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onUpdate(todo.id, { recurrence: undefined });
+              }}
             >
               <Text style={[styles.priorityChipText, !todo.recurrence && { color: Colors.dark.background }]}>None</Text>
             </TouchableOpacity>
@@ -287,16 +290,42 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
               <Text style={[styles.priorityChipText, todo.recurrence?.type === 'daily' && { color: Colors.dark.background }]}>Daily</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.priorityChip, todo.recurrence?.type === 'weekly' && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
+              style={[styles.priorityChip, (todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 const dayOfWeek = new Date().getDay();
-                onUpdate(todo.id, { recurrence: { type: 'weekly', days: [dayOfWeek] } });
+                onUpdate(todo.id, { recurrence: { type: 'custom', days: todo.recurrence?.days || [dayOfWeek] } });
               }}
             >
-              <Text style={[styles.priorityChipText, todo.recurrence?.type === 'weekly' && { color: Colors.dark.background }]}>Weekly</Text>
+              <Text style={[styles.priorityChipText, (todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && { color: Colors.dark.background }]}>Custom</Text>
             </TouchableOpacity>
           </View>
+          {/* Day picker for custom recurrence */}
+          {(todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && (
+            <View style={styles.dayPickerRow}>
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, idx) => {
+                const isSelected = (todo.recurrence?.days || []).includes(idx);
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.dayChip, isSelected && styles.dayChipActive]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      const currentDays = todo.recurrence?.days || [];
+                      const newDays = isSelected
+                        ? currentDays.filter(d => d !== idx)
+                        : [...currentDays, idx];
+                      if (newDays.length > 0) {
+                        onUpdate(todo.id, { recurrence: { type: 'custom', days: newDays } });
+                      }
+                    }}
+                  >
+                    <Text style={[styles.dayChipText, isSelected && styles.dayChipTextActive]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           {/* Move to tomorrow */}
           <TouchableOpacity style={styles.actionRow} onPress={handleMoveToTomorrow} accessibilityLabel="Move task to tomorrow" accessibilityRole="button">
@@ -500,6 +529,34 @@ const styles = StyleSheet.create({
     color: Colors.dark.textTertiary,
     fontSize: 12,
     padding: 4,
+  },
+  dayPickerRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: Spacing.sm,
+    justifyContent: 'center',
+  },
+  dayChip: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.dark.background,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dayChipActive: {
+    backgroundColor: Colors.dark.accent,
+    borderColor: Colors.dark.accent,
+  },
+  dayChipText: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+  },
+  dayChipTextActive: {
+    color: Colors.dark.background,
   },
   notePreview: {
     color: Colors.dark.textSecondary,

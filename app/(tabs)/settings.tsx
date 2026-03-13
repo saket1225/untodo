@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Switch, StyleSheet, Alert, Animated as RNAnimated, Linking } from 'react-native';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Switch, StyleSheet, Alert, Animated as RNAnimated, Linking, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -13,6 +13,7 @@ import {
 import { SiliconConnection } from '../../engines/silicon/types';
 import { useUserStore } from '../../engines/user/store';
 import { useNotificationStore } from '../../engines/notifications/store';
+import { useTodoStore } from '../../engines/todo/store';
 import { setupDefaultNotifications } from '../../engines/notifications/service';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import Constants from 'expo-constants';
@@ -86,8 +87,12 @@ function SettingsScreenContent() {
   const username = useUserStore(s => s.username);
   const notifPrefs = useNotificationStore(s => s.preferences);
   const updateNotifPref = useNotificationStore(s => s.updatePreference);
+  const allTodos = useTodoStore(s => s.todos);
 
   const appVersion = Constants.expoConfig?.version || '1.0.0';
+
+  const totalCompleted = useMemo(() => allTodos.filter(t => t.completed).length, [allTodos]);
+  const totalTasks = allTodos.length;
 
   useEffect(() => {
     const checkConnection = () => {
@@ -173,6 +178,25 @@ function SettingsScreenContent() {
         },
       ]
     );
+  };
+
+  const handleExportData = async (format: 'json' | 'csv') => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      let data: string;
+      if (format === 'json') {
+        data = JSON.stringify(allTodos, null, 2);
+      } else {
+        const header = 'Date,Title,Completed,Priority,Category,Created\n';
+        const rows = allTodos.map(t =>
+          `"${t.logicalDate}","${t.title.replace(/"/g, '""')}",${t.completed},"${t.priority || ''}","${t.category || ''}","${t.createdAt}"`
+        ).join('\n');
+        data = header + rows;
+      }
+      await Share.share({ message: data, title: `untodo-export.${format}` });
+    } catch {
+      // User cancelled share
+    }
   };
 
   const isConnected = silicon?.connected;
@@ -429,11 +453,41 @@ function SettingsScreenContent() {
             <Text style={styles.cardRowLabel}>Version</Text>
             <Text style={styles.cardRowValue}>{appVersion}</Text>
           </View>
+          <View style={styles.cardDivider} />
+          <View style={styles.cardRow}>
+            <Text style={styles.cardRowLabel}>Tasks completed</Text>
+            <Text style={styles.cardRowValue}>{totalCompleted} / {totalTasks}</Text>
+          </View>
+          <View style={styles.cardDivider} />
+          <View style={styles.cardRow}>
+            <Text style={styles.cardRowLabel}>Made with</Text>
+            <Text style={[styles.cardRowValue, { fontFamily: Fonts.accentItalic }]}>Silicon</Text>
+          </View>
         </SectionCard>
 
         {/* Data */}
         <Text style={styles.sectionHeaderText}>DATA</Text>
         <SectionCard>
+          <TouchableOpacity
+            style={styles.cardRow}
+            onPress={() => handleExportData('json')}
+            accessibilityLabel="Export as JSON"
+            accessibilityRole="button"
+          >
+            <Text style={styles.cardRowLabel}>Export as JSON</Text>
+            <Text style={styles.cardRowArrow}>↗</Text>
+          </TouchableOpacity>
+          <View style={styles.cardDivider} />
+          <TouchableOpacity
+            style={styles.cardRow}
+            onPress={() => handleExportData('csv')}
+            accessibilityLabel="Export as CSV"
+            accessibilityRole="button"
+          >
+            <Text style={styles.cardRowLabel}>Export as CSV</Text>
+            <Text style={styles.cardRowArrow}>↗</Text>
+          </TouchableOpacity>
+          <View style={styles.cardDivider} />
           <TouchableOpacity
             style={styles.dangerRow}
             onPress={() => {
@@ -811,6 +865,10 @@ const styles = StyleSheet.create({
     color: Colors.dark.error,
     fontFamily: Fonts.bodyMedium,
     fontSize: 14,
+  },
+  cardRowArrow: {
+    color: Colors.dark.textTertiary,
+    fontSize: 16,
   },
   dangerRow: {
     flexDirection: 'row',
