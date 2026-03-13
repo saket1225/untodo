@@ -37,11 +37,44 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
     }
   }, [autoFocus]);
 
+  // Quick-add shortcut: parse ! and #category from text
+  const parseShortcuts = (raw: string): { title: string; quickPriority: Priority; quickCategory: Category } => {
+    let title = raw.trim();
+    let quickPriority: Priority = priority;
+    let quickCategory: Category = category;
+
+    // ! at start = high priority
+    if (title.startsWith('!')) {
+      quickPriority = 'high';
+      title = title.slice(1).trim();
+    }
+
+    // #category anywhere
+    const categoryMap: Record<string, Category> = {
+      work: 'work', personal: 'personal', health: 'health',
+      learning: 'learning', finance: 'finance', creative: 'creative',
+      gym: 'health', fit: 'health', exercise: 'health',
+      study: 'learning', read: 'learning', money: 'finance',
+    };
+    const hashMatch = title.match(/#(\w+)/);
+    if (hashMatch) {
+      const tag = hashMatch[1].toLowerCase();
+      if (categoryMap[tag]) {
+        quickCategory = categoryMap[tag];
+        title = title.replace(hashMatch[0], '').trim();
+      }
+    }
+
+    return { title, quickPriority, quickCategory };
+  };
+
   const handleAdd = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onAdd(trimmed, priority, category);
+    const { title, quickPriority, quickCategory } = parseShortcuts(trimmed);
+    if (!title) return;
+    onAdd(title, quickPriority, quickCategory);
     setText('');
     setPriority(null);
     setCategory(null);
@@ -160,6 +193,11 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
           <Text style={styles.addButtonText}>+</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Quick-add hint */}
+      {isFocused && !text.trim() && (
+        <Text style={styles.quickAddHint}>! for high priority · #category</Text>
+      )}
 
       {/* Category chips */}
       {showCategories && (
@@ -345,6 +383,14 @@ const styles = StyleSheet.create({
     color: Colors.dark.background,
     fontFamily: Fonts.bodyBold,
     marginTop: -2,
+  },
+  quickAddHint: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    paddingHorizontal: Spacing.lg,
+    marginTop: -Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   catScroll: {
     maxHeight: 40,

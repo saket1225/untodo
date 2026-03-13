@@ -230,6 +230,20 @@ function EmptyState({ isToday, allCompleted }: { isToday: boolean; allCompleted:
   );
 }
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function formatDayHeader(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+}
+
 function TodayScreenContent() {
   const logicalDate = getLogicalDate();
   const allTodos = useTodoStore(s => s.todos);
@@ -253,6 +267,9 @@ function TodayScreenContent() {
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
 
+  // Collapsible completed section
+  const [completedCollapsed, setCompletedCollapsed] = useState(true);
+
   // All todos for the viewing date (sorted with smart ordering)
   const dateTodos = useMemo(() => {
     const dayTodos = allTodos.filter(t => t.logicalDate === viewingDate);
@@ -271,11 +288,18 @@ function TodayScreenContent() {
     });
   }, [allTodos, viewingDate]);
 
+  // Split into active and completed
+  const activeTodos = useMemo(() => dateTodos.filter(t => !t.completed), [dateTodos]);
+  const completedTodos = useMemo(() => dateTodos.filter(t => t.completed), [dateTodos]);
+
   // Filtered by category
   const todos = useMemo(() => {
-    if (activeCategory === 'all') return dateTodos;
-    return dateTodos.filter(t => t.category === activeCategory);
-  }, [dateTodos, activeCategory]);
+    const active = activeCategory === 'all' ? activeTodos : activeTodos.filter(t => t.category === activeCategory);
+    const done = activeCategory === 'all' ? completedTodos : completedTodos.filter(t => t.category === activeCategory);
+    // If completed section is collapsed, only show active tasks
+    if (completedCollapsed) return active;
+    return [...active, ...done];
+  }, [activeTodos, completedTodos, activeCategory, completedCollapsed]);
 
   // Search results across all tasks
   const searchResults = useMemo(() => {
@@ -559,57 +583,66 @@ function TodayScreenContent() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity
-            onPress={goToPrevDay}
-            style={styles.navArrow}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityLabel="Previous day"
-            accessibilityRole="button"
-          >
-            <Text style={styles.navArrowText}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.dateText} accessibilityRole="header">{formatDisplayDate(viewingDate)}</Text>
-          <TouchableOpacity
-            onPress={goToNextDay}
-            style={styles.navArrow}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityLabel="Next day"
-            accessibilityRole="button"
-          >
-            <Text style={styles.navArrowText}>›</Text>
-          </TouchableOpacity>
-          {isSyncing && (
-            <RNAnimated.Text style={[styles.syncIcon, { opacity: syncPulse }]} accessibilityLabel="Syncing">☁</RNAnimated.Text>
-          )}
-        </View>
-        <View style={styles.headerRight}>
-          {activeCats.length > 0 && (
+        <View style={styles.headerTop}>
+          <View style={styles.headerLeft}>
+            {isToday && (
+              <Text style={styles.greetingText}>{getGreeting()}</Text>
+            )}
+            <View style={styles.dateRow}>
+              <TouchableOpacity
+                onPress={goToPrevDay}
+                style={styles.navArrow}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel="Previous day"
+                accessibilityRole="button"
+              >
+                <Text style={styles.navArrowText}>‹</Text>
+              </TouchableOpacity>
+              <Text style={styles.dateText} accessibilityRole="header">{formatDayHeader(viewingDate)}</Text>
+              <TouchableOpacity
+                onPress={goToNextDay}
+                style={styles.navArrow}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel="Next day"
+                accessibilityRole="button"
+              >
+                <Text style={styles.navArrowText}>›</Text>
+              </TouchableOpacity>
+              {isSyncing && (
+                <RNAnimated.Text style={[styles.syncIcon, { opacity: syncPulse }]} accessibilityLabel="Syncing">☁</RNAnimated.Text>
+              )}
+            </View>
+          </View>
+          <View style={styles.headerRight}>
+            {activeCats.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowFilters(prev => !prev);
+                }}
+                style={styles.searchIconBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityLabel={showFilters ? 'Hide filters' : 'Show filters'}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.searchIconText, showFilters && { color: Colors.dark.text }]}>☰</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setShowFilters(prev => !prev);
-              }}
+              onPress={toggleSearch}
               style={styles.searchIconBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityLabel={showFilters ? 'Hide filters' : 'Show filters'}
+              accessibilityLabel={searchExpanded ? 'Close search' : 'Search tasks'}
               accessibilityRole="button"
             >
-              <Text style={[styles.searchIconText, showFilters && { color: Colors.dark.text }]}>☰</Text>
+              <Text style={styles.searchIconText}>{searchExpanded ? '✕' : '⌕'}</Text>
             </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            onPress={toggleSearch}
-            style={styles.searchIconBtn}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel={searchExpanded ? 'Close search' : 'Search tasks'}
-            accessibilityRole="button"
-          >
-            <Text style={styles.searchIconText}>{searchExpanded ? '✕' : '⌕'}</Text>
-          </TouchableOpacity>
-          <Text style={styles.countText} accessibilityLabel={`${completed} of ${total} tasks done`}>
-            {completed}/{total}
-          </Text>
+            {total > 0 && (
+              <Text style={styles.progressText} accessibilityLabel={`${completed} of ${total} tasks done`}>
+                {completed}/{total}
+              </Text>
+            )}
+          </View>
         </View>
       </View>
 
@@ -756,6 +789,40 @@ function TodayScreenContent() {
             <EmptyState isToday={isToday} allCompleted={false} />
           ) : null
         }
+        ListFooterComponent={
+          completedTodos.length > 0 ? (
+            <View>
+              <TouchableOpacity
+                style={styles.completedSectionHeader}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setCompletedCollapsed(prev => !prev);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.completedSectionText}>
+                  Completed ({completedTodos.length})
+                </Text>
+                <Text style={styles.completedSectionChevron}>
+                  {completedCollapsed ? '›' : '⌄'}
+                </Text>
+              </TouchableOpacity>
+              {!completedCollapsed && completedTodos.map(item => (
+                <TodoItem
+                  key={item.id}
+                  todo={item}
+                  onToggle={() => handleToggle(item.id)}
+                  onDelete={() => deleteTodo(item.id)}
+                  onPress={() => setPomodoroTodo(item)}
+                  onLongPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setQuickActionTodo(item);
+                  }}
+                />
+              ))}
+            </View>
+          ) : null
+        }
       />
       </RNAnimated.View>
 
@@ -836,23 +903,38 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
   headerLeft: {
+    flex: 1,
+  },
+  greetingText: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    flex: 1,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+  },
+  progressText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 14,
   },
   navArrow: {
     padding: 4,
@@ -873,10 +955,24 @@ const styles = StyleSheet.create({
     fontSize: 22,
     flexShrink: 1,
   },
-  countText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
+  completedSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 14,
+    marginTop: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.dark.border,
+  },
+  completedSectionText: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 13,
+  },
+  completedSectionChevron: {
+    color: Colors.dark.textTertiary,
+    fontSize: 16,
   },
   // Search
   searchIconBtn: {

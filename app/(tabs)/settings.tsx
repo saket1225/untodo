@@ -422,8 +422,17 @@ function SettingsScreenContent() {
           )}
         </SectionCard>
 
-        {/* Danger Zone */}
-        <Text style={[styles.sectionHeaderText, { color: Colors.dark.error }]}>DANGER ZONE</Text>
+        {/* About */}
+        <Text style={styles.sectionHeaderText}>ABOUT</Text>
+        <SectionCard>
+          <View style={styles.cardRow}>
+            <Text style={styles.cardRowLabel}>Version</Text>
+            <Text style={styles.cardRowValue}>{appVersion}</Text>
+          </View>
+        </SectionCard>
+
+        {/* Data */}
+        <Text style={styles.sectionHeaderText}>DATA</Text>
         <SectionCard>
           <TouchableOpacity
             style={styles.dangerRow}
@@ -439,10 +448,6 @@ function SettingsScreenContent() {
             <Text style={styles.dangerRowArrow}>→</Text>
           </TouchableOpacity>
         </SectionCard>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>untodo v{appVersion}</Text>
-        </View>
 
         <View style={{ height: 120 }} />
       </ScrollView>

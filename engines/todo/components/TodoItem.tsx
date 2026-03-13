@@ -184,6 +184,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
                 text: 'Delete',
                 style: 'destructive',
                 onPress: () => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
                   Animated.parallel([
                     Animated.timing(translateX, { toValue: -SCREEN_WIDTH, duration: 200, useNativeDriver: true }),
                     Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),

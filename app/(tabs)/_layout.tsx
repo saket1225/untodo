@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import { Colors, Fonts } from '../../lib/theme';
 import { useUserStore } from '../../engines/user/store';
@@ -69,6 +70,7 @@ export default function TabLayout() {
         tabBarStyle: styles.tabBar,
         tabBarShowLabel: false,
         animation: 'fade',
+        lazy: false,
         sceneStyle: { backgroundColor: '#0A0A0A' },
       }}
     >
@@ -77,24 +79,28 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ focused }) => <TodayTabIcon focused={focused} />,
         }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="progress"
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="Progress" focused={focused} />,
         }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="wallpaper"
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="Wallpaper" focused={focused} />,
         }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="Settings" focused={focused} />,
         }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
     </Tabs>
   );
