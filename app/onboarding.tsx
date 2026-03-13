@@ -1,269 +1,175 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, Animated, Dimensions, FlatList,
+  KeyboardAvoidingView, Platform, Animated, Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../lib/theme';
 import { useUserStore } from '../engines/user/store';
 import { useTodoStore } from '../engines/todo/store';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-interface WalkthroughSlide {
-  icon: string;
-  title: string;
-  subtitle: string;
-  description: string;
-}
-
-const WALKTHROUGH_SLIDES: WalkthroughSlide[] = [
-  {
-    icon: '◉\n┊\n◉\n┊\n◉',
-    title: 'Track your tasks',
-    subtitle: 'Simple. Focused. Minimal.',
-    description: 'Add tasks, set priorities, and organize by category.\nLong press any task for quick actions.',
-  },
-  {
-    icon: '⬤ ⬤ ⬤ ⬤ ⬤\n⬤ ⬤ ⬤ ○ ○\n○ ○ ○ ○ ○',
-    title: 'Stay accountable',
-    subtitle: 'Your progress, visualized.',
-    description: 'Each dot represents a day. Brighter dots mean more tasks done.\nWatch your wallpaper fill up over time.',
-  },
-  {
-    icon: '[ Si ]',
-    title: 'Connect Silicon',
-    subtitle: 'Your AI companion.',
-    description: 'Silicon can add tasks, write reviews, and nudge you.\nPair from Settings to get started.',
-  },
-];
-
-function WalkthroughScreen({ onComplete }: { onComplete: () => void }) {
-  const flatListRef = useRef<FlatList>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-  }, []);
-
-  const goNext = () => {
-    if (currentIndex < WALKTHROUGH_SLIDES.length - 1) {
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      onComplete();
-    }
-  };
-
-  const renderSlide = ({ item, index }: { item: WalkthroughSlide; index: number }) => (
-    <View style={[walkStyles.slide, { width: SCREEN_WIDTH }]}>
-      <Text style={walkStyles.icon}>{item.icon}</Text>
-      <Text style={walkStyles.title}>{item.title}</Text>
-      <Text style={walkStyles.subtitle}>{item.subtitle}</Text>
-      <Text style={walkStyles.description}>{item.description}</Text>
-    </View>
-  );
-
-  const isLast = currentIndex === WALKTHROUGH_SLIDES.length - 1;
-
-  return (
-    <Animated.View style={[walkStyles.container, { opacity: fadeAnim }]}>
-      <FlatList
-        ref={flatListRef}
-        data={WALKTHROUGH_SLIDES}
-        renderItem={renderSlide}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(e) => {
-          const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-          setCurrentIndex(idx);
-        }}
-        keyExtractor={(_, i) => String(i)}
-      />
-
-      {/* Dots */}
-      <View style={walkStyles.dots}>
-        {WALKTHROUGH_SLIDES.map((_, i) => (
-          <View
-            key={i}
-            style={[walkStyles.dot, i === currentIndex && walkStyles.dotActive]}
-          />
-        ))}
-      </View>
-
-      {/* Buttons */}
-      <View style={walkStyles.buttons}>
-        {!isLast && (
-          <TouchableOpacity style={walkStyles.skipBtn} onPress={onComplete}>
-            <Text style={walkStyles.skipText}>Skip</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={walkStyles.nextBtn} onPress={goNext}>
-          <Text style={walkStyles.nextText}>{isLast ? 'Get Started' : 'Next'}</Text>
-        </TouchableOpacity>
-      </View>
-    </Animated.View>
-  );
-}
-
-const walkStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-    justifyContent: 'center',
-  },
-  slide: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-  },
-  icon: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 24,
-    textAlign: 'center',
-    lineHeight: 32,
-    marginBottom: Spacing.xl,
-  },
-  title: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 32,
-    marginBottom: Spacing.sm,
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 16,
-    marginBottom: Spacing.lg,
-    textAlign: 'center',
-  },
-  description: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    lineHeight: 22,
-    textAlign: 'center',
-  },
-  dots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.dark.border,
-  },
-  dotActive: {
-    backgroundColor: Colors.dark.accent,
-    width: 20,
-  },
-  buttons: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.xxl + 20,
-  },
-  skipBtn: {
-    paddingVertical: 14,
-    paddingHorizontal: Spacing.lg,
-  },
-  skipText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-  },
-  nextBtn: {
-    flex: 1,
-    backgroundColor: Colors.dark.accent,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  nextText: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 16,
-  },
-});
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function OnboardingScreen() {
+  const [step, setStep] = useState<'splash' | 'username'>('splash');
   const [input, setInput] = useState('');
-  const [showWalkthrough, setShowWalkthrough] = useState(false);
   const setUsername = useUserStore(s => s.setUsername);
   const addSampleTasks = useTodoStore(s => s.addSampleTasks);
   const router = useRouter();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Splash animations
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoTranslateY = useRef(new Animated.Value(30)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+  const buttonOpacity = useRef(new Animated.Value(0)).current;
+  const buttonTranslateY = useRef(new Animated.Value(20)).current;
+  const dotOpacity = useRef(new Animated.Value(0)).current;
+
+  // Username screen animations
+  const usernameOpacity = useRef(new Animated.Value(0)).current;
+  const usernameTranslateY = useRef(new Animated.Value(40)).current;
+
+  // Splash exit animation
+  const splashOpacity = useRef(new Animated.Value(1)).current;
+  const splashScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 800,
-      useNativeDriver: true,
-    }).start();
+    // Staggered entrance: logo -> tagline -> decorative dots -> button
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(logoOpacity, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(logoTranslateY, { toValue: 0, duration: 800, useNativeDriver: true }),
+      ]),
+      Animated.timing(taglineOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(dotOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(buttonOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(buttonTranslateY, { toValue: 0, duration: 500, useNativeDriver: true }),
+      ]),
+    ]).start();
   }, []);
 
   const sanitized = input.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9_]/g, '');
 
-  const handleSubmit = () => {
-    if (!sanitized) return;
-    setShowWalkthrough(true);
+  const goToUsername = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Animate splash out, username in
+    Animated.parallel([
+      Animated.timing(splashOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(splashScale, { toValue: 0.95, duration: 300, useNativeDriver: true }),
+    ]).start(() => {
+      setStep('username');
+      Animated.parallel([
+        Animated.timing(usernameOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(usernameTranslateY, { toValue: 0, duration: 500, useNativeDriver: true }),
+      ]).start();
+    });
   };
 
-  const handleWalkthroughComplete = () => {
+  const handleSubmit = () => {
+    if (!sanitized) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setUsername(sanitized);
     addSampleTasks();
     router.replace('/(tabs)');
   };
 
-  if (showWalkthrough) {
-    return <WalkthroughScreen onComplete={handleWalkthroughComplete} />;
+  if (step === 'username') {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Animated.View style={[
+          styles.content,
+          { opacity: usernameOpacity, transform: [{ translateY: usernameTranslateY }] },
+        ]}>
+          <Text style={styles.usernameHeading}>pick a username</Text>
+          <Text style={styles.usernameSubtext}>this is how you'll be known</Text>
+
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="username"
+            placeholderTextColor={Colors.dark.textTertiary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+            maxLength={20}
+            selectionColor={Colors.dark.accent}
+          />
+
+          {input.length > 0 && sanitized !== input && (
+            <Text style={styles.sanitizedHint}>{sanitized}</Text>
+          )}
+
+          <TouchableOpacity
+            style={[styles.continueButton, !sanitized && { opacity: 0.3 }]}
+            onPress={handleSubmit}
+            disabled={!sanitized}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.continueButtonText}>Let's go</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        <Text style={styles.title}>untodo</Text>
-        <Text style={styles.tagline}>Do less. Mean more.</Text>
-        <Text style={styles.subtitle}>pick a username</Text>
+    <View style={styles.container}>
+      <Animated.View style={[
+        styles.splashContent,
+        {
+          opacity: splashOpacity,
+          transform: [{ scale: splashScale }],
+        },
+      ]}>
+        {/* Decorative dot grid */}
+        <Animated.View style={[styles.dotGrid, { opacity: dotOpacity }]}>
+          {Array.from({ length: 15 }).map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.decorDot,
+                i < 5 && { backgroundColor: Colors.dark.textTertiary },
+                i >= 5 && i < 10 && { backgroundColor: Colors.dark.border },
+                i >= 10 && { backgroundColor: '#1C1C1C' },
+              ]}
+            />
+          ))}
+        </Animated.View>
 
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="username"
-          placeholderTextColor={Colors.dark.textTertiary}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoFocus
-          maxLength={20}
-        />
+        {/* Logo */}
+        <Animated.Text style={[
+          styles.logo,
+          { opacity: logoOpacity, transform: [{ translateY: logoTranslateY }] },
+        ]}>
+          untodo
+        </Animated.Text>
 
-        {input.length > 0 && sanitized !== input && (
-          <Text style={styles.sanitizedHint}>{sanitized}</Text>
-        )}
+        {/* Tagline */}
+        <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>
+          Do less. Mean more.
+        </Animated.Text>
 
-        <TouchableOpacity
-          style={[styles.button, !sanitized && { opacity: 0.3 }]}
-          onPress={handleSubmit}
-          disabled={!sanitized}
-        >
-          <Text style={styles.buttonText}>Continue</Text>
-        </TouchableOpacity>
+        {/* Get Started */}
+        <Animated.View style={[
+          styles.getStartedContainer,
+          { opacity: buttonOpacity, transform: [{ translateY: buttonTranslateY }] },
+        ]}>
+          <TouchableOpacity
+            style={styles.getStartedButton}
+            onPress={goToUsername}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.getStartedText}>Get Started</Text>
+          </TouchableOpacity>
+        </Animated.View>
       </Animated.View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -272,28 +178,73 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.dark.background,
   },
+  // Splash screen
+  splashContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  dotGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: 90,
+    gap: 12,
+    justifyContent: 'center',
+    marginBottom: Spacing.xl,
+  },
+  decorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.dark.border,
+  },
+  logo: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 72,
+    letterSpacing: -1,
+  },
+  tagline: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 18,
+    marginTop: Spacing.sm,
+  },
+  getStartedContainer: {
+    position: 'absolute',
+    bottom: 80,
+    left: Spacing.xl,
+    right: Spacing.xl,
+  },
+  getStartedButton: {
+    backgroundColor: Colors.dark.accent,
+    borderRadius: 14,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  getStartedText: {
+    color: Colors.dark.background,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 17,
+  },
+  // Username screen
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
   },
-  title: {
+  usernameHeading: {
     color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
-    fontSize: 64,
-    marginBottom: Spacing.xs,
+    fontSize: 32,
+    marginBottom: Spacing.sm,
   },
-  tagline: {
+  usernameSubtext: {
     color: Colors.dark.textTertiary,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 16,
-    marginBottom: Spacing.xl,
-  },
-  subtitle: {
-    color: Colors.dark.textSecondary,
     fontFamily: Fonts.body,
-    fontSize: 16,
+    fontSize: 15,
     marginBottom: Spacing.xxl,
   },
   input: {
@@ -301,12 +252,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
     borderColor: Colors.dark.border,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: 16,
+    paddingVertical: 18,
     color: Colors.dark.text,
     fontFamily: Fonts.body,
-    fontSize: 18,
+    fontSize: 20,
     textAlign: 'center',
     marginBottom: Spacing.sm,
   },
@@ -316,19 +267,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: Spacing.md,
   },
-  button: {
+  continueButton: {
     width: '100%',
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: Colors.dark.accent,
+    borderRadius: 14,
+    paddingVertical: 18,
     alignItems: 'center',
-    marginTop: Spacing.md,
+    marginTop: Spacing.lg,
   },
-  buttonText: {
-    color: Colors.dark.text,
+  continueButtonText: {
+    color: Colors.dark.background,
     fontFamily: Fonts.bodyMedium,
-    fontSize: 16,
+    fontSize: 17,
   },
 });

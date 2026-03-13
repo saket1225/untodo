@@ -135,6 +135,101 @@ function SearchResults({
   );
 }
 
+// --- Skeleton Loading ---
+function SkeletonBar({ width, delay = 0 }: { width: number | string; delay?: number }) {
+  const shimmer = useRef(new RNAnimated.Value(0)).current;
+  useEffect(() => {
+    const anim = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(shimmer, { toValue: 1, duration: 1000, delay, useNativeDriver: true }),
+        RNAnimated.timing(shimmer, { toValue: 0, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, []);
+
+  const opacity = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.06, 0.12],
+  });
+
+  return (
+    <RNAnimated.View
+      style={{
+        height: 14,
+        width: width as any,
+        backgroundColor: Colors.dark.text,
+        borderRadius: 7,
+        opacity,
+        marginBottom: 8,
+      }}
+    />
+  );
+}
+
+function SkeletonLoader() {
+  return (
+    <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg }}>
+      {[0, 1, 2, 3, 4].map(i => (
+        <View key={i} style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 16,
+          gap: Spacing.md,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: Colors.dark.border,
+        }}>
+          <RNAnimated.View style={{
+            width: 22, height: 22, borderRadius: 11,
+            backgroundColor: Colors.dark.text,
+            opacity: 0.06,
+          }} />
+          <View style={{ flex: 1 }}>
+            <SkeletonBar width={`${70 - i * 10}%`} delay={i * 100} />
+            <SkeletonBar width={`${40 - i * 5}%`} delay={i * 100 + 50} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// --- Empty States ---
+function EmptyState({ isToday, allCompleted }: { isToday: boolean; allCompleted: boolean }) {
+  const fadeAnim = useRef(new RNAnimated.Value(0)).current;
+  useEffect(() => {
+    RNAnimated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+  }, []);
+
+  if (allCompleted) {
+    return (
+      <RNAnimated.View style={[styles.empty, { opacity: fadeAnim }]}>
+        <Text style={styles.emptyIcon}>✓</Text>
+        <Text style={styles.emptyQuote}>All done. Go live your day.</Text>
+        <Text style={styles.emptySubtext}>You've completed everything. Nice work.</Text>
+      </RNAnimated.View>
+    );
+  }
+
+  if (isToday) {
+    return (
+      <RNAnimated.View style={[styles.empty, { opacity: fadeAnim }]}>
+        <Text style={styles.emptyIcon}>○</Text>
+        <Text style={styles.emptyQuote}>Nothing on the plate.</Text>
+        <Text style={styles.emptySubtext}>Add something worth doing.</Text>
+      </RNAnimated.View>
+    );
+  }
+
+  return (
+    <RNAnimated.View style={[styles.empty, { opacity: fadeAnim }]}>
+      <Text style={styles.emptyQuote}>Nothing here yet</Text>
+      <Text style={styles.emptySubtext}>Add a task or navigate to another day</Text>
+    </RNAnimated.View>
+  );
+}
+
 function TodayScreenContent() {
   const logicalDate = getLogicalDate();
   const allTodos = useTodoStore(s => s.todos);
@@ -611,10 +706,16 @@ function TodayScreenContent() {
       {/* Input */}
       <TodoInput onAdd={handleAdd} autoFocus={isToday} viewingDate={viewingDate} />
 
-      {/* Initial loading */}
+      {/* Skeleton loading */}
       {initialLoading && total === 0 && (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Syncing...</Text>
+        <SkeletonLoader />
+      )}
+
+      {/* All done banner */}
+      {isToday && total > 0 && completed === total && !showCelebration && (
+        <View style={styles.allDoneBanner}>
+          <Text style={styles.allDoneCheck}>✓</Text>
+          <Text style={styles.allDoneText}>All done. Go live your day.</Text>
         </View>
       )}
 
@@ -639,27 +740,21 @@ function TodayScreenContent() {
             onRefresh={async () => {
               setRefreshing(true);
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              // Re-check carry-over, spawn recurring, and sync
               setCheckedCarryOver(false);
+              spawnRecurringTasks();
               await syncFromFirestore().catch(() => {});
               setRefreshing(false);
             }}
             tintColor={Colors.dark.textTertiary}
-            title="Syncing..."
+            title="Pull to sync"
             titleColor={Colors.dark.textTertiary}
           />
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyQuote}>
-              {isToday ? '"The secret of getting ahead\nis getting started."' : 'Nothing here yet'}
-            </Text>
-            <Text style={styles.emptyAttribution}>
-              {isToday ? '— Mark Twain' : ''}
-            </Text>
-            <Text style={styles.emptySubtext}>
-              {isToday ? 'What will you accomplish today?' : 'Add a task or navigate to another day'}
-            </Text>
-          </View>
+          !initialLoading ? (
+            <EmptyState isToday={isToday} allCompleted={false} />
+          ) : null
         }
       />
       </RNAnimated.View>
@@ -916,23 +1011,20 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: Colors.dark.background,
   },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: Spacing.lg,
-  },
-  loadingText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-  },
   list: {
     paddingBottom: 120,
     paddingTop: Spacing.xs,
   },
   empty: {
     alignItems: 'center',
-    paddingTop: 100,
+    paddingTop: 80,
     paddingHorizontal: Spacing.xl,
+  },
+  emptyIcon: {
+    color: Colors.dark.textTertiary,
+    fontSize: 40,
+    marginBottom: Spacing.lg,
+    opacity: 0.5,
   },
   emptyQuote: {
     color: Colors.dark.textSecondary,
@@ -941,18 +1033,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 32,
   },
-  emptyAttribution: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    marginTop: Spacing.sm,
-  },
   emptySubtext: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 14,
-    marginTop: Spacing.xl,
+    marginTop: Spacing.md,
     textAlign: 'center',
+  },
+  allDoneBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    marginHorizontal: Spacing.lg,
+    backgroundColor: Colors.dark.success + '12',
+    borderRadius: 12,
+    marginTop: Spacing.xs,
+  },
+  allDoneCheck: {
+    color: Colors.dark.success,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  allDoneText: {
+    color: Colors.dark.success,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 16,
   },
 
   // Carry-over modal

@@ -1,15 +1,24 @@
 import { useRef, memo, useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Animated, PanResponder, Alert, Dimensions,
+  LayoutAnimation, UIManager, Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Todo, CATEGORIES, PRIORITY_CONFIG } from '../types';
 import { useTodoStore } from '../store';
 
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SWIPE_COMPLETE_THRESHOLD = 80;
 const SWIPE_DELETE_THRESHOLD = -100;
+
+const CONFETTI_COLORS = ['#4ADE80', '#60A5FA', '#FBBF24', '#F472B6', '#A78BFA', '#F5F5F5'];
+const NUM_CONFETTI = 8;
 
 interface Props {
   todo: Todo;
@@ -49,10 +58,82 @@ function LiveTimer({ startedAt, baseSeconds }: { startedAt: string; baseSeconds:
   );
 }
 
+// Mini confetti burst on the checkbox area
+function CheckboxConfetti({ visible }: { visible: boolean }) {
+  const particles = useRef(
+    Array.from({ length: NUM_CONFETTI }, (_, i) => ({
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(0),
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      angle: (i / NUM_CONFETTI) * 2 * Math.PI,
+    }))
+  ).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    const radius = 24;
+    particles.forEach((p) => {
+      p.x.setValue(0);
+      p.y.setValue(0);
+      p.opacity.setValue(1);
+      p.scale.setValue(1);
+      Animated.parallel([
+        Animated.timing(p.x, {
+          toValue: Math.cos(p.angle) * radius,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(p.y, {
+          toValue: Math.sin(p.angle) * radius,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(p.opacity, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(p.scale, { toValue: 1.2, duration: 150, useNativeDriver: true }),
+          Animated.timing(p.scale, { toValue: 0, duration: 250, useNativeDriver: true }),
+        ]),
+      ]).start();
+    });
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <View style={styles.confettiContainer} pointerEvents="none">
+      {particles.map((p, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            position: 'absolute',
+            width: 5,
+            height: 5,
+            borderRadius: i % 2 === 0 ? 2.5 : 1,
+            backgroundColor: p.color,
+            transform: [
+              { translateX: p.x },
+              { translateY: p.y },
+              { scale: p.scale },
+            ],
+            opacity: p.opacity,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
 function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props) {
   const translateX = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
+  const [showConfetti, setShowConfetti] = useState(false);
   const startTimeTracking = useTodoStore(s => s.startTimeTracking);
   const stopTimeTracking = useTodoStore(s => s.stopTimeTracking);
 
@@ -63,7 +144,6 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 20 && Math.abs(gs.dy) < 20,
       onPanResponderMove: (_, gs) => {
-        // Allow right swipe only if not completed, allow left swipe always
         if (gs.dx > 0 && !todo.completed) {
           translateX.setValue(gs.dx);
         } else if (gs.dx < 0) {
@@ -72,20 +152,21 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
       },
       onPanResponderRelease: (_, gs) => {
         if (gs.dx > SWIPE_COMPLETE_THRESHOLD && !todo.completed) {
-          // Swipe right -> complete task with satisfying animation
+          // Swipe right -> complete with satisfying animation
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setShowConfetti(true);
+          setTimeout(() => setShowConfetti(false), 500);
           Animated.parallel([
             Animated.timing(translateX, { toValue: SCREEN_WIDTH, duration: 250, useNativeDriver: true }),
             Animated.timing(opacityAnim, { toValue: 0.3, duration: 250, useNativeDriver: true }),
           ]).start(() => {
             if (isTracking) stopTimeTracking(todo.id);
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
             onToggle();
-            // Reset for re-render
             translateX.setValue(0);
             opacityAnim.setValue(1);
           });
         } else if (gs.dx < SWIPE_DELETE_THRESHOLD) {
-          // Swipe left -> delete with confirmation
           Animated.spring(translateX, { toValue: -120, useNativeDriver: true, friction: 8 }).start();
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           Alert.alert(
@@ -107,6 +188,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
                     Animated.timing(translateX, { toValue: -SCREEN_WIDTH, duration: 200, useNativeDriver: true }),
                     Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
                   ]).start(() => {
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                     onDelete();
                     translateX.setValue(0);
                     opacityAnim.setValue(1);
@@ -124,22 +206,25 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
 
   const handleToggle = () => {
     if (!todo.completed) {
-      // Completing - satisfying animation
+      // Completing — satisfying scale pulse + confetti + haptic
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 500);
       Animated.sequence([
-        Animated.timing(scaleAnim, { toValue: 0.92, duration: 100, useNativeDriver: true }),
-        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4, tension: 200 }),
+        Animated.timing(scaleAnim, { toValue: 1.02, duration: 120, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4, tension: 300 }),
       ]).start();
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       Animated.sequence([
-        Animated.timing(scaleAnim, { toValue: 0.95, duration: 80, useNativeDriver: true }),
+        Animated.timing(scaleAnim, { toValue: 0.97, duration: 80, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4 }),
       ]).start();
     }
     if (!todo.completed && isTracking) {
       stopTimeTracking(todo.id);
     }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onToggle();
   };
 
@@ -158,7 +243,6 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
   const subtasks = todo.subtasks || [];
   const subtasksDone = subtasks.filter(s => s.completed).length;
 
-  // Interpolate background colors for swipe hints
   const completeBackgroundOpacity = translateX.interpolate({
     inputRange: [0, SWIPE_COMPLETE_THRESHOLD],
     outputRange: [0, 1],
@@ -197,6 +281,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress }: Props
           <View style={[styles.checkboxInner, todo.completed && styles.checkboxChecked]}>
             {todo.completed && <Text style={styles.checkmark}>✓</Text>}
           </View>
+          <CheckboxConfetti visible={showConfetti} />
         </TouchableOpacity>
 
         {/* Content */}
@@ -336,6 +421,16 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     padding: 2,
+    position: 'relative',
+  },
+  confettiContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   checkboxInner: {
     width: 22,
@@ -415,7 +510,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 11,
   },
-  // Time tracking
   trackingBtn: {
     width: 26,
     height: 26,
