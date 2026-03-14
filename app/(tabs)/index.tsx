@@ -259,7 +259,9 @@ function TodayScreenContent() {
     if (streak <= 0 || !isToday) return;
     const milestones = [3, 7, 14, 30, 60, 100];
     if (!milestones.includes(streak)) return;
+    let mounted = true;
     AsyncStorage.getItem(MILESTONE_KEY).then(val => {
+      if (!mounted) return;
       const last = parseInt(val || '0', 10);
       if (streak > last) {
         setMilestoneStreak(streak);
@@ -267,6 +269,7 @@ function TodayScreenContent() {
         AsyncStorage.setItem(MILESTONE_KEY, streak.toString());
       }
     });
+    return () => { mounted = false; };
   }, [streak, isToday]);
 
   // Compute habit history for recurring tasks (last 7 days completion)

@@ -152,7 +152,7 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
       setFlowElapsed(0);
       setFlowStartTime(Date.now());
     } else {
-      setSeconds(preset.name === 'custom' ? parseInt(customWork) * 60 : preset.work * 60);
+      setSeconds(preset.name === 'custom' ? (parseInt(customWork) || 25) * 60 : preset.work * 60);
     }
     setIsRunning(true);
     setSessionLog('');
@@ -175,8 +175,8 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
     setPhase(isLong ? 'long-break' : 'short-break');
     if (!preset.isFlowtime) {
       const breakTime = isLong
-        ? (preset.name === 'custom' ? parseInt(customLongBreak) : preset.longBreak)
-        : (preset.name === 'custom' ? parseInt(customBreak) : preset.shortBreak);
+        ? (preset.name === 'custom' ? (parseInt(customLongBreak) || 20) : preset.longBreak)
+        : (preset.name === 'custom' ? (parseInt(customBreak) || 5) : preset.shortBreak);
       setSeconds(breakTime * 60);
     }
     setBreakSuggestion(randomSuggestion());
@@ -196,7 +196,7 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
     if (p.isFlowtime) {
       setSeconds(0);
     } else if (p.name === 'custom') {
-      setSeconds(parseInt(customWork) * 60 || 25 * 60);
+      setSeconds((parseInt(customWork) || 25) * 60);
     } else {
       setSeconds(p.work * 60);
     }
@@ -212,7 +212,7 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
     if (preset.isFlowtime) {
       setSeconds(0);
     } else if (preset.name === 'custom') {
-      setSeconds(parseInt(customWork) * 60 || 25 * 60);
+      setSeconds((parseInt(customWork) || 25) * 60);
     } else {
       setSeconds(preset.work * 60);
     }
@@ -220,8 +220,8 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
 
   const updateSessions = (val: string) => {
     setCustomSessions(val);
-    const n = parseInt(val);
-    if (n > 0) setTotalSessions(n);
+    const n = parseInt(val) || 0;
+    if (n > 0 && n <= 20) setTotalSessions(n);
   };
 
   const displayTime = preset.isFlowtime && phase === 'work' ? flowElapsed : seconds;
@@ -381,7 +381,7 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
                 value={customWork}
                 onChangeText={v => {
                   setCustomWork(v);
-                  const n = parseInt(v);
+                  const n = parseInt(v) || 0;
                   if (n > 0) setSeconds(n * 60);
                 }}
                 keyboardType="number-pad"

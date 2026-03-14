@@ -116,11 +116,10 @@ export function StreakMilestone({ streak, visible, onDismiss }: { streak: number
     ]).start();
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 200);
-    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 400);
-
-    const timer = setTimeout(onDismiss, 4000);
-    return () => clearTimeout(timer);
+    const t1 = setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 200);
+    const t2 = setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 400);
+    const t3 = setTimeout(onDismiss, 4000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [visible]);
 
   if (!visible || !milestone) return null;

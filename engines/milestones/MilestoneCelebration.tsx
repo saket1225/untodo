@@ -27,11 +27,10 @@ export default function MilestoneCelebration() {
     RNAnimated.timing(counterAnim, { toValue: 1, duration: 1200, useNativeDriver: false }).start();
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 200);
-    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 400);
-
-    const timer = setTimeout(dismiss, 5000);
-    return () => clearTimeout(timer);
+    const t1 = setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 200);
+    const t2 = setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 400);
+    const t3 = setTimeout(dismiss, 5000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [pendingMilestone?.threshold]);
 
   const dismiss = () => {

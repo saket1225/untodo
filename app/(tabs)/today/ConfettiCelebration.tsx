@@ -58,11 +58,11 @@ export function ConfettiCelebration({ visible, onDismiss, streak }: { visible: b
     });
     // Celebration haptic pattern
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 200);
-    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 400);
+    const t1 = setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 200);
+    const t2 = setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 400);
     // Auto-dismiss after 3.5 seconds
-    const timer = setTimeout(onDismiss, 3500);
-    return () => clearTimeout(timer);
+    const t3 = setTimeout(onDismiss, 3500);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [visible]);
 
   if (!visible) return null;

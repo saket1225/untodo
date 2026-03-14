@@ -504,9 +504,9 @@ function DateInput({ value, onChange, error, label }: { value: string; onChange:
   useEffect(() => {
     if (value && isValidDateStr(value)) {
       const parts = value.split('-');
-      setYear(parts[0]);
-      setMonth(parts[1]);
-      setDay(parts[2]);
+      setYear(parts[0] || '2028');
+      setMonth(parts[1] || '01');
+      setDay(parts[2] || '12');
     }
   }, [value]);
 

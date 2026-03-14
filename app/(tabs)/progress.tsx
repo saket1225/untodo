@@ -640,6 +640,7 @@ function ProgressScreenContent() {
   const checkAchievements = useAchievementStore(s => s.checkAchievements);
   const achievements = useAchievementStore(s => s.achievements);
   const unlockedCount = achievements.filter(a => a.unlockedAt).length;
+  const completedCount = useMemo(() => todos.filter(t => t.completed).length, [todos]);
 
   const { collapsed, toggle } = useCollapseState({
     weeklyReview: false,  // expanded by default
@@ -649,7 +650,7 @@ function ProgressScreenContent() {
 
   useEffect(() => {
     if (hasAnyTasks) checkAchievements();
-  }, [todos.length, todos.filter(t => t.completed).length]);
+  }, [todos.length, completedCount]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
