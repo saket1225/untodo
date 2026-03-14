@@ -12,6 +12,8 @@ import { computeAnalytics, generateDailyInsight, AnalyticsData } from '../../lib
 import { format } from 'date-fns';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import WeeklyReviewComponent from '../../engines/progress/components/WeeklyReview';
+import { useAchievementStore, Achievement } from '../../engines/achievements/store';
+import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -673,6 +675,185 @@ function ShareSection({ analytics }: { analytics: AnalyticsData }) {
   );
 }
 
+// --- Achievement Celebration Toast ---
+function AchievementCelebration() {
+  const newlyUnlocked = useAchievementStore(s => s.newlyUnlocked);
+  const achievements = useAchievementStore(s => s.achievements);
+  const dismissAll = useAchievementStore(s => s.dismissAllCelebrations);
+  const fadeAnim = useRef(new RNAnimated.Value(0)).current;
+  const scaleAnim = useRef(new RNAnimated.Value(0.8)).current;
+
+  const toShow = achievements.filter(a => newlyUnlocked.includes(a.id));
+
+  useEffect(() => {
+    if (toShow.length > 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      RNAnimated.parallel([
+        RNAnimated.spring(scaleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
+        RNAnimated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+
+      const timer = setTimeout(() => {
+        RNAnimated.timing(fadeAnim, { toValue: 0, duration: 400, useNativeDriver: true }).start(() => {
+          dismissAll();
+          scaleAnim.setValue(0.8);
+        });
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [toShow.length]);
+
+  if (toShow.length === 0) return null;
+  const a = toShow[0];
+
+  return (
+    <RNAnimated.View style={[styles.celebrationToast, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+      <Text style={styles.celebrationIcon}>{a.icon}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.celebrationTitle}>Achievement Unlocked!</Text>
+        <Text style={styles.celebrationName}>{a.title}</Text>
+      </View>
+    </RNAnimated.View>
+  );
+}
+
+// --- Achievements Badge Grid ---
+function AchievementsGrid() {
+  const achievements = useAchievementStore(s => s.achievements);
+  const unlocked = achievements.filter(a => a.unlockedAt);
+  const locked = achievements.filter(a => !a.unlockedAt);
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.achievementsHeader}>
+        <Text style={styles.sectionTitle}>Achievements</Text>
+        <Text style={styles.achievementsCount}>{unlocked.length}/{achievements.length}</Text>
+      </View>
+      <View style={styles.achievementsGrid}>
+        {achievements.map(a => (
+          <View
+            key={a.id}
+            style={[styles.achievementBadge, !a.unlockedAt && styles.achievementLocked]}
+          >
+            <Text style={[styles.achievementIcon, !a.unlockedAt && { opacity: 0.2 }]}>{a.icon}</Text>
+            <Text style={[styles.achievementTitle, !a.unlockedAt && { color: Colors.dark.textTertiary }]} numberOfLines={1}>
+              {a.title}
+            </Text>
+            <Text style={styles.achievementDesc} numberOfLines={2}>{a.description}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// --- Deep Statistics ---
+function DeepStatistics({ analytics, todos }: { analytics: AnalyticsData; todos: any[] }) {
+  const stats = useMemo(() => {
+    const allCompleted = todos.filter((t: any) => t.completed);
+    const totalCompleted = allCompleted.length;
+    const totalTasks = todos.length;
+
+    // Average tasks per day
+    const datesWithTasks = new Set(todos.map((t: any) => t.logicalDate));
+    const avgPerDay = datesWithTasks.size > 0 ? (totalCompleted / datesWithTasks.size).toFixed(1) : '0';
+
+    // Completion rate
+    const completionRate = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
+
+    // Most productive time of day
+    const hourBuckets: number[] = new Array(24).fill(0);
+    allCompleted.forEach((t: any) => {
+      if (t.updatedAt) {
+        const hour = new Date(t.updatedAt).getHours();
+        hourBuckets[hour]++;
+      }
+    });
+    const peakHour = hourBuckets.indexOf(Math.max(...hourBuckets));
+    const timeOfDay = peakHour < 6 ? 'Late night' : peakHour < 12 ? 'Morning' : peakHour < 17 ? 'Afternoon' : peakHour < 21 ? 'Evening' : 'Night';
+    const peakHourLabel = peakHour === 0 ? '12am' : peakHour < 12 ? `${peakHour}am` : peakHour === 12 ? '12pm' : `${peakHour - 12}pm`;
+
+    // Total focus time (pomodoro + time tracking)
+    let totalFocusMins = 0;
+    todos.forEach((t: any) => {
+      totalFocusMins += t.pomodoroMinutesLogged || 0;
+      if (t.timeTracking?.totalSeconds) totalFocusMins += Math.floor(t.timeTracking.totalSeconds / 60);
+    });
+    const focusHours = Math.floor(totalFocusMins / 60);
+    const focusMins = totalFocusMins % 60;
+    const focusLabel = focusHours > 0 ? `${focusHours}h ${focusMins}m` : `${focusMins}m`;
+
+    // Completion rate trend (last 7 days vs previous 7 days)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let recent7Completed = 0, recent7Total = 0;
+    let prev7Completed = 0, prev7Total = 0;
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayTodos = todos.filter((t: any) => t.logicalDate === dateStr);
+      const completed = dayTodos.filter((t: any) => t.completed).length;
+      if (i < 7) { recent7Completed += completed; recent7Total += dayTodos.length; }
+      else { prev7Completed += completed; prev7Total += dayTodos.length; }
+    }
+    const recentRate = recent7Total > 0 ? recent7Completed / recent7Total : 0;
+    const prevRate = prev7Total > 0 ? prev7Completed / prev7Total : 0;
+    const trend = recentRate > prevRate + 0.05 ? 'improving' : recentRate < prevRate - 0.05 ? 'declining' : 'steady';
+    const trendIcon = trend === 'improving' ? '↑' : trend === 'declining' ? '↓' : '→';
+    const trendColor = trend === 'improving' ? Colors.dark.success : trend === 'declining' ? Colors.dark.error : Colors.dark.textSecondary;
+
+    return {
+      totalCompleted, avgPerDay, completionRate,
+      longestStreak: analytics.longestStreak,
+      mostProductiveDay: analytics.mostProductiveDay,
+      timeOfDay, peakHourLabel,
+      focusLabel, totalFocusMins,
+      trend, trendIcon, trendColor,
+    };
+  }, [todos, analytics]);
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Statistics</Text>
+      <View style={styles.deepStatsGrid}>
+        <View style={styles.deepStatCard}>
+          <Text style={styles.deepStatValue}>{stats.totalCompleted}</Text>
+          <Text style={styles.deepStatLabel}>all-time completed</Text>
+        </View>
+        <View style={styles.deepStatCard}>
+          <Text style={styles.deepStatValue}>{stats.avgPerDay}</Text>
+          <Text style={styles.deepStatLabel}>avg tasks/day</Text>
+        </View>
+        <View style={styles.deepStatCard}>
+          <Text style={[styles.deepStatValue, { color: Colors.dark.success }]}>{stats.longestStreak}</Text>
+          <Text style={styles.deepStatLabel}>best streak ever</Text>
+        </View>
+        <View style={styles.deepStatCard}>
+          <Text style={styles.deepStatValue}>{stats.mostProductiveDay.slice(0, 3)}</Text>
+          <Text style={styles.deepStatLabel}>best day of week</Text>
+        </View>
+        <View style={styles.deepStatCard}>
+          <Text style={styles.deepStatValue}>{stats.peakHourLabel}</Text>
+          <Text style={styles.deepStatLabel}>{stats.timeOfDay.toLowerCase()}</Text>
+        </View>
+        <View style={styles.deepStatCard}>
+          <Text style={[styles.deepStatValue, { color: Colors.dark.timer }]}>{stats.focusLabel}</Text>
+          <Text style={styles.deepStatLabel}>total focus time</Text>
+        </View>
+        <View style={styles.deepStatCard}>
+          <Text style={styles.deepStatValue}>{stats.completionRate}%</Text>
+          <Text style={styles.deepStatLabel}>all-time rate</Text>
+        </View>
+        <View style={styles.deepStatCard}>
+          <Text style={[styles.deepStatValue, { color: stats.trendColor }]}>{stats.trendIcon}</Text>
+          <Text style={styles.deepStatLabel}>trend: {stats.trend}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function DailyInsightBanner({ todos }: { todos: any[] }) {
   const insight = useMemo(() => generateDailyInsight(todos), [todos]);
   if (!insight) return null;
@@ -689,14 +870,22 @@ function ProgressScreenContent() {
   const todos = useTodoStore(s => s.todos);
   const hasAnyTasks = todos.length > 0;
   const analytics = useMemo(() => computeAnalytics(todos), [todos]);
+  const checkAchievements = useAchievementStore(s => s.checkAchievements);
+
+  // Check achievements when todos change
+  useEffect(() => {
+    if (hasAnyTasks) checkAchievements();
+  }, [todos.length, todos.filter(t => t.completed).length]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
+    checkAchievements();
     setTimeout(() => setRefreshing(false), 500);
   }, []);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <AchievementCelebration />
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -717,6 +906,8 @@ function ProgressScreenContent() {
             <TodaySummaryCard />
             <DailyInsightBanner todos={todos} />
             <ContributionGraph heatmap={analytics.heatmap} />
+            <AchievementsGrid />
+            <DeepStatistics analytics={analytics} todos={todos} />
             <WeeklyReviewComponent />
             <AnalyticsSummary analytics={analytics} />
             <CategoryBreakdown data={analytics.categoryBreakdown} />
@@ -1345,5 +1536,123 @@ const styles = StyleSheet.create({
     color: Colors.dark.text,
     fontFamily: Fonts.bodyMedium,
     fontSize: 15,
+  },
+
+  // Achievement Celebration Toast
+  celebrationToast: {
+    position: 'absolute',
+    top: 60,
+    left: Spacing.lg,
+    right: Spacing.lg,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.success,
+    padding: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    zIndex: 100,
+    shadowColor: Colors.dark.success,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 20,
+  },
+  celebrationIcon: {
+    fontSize: 32,
+    color: Colors.dark.success,
+  },
+  celebrationTitle: {
+    color: Colors.dark.success,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  celebrationName: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 20,
+    marginTop: 2,
+  },
+
+  // Achievements Grid
+  achievementsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: Spacing.md,
+  },
+  achievementsCount: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.accent,
+    fontSize: 14,
+  },
+  achievementsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  achievementBadge: {
+    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 4) / 5,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.sm,
+    alignItems: 'center',
+    minHeight: 80,
+  },
+  achievementLocked: {
+    opacity: 0.5,
+  },
+  achievementIcon: {
+    fontSize: 22,
+    color: Colors.dark.text,
+    marginBottom: 4,
+  },
+  achievementTitle: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 9,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  achievementDesc: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 7,
+    textAlign: 'center',
+    lineHeight: 10,
+  },
+
+  // Deep Statistics
+  deepStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  deepStatCard: {
+    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 3) / 4,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.sm,
+    alignItems: 'center',
+  },
+  deepStatValue: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accent,
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  deepStatLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 9,
+    textAlign: 'center',
+    marginTop: 2,
   },
 });
