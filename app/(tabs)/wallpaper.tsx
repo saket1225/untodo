@@ -31,6 +31,11 @@ const INNER_WIDTH = PREVIEW_WIDTH - PHONE_BORDER * 2;
 const PREVIEW_HEIGHT = INNER_WIDTH * WALLPAPER_RATIO;
 const MAX_DOTS = 1000;
 
+// Full-resolution rendering: content renders at wallpaper resolution, preview scales it down
+const WP_SCALE = WALLPAPER_W / INNER_WIDTH;
+const PREVIEW_SCALE = INNER_WIDTH / WALLPAPER_W;
+const wp = (v: number) => Math.round(v * WP_SCALE * 100) / 100; // scale helper
+
 // ─── Quote Pool ─────────────────────────────────────────────────────────────────
 
 const QUOTE_POOL = [
@@ -90,7 +95,8 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Ultra clean',
     bg: '#080808',
     dotCompleted: (rate) => {
-      const v = Math.round(80 + 175 * rate);
+      const r = Math.max(0.4, rate);
+      const v = Math.round(120 + 135 * r);
       return `rgb(${v}, ${v}, ${v})`;
     },
     dotToday: '#FFFFFF',
@@ -106,7 +112,8 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Hacker mode',
     bg: '#0A0A0A',
     dotCompleted: (rate) => {
-      const v = Math.round(60 + 195 * rate);
+      const r = Math.max(0.4, rate);
+      const v = Math.round(120 + 135 * r);
       return `rgb(0, ${v}, ${Math.round(v * 0.25)})`;
     },
     dotToday: '#00FF41',
@@ -124,9 +131,10 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Deep twilight',
     bg: '#0C0C1E',
     dotCompleted: (rate) => {
-      const r = Math.round(70 + 110 * rate);
-      const g = Math.round(70 + 130 * rate);
-      const b = Math.round(110 + 145 * rate);
+      const cr = Math.max(0.4, rate);
+      const r = Math.round(110 + 70 * cr);
+      const g = Math.round(110 + 90 * cr);
+      const b = Math.round(150 + 105 * cr);
       return `rgb(${r}, ${g}, ${b})`;
     },
     dotToday: '#9BABFF',
@@ -142,7 +150,8 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Electric glow',
     bg: '#040410',
     dotCompleted: (rate) => {
-      const v = Math.round(100 + 155 * rate);
+      const r = Math.max(0.4, rate);
+      const v = Math.round(140 + 115 * r);
       return `rgb(${Math.round(v * 0.95)}, ${Math.round(v * 0.15)}, ${v})`;
     },
     dotToday: '#FF33FF',
@@ -159,7 +168,8 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Warm & light',
     bg: '#F2EDE4',
     dotCompleted: (rate) => {
-      const v = Math.round(180 - 155 * rate);
+      const r = Math.max(0.4, rate);
+      const v = Math.round(160 - 130 * r);
       return `rgb(${v}, ${v - 8}, ${v - 18})`;
     },
     dotToday: '#1A1A1A',
@@ -175,7 +185,8 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Technical feel',
     bg: '#081828',
     dotCompleted: (rate) => {
-      const v = Math.round(80 + 175 * rate);
+      const r = Math.max(0.4, rate);
+      const v = Math.round(120 + 135 * r);
       return `rgb(${Math.round(v * 0.35)}, ${Math.round(v * 0.65)}, ${v})`;
     },
     dotToday: '#5CACEE',
@@ -193,7 +204,8 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Pure darkness',
     bg: '#000000',
     dotCompleted: (rate) => {
-      const v = Math.round(180 + 75 * rate);
+      const r = Math.max(0.4, rate);
+      const v = Math.round(190 + 65 * r);
       return `rgb(${v}, ${v}, ${v})`;
     },
     dotToday: '#FFFFFF',
@@ -209,9 +221,10 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Purple shimmer',
     bg: '#06041A',
     dotCompleted: (rate) => {
-      const r = Math.round(130 + 90 * rate);
-      const g = Math.round(110 + 110 * rate);
-      const b = Math.round(190 + 65 * rate);
+      const cr = Math.max(0.4, rate);
+      const r = Math.round(155 + 65 * cr);
+      const g = Math.round(135 + 85 * cr);
+      const b = Math.round(205 + 50 * cr);
       return `rgb(${r}, ${g}, ${b})`;
     },
     dotToday: '#E8DEFF',
@@ -369,14 +382,16 @@ function getDotColor(day: DayData, style: StyleTheme): string {
   return style.dotCompleted(day.completionRate);
 }
 
-function DotGrid({ config, days, style }: { config: import('../../engines/wallpaper/types').WallpaperConfig; days: DayData[]; style: StyleTheme }) {
+function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../../engines/wallpaper/types').WallpaperConfig; days: DayData[]; style: StyleTheme; scaleFactor?: number }) {
   const { dotSize, spacing, cols } = config;
-  const dotDiameter = dotSize * 2;
-  const totalWidth = cols * dotDiameter + (cols - 1) * spacing;
-  const availableWidth = INNER_WIDTH - Spacing.md * 2;
+  const sDotSize = dotSize * scaleFactor;
+  const sSpacing = spacing * scaleFactor;
+  const dotDiameter = sDotSize * 2;
+  const totalWidth = cols * dotDiameter + (cols - 1) * sSpacing;
+  const availableWidth = (INNER_WIDTH - Spacing.md * 2) * scaleFactor;
   const scale = Math.min(1, availableWidth / totalWidth);
   const finalDot = Math.round(dotDiameter * scale * 100) / 100;
-  const finalSpacing = Math.round(spacing * scale * 100) / 100;
+  const finalSpacing = Math.round(sSpacing * scale * 100) / 100;
   const finalWidth = cols * finalDot + (cols - 1) * finalSpacing;
   const hasGlowEffect = style.glowCompleted || false;
 
@@ -386,16 +401,16 @@ function DotGrid({ config, days, style }: { config: import('../../engines/wallpa
   }
 
   return (
-    <View style={{ alignItems: 'center', paddingVertical: Spacing.xs }}>
+    <View style={{ alignItems: 'center', paddingVertical: Spacing.xs * scaleFactor }}>
       {/* Blueprint grid overlay */}
       {style.gridLines && (
         <View style={{
           position: 'absolute',
-          width: finalWidth + 16,
+          width: finalWidth + 16 * scaleFactor,
           height: '100%',
-          borderWidth: 0.5,
+          borderWidth: 0.5 * scaleFactor,
           borderColor: 'rgba(92, 172, 238, 0.06)',
-          borderRadius: 2,
+          borderRadius: 2 * scaleFactor,
         }} />
       )}
       <View style={{ width: finalWidth }}>
@@ -406,6 +421,7 @@ function DotGrid({ config, days, style }: { config: import('../../engines/wallpa
               flexDirection: 'row',
               height: finalDot,
               marginBottom: rowIdx < rows.length - 1 ? finalSpacing : 0,
+              alignItems: 'center',
             }}
           >
             {row.map((day, colIdx) => {
@@ -415,6 +431,8 @@ function DotGrid({ config, days, style }: { config: import('../../engines/wallpa
               const shouldGlow = isToday || (hasGlowEffect && isCompletedPast);
               const glowRadius = isToday ? finalDot * 2 : finalDot * 0.6;
               const glowOpacity = isToday ? 1 : 0.5 + day.completionRate * 0.3;
+              // Completed past dots are 15% larger for visual prominence
+              const dotScale = isCompletedPast ? 1.15 : 1;
 
               return (
                 <View
@@ -425,12 +443,13 @@ function DotGrid({ config, days, style }: { config: import('../../engines/wallpa
                     borderRadius: finalDot,
                     backgroundColor: color,
                     marginRight: colIdx < cols - 1 ? finalSpacing : 0,
+                    ...(dotScale !== 1 ? { transform: [{ scale: dotScale }] } : {}),
                     ...(shouldGlow ? {
                       shadowColor: isToday ? style.dotTodayGlow : color,
                       shadowOffset: { width: 0, height: 0 },
                       shadowOpacity: glowOpacity,
                       shadowRadius: glowRadius,
-                      elevation: isToday ? 8 : 3,
+                      elevation: isToday ? 8 * scaleFactor : 3 * scaleFactor,
                     } : {}),
                     ...(isToday ? {
                       borderWidth: finalDot * 0.15,
@@ -1009,90 +1028,92 @@ function WallpaperScreenContent() {
         {/* ── Live Preview — phone frame ── */}
         <View style={styles.phoneFrame}>
           <View style={styles.phoneNotch} />
-          <ViewShot
-            ref={viewShotRef}
-            options={{
-              format: 'png',
-              quality: 1,
-              result: 'tmpfile',
-              width: WALLPAPER_W,
-              height: WALLPAPER_H,
-            }}
-          >
-            <View style={[styles.preview, { backgroundColor: activeStyle.bg }]}>
-              {/* Vibe-specific overlay effects */}
-              <VibeOverlay style={config.wallpaperStyle || 'minimal'} />
+          <View style={{ width: INNER_WIDTH, height: PREVIEW_HEIGHT, overflow: 'hidden' }}>
+            <View style={{
+              transformOrigin: 'top left',
+              transform: [{ scale: PREVIEW_SCALE }],
+            }}>
+              <ViewShot
+                ref={viewShotRef}
+                options={{
+                  format: 'png',
+                  quality: 1,
+                  result: 'tmpfile',
+                  width: WALLPAPER_W,
+                  height: WALLPAPER_H,
+                }}
+              >
+                <View style={{ width: WALLPAPER_W, height: WALLPAPER_H, backgroundColor: activeStyle.bg }}>
+                  {/* Vibe-specific overlay effects */}
+                  <VibeOverlay style={config.wallpaperStyle || 'minimal'} />
 
-              {/* Content */}
-              <View style={styles.previewContent}>
-                {/* Day count number */}
-                {config.showDayCount && (
-                  <Text style={[
-                    styles.previewDayCount,
-                    { color: activeStyle.textPrimary },
-                    fontFamily ? { fontFamily } : {},
-                    isTerminal ? { letterSpacing: -2, fontSize: 88 } : {},
-                  ]}>
-                    {displayNumber}
-                  </Text>
-                )}
+                  {/* Content */}
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: wp(Spacing.md) }}>
+                    {/* Day count number */}
+                    {config.showDayCount && (
+                      <Text style={[
+                        { fontFamily: Fonts.accent, fontSize: wp(100), marginBottom: wp(-6), letterSpacing: wp(-1), color: activeStyle.textPrimary },
+                        fontFamily ? { fontFamily } : {},
+                        isTerminal ? { letterSpacing: wp(-2), fontSize: wp(88) } : {},
+                      ]}>
+                        {displayNumber}
+                      </Text>
+                    )}
 
-                {/* Label */}
-                {config.showDayCount && (
-                  <Text style={[
-                    styles.previewDayLabel,
-                    { color: activeStyle.textSecondary },
-                    fontFamily ? { fontFamily, fontSize: 11, letterSpacing: 3 } : {},
-                  ]}>{displayLabel}</Text>
-                )}
+                    {/* Label */}
+                    {config.showDayCount && (
+                      <Text style={[
+                        { fontFamily: Fonts.headingMedium, fontSize: wp(12), letterSpacing: wp(2), textTransform: 'uppercase', marginBottom: wp(Spacing.lg), color: activeStyle.textSecondary },
+                        fontFamily ? { fontFamily, fontSize: wp(11), letterSpacing: wp(3) } : {},
+                      ]}>{displayLabel}</Text>
+                    )}
 
-                {/* Sublabel */}
-                {config.showDayCount && displaySubLabel && (
-                  <Text style={[
-                    styles.previewSubLabel,
-                    { color: activeStyle.textTertiary },
-                    fontFamily ? { fontFamily, fontSize: 10 } : {},
-                  ]}>{displaySubLabel}</Text>
-                )}
+                    {/* Sublabel */}
+                    {config.showDayCount && displaySubLabel && (
+                      <Text style={[
+                        { fontFamily: Fonts.body, fontSize: wp(10), letterSpacing: wp(0.5), marginBottom: wp(Spacing.sm), opacity: 0.8, color: activeStyle.textTertiary },
+                        fontFamily ? { fontFamily, fontSize: wp(10) } : {},
+                      ]}>{displaySubLabel}</Text>
+                    )}
 
-                {/* Stats line (stats preset only) */}
-                {isStats && (
-                  <View style={styles.statsRow}>
-                    <Text style={[styles.statItem, { color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
-                      {weekRate}% this week
-                    </Text>
-                    <Text style={[styles.statDivider, { color: activeStyle.textTertiary }]}>·</Text>
-                    <Text style={[styles.statItem, { color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
-                      {streak}d streak
-                    </Text>
+                    {/* Stats line (stats preset only) */}
+                    {isStats && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: wp(Spacing.md), gap: wp(Spacing.sm) }}>
+                        <Text style={[{ fontFamily: Fonts.bodyMedium, fontSize: wp(11), letterSpacing: wp(0.5), color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
+                          {weekRate}% this week
+                        </Text>
+                        <Text style={{ fontSize: wp(11), color: activeStyle.textTertiary }}>·</Text>
+                        <Text style={[{ fontFamily: Fonts.bodyMedium, fontSize: wp(11), letterSpacing: wp(0.5), color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
+                          {streak}d streak
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Dot grid */}
+                    <DotGrid config={config} days={days} style={activeStyle} scaleFactor={WP_SCALE} />
+
+                    {/* Quote */}
+                    {config.showQuote && (
+                      <Text style={[
+                        { fontFamily: Fonts.accentItalic, fontSize: wp(12), textAlign: 'center', marginTop: wp(Spacing.lg), paddingHorizontal: wp(Spacing.xl), lineHeight: wp(18), opacity: 0.9, color: activeStyle.textTertiary },
+                        fontFamily ? { fontFamily, fontStyle: 'normal', fontSize: wp(11) } : {},
+                      ]}>"{quote}"</Text>
+                    )}
+
+                    {/* Streak line */}
+                    {config.showStreak && !isStats && (
+                      <Text style={[
+                        { fontFamily: Fonts.body, fontSize: wp(10), marginTop: wp(Spacing.sm), letterSpacing: wp(0.5), color: activeStyle.textTertiary },
+                        fontFamily ? { fontFamily } : {},
+                      ]}>
+                        {streak > 0 ? `${streak} day streak` : 'Start your streak'} · day {dayNumber}
+                      </Text>
+                    )}
                   </View>
-                )}
-
-                {/* Dot grid */}
-                <DotGrid config={config} days={days} style={activeStyle} />
-
-                {/* Quote */}
-                {config.showQuote && (
-                  <Text style={[
-                    styles.previewQuote,
-                    { color: activeStyle.textTertiary },
-                    fontFamily ? { fontFamily, fontStyle: 'normal', fontSize: 11 } : {},
-                  ]}>"{quote}"</Text>
-                )}
-
-                {/* Streak line */}
-                {config.showStreak && !isStats && (
-                  <Text style={[
-                    styles.previewStreak,
-                    { color: activeStyle.textTertiary },
-                    fontFamily ? { fontFamily } : {},
-                  ]}>
-                    {streak > 0 ? `${streak} day streak` : 'Start your streak'} · day {dayNumber}
-                  </Text>
-                )}
-              </View>
+                </View>
+              </ViewShot>
             </View>
-          </ViewShot>
+          </View>
         </View>
 
         {/* Toast */}
@@ -1442,7 +1463,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2A2A2A',
     alignSelf: 'center',
     marginTop: 8,
-    marginBottom: -8,
+    marginBottom: 4,
     zIndex: 10,
   },
   preview: {
