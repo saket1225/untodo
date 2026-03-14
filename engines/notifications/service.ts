@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { useNotificationStore } from './store';
 import { useTodoStore } from '../todo/store';
 import { getLogicalDate } from '../../lib/date-utils';
+import { calculateStreak } from '../../lib/streak';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -75,20 +76,7 @@ function getTaskStats() {
     const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
     const carriedOver = todayTodos.filter(t => t.carriedOverFrom).length;
 
-    // Calculate streak
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    let streak = 0;
-    for (let i = 1; i < 365; i++) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayTodos = todos.filter(t => t.logicalDate === dateStr);
-      const dayTotal = dayTodos.length;
-      const dayCompleted = dayTodos.filter(t => t.completed).length;
-      if (dayTotal > 0 && dayCompleted / dayTotal >= 0.5) streak++;
-      else if (dayTotal > 0) break;
-    }
+    const streak = calculateStreak(todos);
 
     return { total, completed, remaining, pct, streak, carriedOver };
   } catch {
@@ -248,7 +236,7 @@ export async function setupDefaultNotifications(): Promise<void> {
           title: 'Weekly Review',
           body,
           sound: true,
-          channelId: 'achievements',
+          ...({ channelId: 'achievements' }),
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
@@ -287,7 +275,7 @@ export async function sendPomodoroEndNotification(): Promise<void> {
         title: 'Pomodoro Complete',
         body: 'Time for a break!',
         sound: true,
-        channelId: 'reminders',
+        ...({ channelId: 'reminders' }),
       },
       trigger: null,
     });
@@ -319,7 +307,7 @@ export async function updateProgressNotification(): Promise<void> {
         sound: false,
         sticky: true,
         priority: Notifications.AndroidNotificationPriority.LOW,
-        channelId: 'progress',
+        ...({ channelId: 'progress' }),
       },
       trigger: null,
     });

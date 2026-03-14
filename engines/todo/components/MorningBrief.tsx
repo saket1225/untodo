@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { useTodoStore } from '../store';
 import { getLogicalDate } from '../../../lib/date-utils';
+import { calculateStreak } from '../../../lib/streak';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MORNING_BRIEF_KEY = 'untodo-morning-brief-last-shown';
@@ -30,21 +31,7 @@ export default function MorningBrief({ onDismiss }: { onDismiss: () => void }) {
         return pa - pb;
       })[0];
 
-    // Calculate streak
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    let streak = 0;
-    for (let i = 1; i <= 365; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayTodos = allTodos.filter(t => t.logicalDate === dateStr);
-      if (dayTodos.some(t => t.completed)) {
-        streak++;
-      } else if (dayTodos.length > 0) {
-        break;
-      }
-    }
+    const streak = calculateStreak(allTodos);
 
     return { total, carriedOver, streak, topPriority };
   }, [allTodos, logicalDate]);

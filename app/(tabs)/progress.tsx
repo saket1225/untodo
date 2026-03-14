@@ -9,6 +9,7 @@ import { useProgressStore, getWeekStats, getRecentDays } from '../../engines/pro
 import { DaySummary } from '../../engines/progress/types';
 import { getLogicalDate } from '../../lib/date-utils';
 import { computeAnalytics, generateDailyInsight, AnalyticsData } from '../../lib/insights';
+import { calculateStreak } from '../../lib/streak';
 import { format } from 'date-fns';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import WeeklyReviewComponent from '../../engines/progress/components/WeeklyReview';
@@ -266,19 +267,7 @@ function TodaySummaryCard() {
     }
     const weekRate = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
 
-    let streak = 0;
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayTodos = todos.filter(t => t.logicalDate === dateStr);
-      const dayTotal = dayTodos.length;
-      const dayCompleted = dayTodos.filter(t => t.completed).length;
-      const rate = dayTotal > 0 ? dayCompleted / dayTotal : 0;
-      if (i === 0 && dayTotal === 0) continue;
-      if (dayTotal > 0 && rate >= 0.5) streak++;
-      else if (dayTotal > 0) break;
-    }
+    const streak = calculateStreak(todos);
     return { completed, total, pomodoroMins, streak, focusToday, weekRate };
   }, [todos, logicalDate]);
 
@@ -349,11 +338,12 @@ function TaskCompletionStreak() {
   const todos = useTodoStore(s => s.todos);
 
   const { streak, bestDay } = useMemo(() => {
+    const streak = calculateStreak(todos);
+
+    // Find best day (highest completion rate)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    let streak = 0;
     let bestDay: { date: string; rate: number; completed: number; total: number } | null = null;
-
     for (let i = 0; i < 365; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
@@ -362,15 +352,11 @@ function TaskCompletionStreak() {
       const total = dayTodos.length;
       const completed = dayTodos.filter(t => t.completed).length;
       const rate = total > 0 ? completed / total : 0;
-
       if (total > 0) {
         if (!bestDay || rate > bestDay.rate || (rate === bestDay.rate && completed > bestDay.completed)) {
           bestDay = { date: dateStr, rate, completed, total };
         }
       }
-      if (i === 0 && total === 0) continue;
-      if (total > 0 && rate >= 0.5) streak++;
-      else if (total > 0) break;
     }
     return { streak, bestDay };
   }, [todos]);
@@ -385,7 +371,7 @@ function TaskCompletionStreak() {
             <Text style={styles.streakBigNum}>{streak}</Text>
           </View>
           <Text style={styles.streakCardLabel}>day streak</Text>
-          <Text style={styles.streakCardSub}>{'>'}50% completion</Text>
+          <Text style={styles.streakCardSub}>consecutive days</Text>
         </View>
         {bestDay && (
           <View style={styles.streakCard}>
@@ -592,23 +578,7 @@ function ShareSection({ analytics }: { analytics: AnalyticsData }) {
 
   const weekStats = useMemo(() => getWeekStats(), [todos]);
   const logicalDate = getLogicalDate();
-  const streak = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    let s = 0;
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayTodos = todos.filter(t => t.logicalDate === dateStr);
-      const total = dayTodos.length;
-      const completed = dayTodos.filter(t => t.completed).length;
-      if (i === 0 && total === 0) continue;
-      if (total > 0 && completed / total >= 0.5) s++;
-      else if (total > 0) break;
-    }
-    return s;
-  }, [todos]);
+  const streak = useMemo(() => calculateStreak(todos), [todos]);
 
   const handleShare = async () => {
     try {
