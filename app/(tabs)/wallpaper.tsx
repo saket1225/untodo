@@ -21,20 +21,21 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 // ─── Dimensions ──────────────────────────────────────────────────────────────────
 
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('screen');
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const WALLPAPER_W = 1080;
-const WALLPAPER_H = 2400;
-const WALLPAPER_RATIO = WALLPAPER_H / WALLPAPER_W; // 2.222 (20:9)
+const WALLPAPER_W = SCREEN_W;
+const WALLPAPER_H = SCREEN_H;
 const PHONE_BORDER = 3;
-const PREVIEW_WIDTH = SCREEN_WIDTH - Spacing.lg * 2;
-const INNER_WIDTH = PREVIEW_WIDTH - PHONE_BORDER * 2;
-const PREVIEW_HEIGHT = INNER_WIDTH * WALLPAPER_RATIO;
+const PREVIEW_WIDTH = SCREEN_WIDTH * 0.7;
+const PREVIEW_SCALE = PREVIEW_WIDTH / SCREEN_W;
+const PREVIEW_HEIGHT = SCREEN_H * PREVIEW_SCALE;
 const MAX_DOTS = 1000;
 
-// Full-resolution rendering: content renders at wallpaper resolution, preview scales it down
-const WP_SCALE = WALLPAPER_W / INNER_WIDTH;
-const PREVIEW_SCALE = INNER_WIDTH / WALLPAPER_W;
-const wp = (v: number) => Math.round(v * WP_SCALE * 100) / 100; // scale helper
+// Content renders at device logical resolution (SCREEN_W x SCREEN_H).
+// ViewShot captures at physical pixel resolution via PixelRatio.
+const PIXEL_RATIO = PixelRatio.get();
+const WP_SCALE = 1;
+const wp = (v: number) => Math.round(v * 100) / 100;
 
 // ─── Quote Pool ─────────────────────────────────────────────────────────────────
 
@@ -379,7 +380,8 @@ function getDotColor(day: DayData, style: StyleTheme): string {
   if (day.isToday) return style.dotToday;
   if (day.isFuture) return style.dotFuture;
   if (day.completionRate === 0) return style.dotEmpty;
-  return style.dotCompleted(day.completionRate);
+  // Past completed dots always use full brightness (rate=1)
+  return style.dotCompleted(1);
 }
 
 function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../../engines/wallpaper/types').WallpaperConfig; days: DayData[]; style: StyleTheme; scaleFactor?: number }) {
@@ -388,7 +390,7 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
   const sSpacing = spacing * scaleFactor;
   const dotDiameter = sDotSize * 2;
   const totalWidth = cols * dotDiameter + (cols - 1) * sSpacing;
-  const availableWidth = (INNER_WIDTH - Spacing.md * 2) * scaleFactor;
+  const availableWidth = (WALLPAPER_W - Spacing.md * 2) * scaleFactor;
   const scale = Math.min(1, availableWidth / totalWidth);
   const finalDot = Math.round(dotDiameter * scale * 100) / 100;
   const finalSpacing = Math.round(sSpacing * scale * 100) / 100;
@@ -1026,9 +1028,9 @@ function WallpaperScreenContent() {
         <Text style={styles.heading}>Wallpaper</Text>
 
         {/* ── Live Preview — phone frame ── */}
-        <View style={styles.phoneFrame}>
+        <View style={[styles.phoneFrame, { width: PREVIEW_WIDTH + PHONE_BORDER * 2, alignSelf: 'center' }]}>
           <View style={styles.phoneNotch} />
-          <View style={{ width: INNER_WIDTH, height: PREVIEW_HEIGHT, overflow: 'hidden' }}>
+          <View style={{ width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT, overflow: 'hidden' }}>
             <View style={{
               transformOrigin: 'top left',
               transform: [{ scale: PREVIEW_SCALE }],
@@ -1039,8 +1041,8 @@ function WallpaperScreenContent() {
                   format: 'png',
                   quality: 1,
                   result: 'tmpfile',
-                  width: WALLPAPER_W,
-                  height: WALLPAPER_H,
+                  width: Math.round(WALLPAPER_W * PIXEL_RATIO),
+                  height: Math.round(WALLPAPER_H * PIXEL_RATIO),
                 }}
               >
                 <View style={{ width: WALLPAPER_W, height: WALLPAPER_H, backgroundColor: activeStyle.bg }}>
@@ -1467,7 +1469,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   preview: {
-    width: INNER_WIDTH,
+    width: PREVIEW_WIDTH,
     height: PREVIEW_HEIGHT,
     backgroundColor: '#080808',
   },
