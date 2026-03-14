@@ -561,7 +561,7 @@ export const useTodoStore = create<TodoStore>()(
         const samples = [
           { title: 'Welcome to untodo — tap to start a pomodoro', order: 0 },
           { title: 'Long press me for quick actions', order: 1 },
-          { title: 'Swipe left or use quick actions to delete', order: 2 },
+          { title: 'Long press for options — edit, priority, delete, and more', order: 2 },
         ];
         const newTodos: Todo[] = samples.map(s => ({
           id: makeId(),

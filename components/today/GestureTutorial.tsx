@@ -23,19 +23,19 @@ export function GestureTutorial({ onDismiss }: { onDismiss: () => void }) {
         <View style={tutorialStyles.card}>
           <Text style={tutorialStyles.title}>Quick gestures</Text>
           <View style={tutorialStyles.row}>
-            <Text style={tutorialStyles.gesture}>Swipe right</Text>
+            <Text style={tutorialStyles.gesture}>Tap circle</Text>
             <Text style={tutorialStyles.desc}>Complete task</Text>
           </View>
           <View style={tutorialStyles.row}>
-            <Text style={tutorialStyles.gesture}>Swipe left</Text>
-            <Text style={tutorialStyles.desc}>Delete task</Text>
-          </View>
-          <View style={tutorialStyles.row}>
             <Text style={tutorialStyles.gesture}>Long press</Text>
-            <Text style={tutorialStyles.desc}>Quick actions</Text>
+            <Text style={tutorialStyles.desc}>Edit, priority, delete…</Text>
           </View>
           <View style={tutorialStyles.row}>
-            <Text style={tutorialStyles.gesture}>Tap</Text>
+            <Text style={tutorialStyles.gesture}>Swipe left / right</Text>
+            <Text style={tutorialStyles.desc}>Change date</Text>
+          </View>
+          <View style={tutorialStyles.row}>
+            <Text style={tutorialStyles.gesture}>Tap task</Text>
             <Text style={tutorialStyles.desc}>Task details</Text>
           </View>
           <Text style={tutorialStyles.dismiss}>Tap anywhere to dismiss</Text>
