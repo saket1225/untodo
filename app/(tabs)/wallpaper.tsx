@@ -1,5 +1,5 @@
 import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Switch, TextInput, StyleSheet, Dimensions, Alert, AppState, Platform, Share } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Switch, TextInput, StyleSheet, Dimensions, Alert, AppState, Platform, Share, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
@@ -66,6 +66,7 @@ interface StyleTheme {
   textTertiary: string;
   fontOverride?: string; // monospace override for terminal
   gridLines?: boolean; // blueprint grid lines
+  cosmicGlow?: boolean; // cosmic style star glow
 }
 
 const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
@@ -168,6 +169,41 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     textSecondary: '#2E6898',
     textTertiary: '#1A3D5C',
     gridLines: true,
+  },
+  minimal_dark: {
+    label: 'Void',
+    desc: 'Pure black',
+    bg: '#000000',
+    dotCompleted: (rate) => {
+      const v = Math.round(200 + 55 * rate);
+      return `rgb(${v}, ${v}, ${v})`;
+    },
+    dotToday: '#FFFFFF',
+    dotTodayGlow: 'rgba(255, 255, 255, 0.5)',
+    dotFuture: 'rgba(255, 255, 255, 0.02)',
+    dotEmpty: 'rgba(255, 255, 255, 0.05)',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#444444',
+    textTertiary: '#2A2A2A',
+  },
+  cosmic: {
+    label: 'Cosmic',
+    desc: 'Starfield glow',
+    bg: '#08061A',
+    dotCompleted: (rate) => {
+      const r = Math.round(140 + 80 * rate);
+      const g = Math.round(120 + 100 * rate);
+      const b = Math.round(200 + 55 * rate);
+      return `rgb(${r}, ${g}, ${b})`;
+    },
+    dotToday: '#E8DEFF',
+    dotTodayGlow: 'rgba(180, 140, 255, 0.7)',
+    dotFuture: 'rgba(120, 80, 200, 0.04)',
+    dotEmpty: 'rgba(120, 80, 200, 0.08)',
+    textPrimary: '#E8DEFF',
+    textSecondary: '#7B5EA7',
+    textTertiary: '#4A3568',
+    cosmicGlow: true,
   },
 };
 
@@ -316,13 +352,20 @@ function getDotColor(day: DayData, style: StyleTheme): string {
 
 function DotGrid({ config, days, style }: { config: import('../../engines/wallpaper/types').WallpaperConfig; days: DayData[]; style: StyleTheme }) {
   const { dotSize, spacing, cols } = config;
-  const totalWidth = cols * (dotSize * 2 + spacing) - spacing;
+  const dotDiameter = dotSize * 2;
+  const totalWidth = cols * dotDiameter + (cols - 1) * spacing;
   const availableWidth = PREVIEW_WIDTH - Spacing.md * 2 - 8;
   const scale = Math.min(1, availableWidth / totalWidth);
-  const finalDot = dotSize * scale;
-  const finalSpacing = spacing * scale;
-  const finalWidth = cols * (finalDot * 2 + finalSpacing) - finalSpacing;
-  const isNeon = config.wallpaperStyle === 'neon';
+  const finalDot = Math.round(dotDiameter * scale * 100) / 100;
+  const finalSpacing = Math.round(spacing * scale * 100) / 100;
+  const finalWidth = cols * finalDot + (cols - 1) * finalSpacing;
+  const hasGlowEffect = config.wallpaperStyle === 'neon' || config.wallpaperStyle === 'cosmic';
+
+  // Split days into rows for pixel-perfect alignment
+  const rows: DayData[][] = [];
+  for (let i = 0; i < days.length; i += cols) {
+    rows.push(days.slice(i, i + cols));
+  }
 
   return (
     <View style={{ alignItems: 'center', paddingVertical: Spacing.sm }}>
@@ -336,30 +379,42 @@ function DotGrid({ config, days, style }: { config: import('../../engines/wallpa
           borderRadius: 2,
         }} />
       )}
-      <View style={{ width: finalWidth, flexDirection: 'row', flexWrap: 'wrap', gap: finalSpacing }}>
-        {days.map((day, i) => {
-          const isToday = day.isToday;
-          const color = getDotColor(day, style);
-          const hasGlow = isToday || (isNeon && day.completionRate > 0 && !day.isFuture);
-          return (
-            <View
-              key={i}
-              style={{
-                width: finalDot * 2,
-                height: finalDot * 2,
-                borderRadius: finalDot,
-                backgroundColor: color,
-                ...(hasGlow ? {
-                  shadowColor: isToday ? style.dotTodayGlow : color,
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: isToday ? 1 : 0.6,
-                  shadowRadius: isToday ? finalDot * 2 : finalDot,
-                  elevation: isToday ? 8 : 4,
-                } : {}),
-              }}
-            />
-          );
-        })}
+      <View style={{ width: finalWidth }}>
+        {rows.map((row, rowIdx) => (
+          <View
+            key={rowIdx}
+            style={{
+              flexDirection: 'row',
+              height: finalDot,
+              marginBottom: rowIdx < rows.length - 1 ? finalSpacing : 0,
+            }}
+          >
+            {row.map((day, colIdx) => {
+              const isToday = day.isToday;
+              const color = getDotColor(day, style);
+              const shouldGlow = isToday || (hasGlowEffect && day.completionRate > 0 && !day.isFuture);
+              return (
+                <View
+                  key={colIdx}
+                  style={{
+                    width: finalDot,
+                    height: finalDot,
+                    borderRadius: finalDot / 2,
+                    backgroundColor: color,
+                    marginRight: colIdx < cols - 1 ? finalSpacing : 0,
+                    ...(shouldGlow ? {
+                      shadowColor: isToday ? style.dotTodayGlow : color,
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: isToday ? 1 : 0.7,
+                      shadowRadius: isToday ? finalDot * 1.5 : finalDot * 0.8,
+                      elevation: isToday ? 8 : 4,
+                    } : {}),
+                  }}
+                />
+              );
+            })}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -514,6 +569,7 @@ function WallpaperScreenContent() {
   const todos = useTodoStore(s => s.todos);
   const viewShotRef = useRef<ViewShot>(null);
   const [savedToast, setSavedToast] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const activeStyle = WALLPAPER_STYLES[config.wallpaperStyle || 'minimal'];
   const startDate = new Date((config.startDate || '2026-03-10') + 'T00:00:00');
@@ -521,7 +577,12 @@ function WallpaperScreenContent() {
   const goalDateValid = isValidDateStr(goalDate);
 
   const goalInPast = goalDateValid && getDaysLeft(goalDate) === 0;
-  const endDate = goalDateValid && !goalInPast ? new Date(goalDate + 'T00:00:00') : new Date(startDate);
+  // When goal is in the past, still show dots up to today so the grid isn't empty
+  const nowDate = new Date();
+  nowDate.setHours(0, 0, 0, 0);
+  const endDate = goalDateValid && !goalInPast
+    ? new Date(goalDate + 'T00:00:00')
+    : (startDate.getTime() <= nowDate.getTime() ? nowDate : new Date(startDate));
 
   const days = useMemo(() => {
     try {
@@ -574,67 +635,91 @@ function WallpaperScreenContent() {
 
   const handleSaveWallpaper = useCallback(async (silent = false) => {
     try {
+      if (!silent) setGenerating(true);
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        if (!silent) Alert.alert('Permission needed', 'Allow gallery access to save wallpapers.');
+        if (!silent) {
+          setGenerating(false);
+          Alert.alert('Permission needed', 'Allow gallery access to save wallpapers.');
+        }
         return;
       }
+
+      // Small delay to ensure ViewShot renders fully
+      await new Promise(r => setTimeout(r, 100));
 
       if (viewShotRef.current?.capture) {
         const uri = await viewShotRef.current.capture();
         await MediaLibrary.saveToLibraryAsync(uri);
         updateConfig({ lastWallpaperDate: getLogicalDate() });
         if (!silent) {
+          setGenerating(false);
           setSavedToast(true);
           setTimeout(() => setSavedToast(false), 3000);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
+      } else {
+        if (!silent) setGenerating(false);
       }
     } catch (e) {
-      if (!silent) Alert.alert('Error', 'Failed to save wallpaper.');
+      if (!silent) {
+        setGenerating(false);
+        Alert.alert('Error', 'Failed to save wallpaper.');
+      }
     }
   }, [updateConfig]);
 
   const handleSetWallpaper = useCallback(async () => {
     try {
+      setGenerating(true);
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
+        setGenerating(false);
         Alert.alert('Permission needed', 'Allow gallery access to save and set wallpapers.');
         return;
       }
+
+      // Small delay to ensure ViewShot renders fully
+      await new Promise(r => setTimeout(r, 100));
 
       if (viewShotRef.current?.capture) {
         const uri = await viewShotRef.current.capture();
         const asset = await MediaLibrary.createAssetAsync(uri);
         updateConfig({ lastWallpaperDate: getLogicalDate() });
+        setGenerating(false);
 
         if (Platform.OS === 'android') {
           try {
+            // Use content URI format that works reliably across Android versions
             const contentUri = `content://media/external/images/media/${asset.id}`;
             await IntentLauncher.startActivityAsync(
               'android.intent.action.ATTACH_DATA',
               {
                 data: contentUri,
-                type: 'image/*',
+                type: 'image/png',
                 flags: 1,
                 extra: { 'mimeType': 'image/png' },
               }
             );
           } catch {
             try {
+              // Fallback: open wallpaper picker
               await IntentLauncher.startActivityAsync(
                 'android.intent.action.SET_WALLPAPER'
               );
             } catch {
-              Alert.alert('Wallpaper Saved', 'Image saved to gallery. Set it as wallpaper from your gallery app.');
+              Alert.alert('Wallpaper Saved', 'Image saved to gallery. Open your gallery and long-press to set as wallpaper.');
             }
           }
         } else {
           Alert.alert('Wallpaper Saved', 'Image saved to gallery. Set it as wallpaper from your Photos app.');
         }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setGenerating(false);
       }
     } catch (e) {
+      setGenerating(false);
       Alert.alert('Error', 'Failed to set wallpaper.');
     }
   }, [updateConfig]);
@@ -677,6 +762,24 @@ function WallpaperScreenContent() {
                   <View style={{
                     position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%',
                     backgroundColor: 'rgba(10, 10, 30, 0.6)',
+                  }} />
+                </>
+              )}
+
+              {/* Cosmic radial glow */}
+              {config.wallpaperStyle === 'cosmic' && (
+                <>
+                  <View style={{
+                    position: 'absolute', top: '20%', left: '15%',
+                    width: '70%', height: '50%',
+                    borderRadius: 999,
+                    backgroundColor: 'rgba(80, 40, 160, 0.08)',
+                  }} />
+                  <View style={{
+                    position: 'absolute', top: '30%', left: '25%',
+                    width: '50%', height: '30%',
+                    borderRadius: 999,
+                    backgroundColor: 'rgba(100, 60, 200, 0.06)',
                   }} />
                 </>
               )}
@@ -767,15 +870,24 @@ function WallpaperScreenContent() {
           </View>
         )}
 
+        {/* Loading overlay */}
+        {generating && (
+          <View style={styles.generatingOverlay}>
+            <ActivityIndicator size="small" color={Colors.dark.accent} />
+            <Text style={styles.generatingText}>Generating...</Text>
+          </View>
+        )}
+
         {/* Action Buttons */}
         <TouchableOpacity
-          style={styles.setWallpaperBtn}
+          style={[styles.setWallpaperBtn, generating && { opacity: 0.5 }]}
+          disabled={generating}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             handleSetWallpaper();
           }}
         >
-          <Text style={styles.setWallpaperBtnText}>Set as Wallpaper</Text>
+          <Text style={styles.setWallpaperBtnText}>{generating ? 'Generating...' : 'Set as Wallpaper'}</Text>
         </TouchableOpacity>
         <View style={styles.secondaryActionRow}>
           <TouchableOpacity
@@ -1391,6 +1503,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 20,
+  },
+
+  // Generating overlay
+  generatingOverlay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  generatingText: {
+    color: Colors.dark.accent,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 13,
   },
 
   // Reset

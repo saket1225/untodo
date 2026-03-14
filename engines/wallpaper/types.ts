@@ -2,7 +2,7 @@ export type WallpaperPreset = 'minimal' | 'countdown' | 'full' | 'stats';
 
 export type DotColorTheme = 'classic' | 'green' | 'blue' | 'warm';
 
-export type WallpaperStyle = 'minimal' | 'terminal' | 'gradient' | 'neon' | 'paper' | 'blueprint';
+export type WallpaperStyle = 'minimal' | 'terminal' | 'gradient' | 'neon' | 'paper' | 'blueprint' | 'minimal_dark' | 'cosmic';
 
 export interface WallpaperConfig {
   enabled: boolean;
