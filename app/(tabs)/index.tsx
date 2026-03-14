@@ -20,6 +20,7 @@ import TodoItem from '../../engines/todo/components/TodoItem';
 import PomodoroTimer from '../../engines/todo/components/PomodoroTimer';
 import QuickActions from '../../engines/todo/components/QuickActions';
 import TaskDetail from '../../engines/todo/components/TaskDetail';
+import FocusMode from '../../engines/todo/components/FocusMode';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import UndoToast, { showUndoToast } from '../../components/UndoToast';
 import { Todo, Category, CATEGORIES, Priority, Recurrence } from '../../engines/todo/types';
@@ -386,6 +387,197 @@ const streakStyles = StyleSheet.create({
     color: Colors.dark.error,
     fontFamily: Fonts.bodyMedium,
     fontSize: 13,
+  },
+});
+
+// --- Daily Score Component ---
+function getDailyScore(completed: number, total: number, streak: number): { grade: string; color: string; pct: number } {
+  if (total === 0) return { grade: '--', color: Colors.dark.textTertiary, pct: 0 };
+  const completionPct = completed / total;
+  // Weighted: 70% completion, 15% streak bonus, 15% total tasks bonus
+  const streakBonus = Math.min(streak / 30, 1); // max at 30-day streak
+  const taskBonus = Math.min(total / 8, 1); // max at 8 tasks
+  const score = (completionPct * 0.7 + streakBonus * 0.15 + taskBonus * 0.15) * 100;
+
+  if (score >= 95) return { grade: 'A+', color: Colors.dark.success, pct: score };
+  if (score >= 85) return { grade: 'A', color: Colors.dark.success, pct: score };
+  if (score >= 75) return { grade: 'B+', color: '#4ADE80', pct: score };
+  if (score >= 65) return { grade: 'B', color: Colors.dark.timer, pct: score };
+  if (score >= 50) return { grade: 'C', color: Colors.dark.timer, pct: score };
+  return { grade: 'D', color: Colors.dark.error, pct: score };
+}
+
+function DailyScore({ completed, total, streak }: { completed: number; total: number; streak: number }) {
+  const { grade, color, pct } = getDailyScore(completed, total, streak);
+  const scaleAnim = useRef(new RNAnimated.Value(0.8)).current;
+
+  useEffect(() => {
+    RNAnimated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }).start();
+  }, [grade]);
+
+  if (total === 0) return null;
+
+  return (
+    <View style={scoreStyles.container}>
+      <RNAnimated.View style={[scoreStyles.gradeCircle, { borderColor: color, transform: [{ scale: scaleAnim }] }]}>
+        <Text style={[scoreStyles.gradeText, { color }]}>{grade}</Text>
+      </RNAnimated.View>
+      <View style={scoreStyles.details}>
+        <Text style={scoreStyles.label}>Today's score</Text>
+        <View style={scoreStyles.barTrack}>
+          <View style={[scoreStyles.barFill, { width: `${Math.min(pct, 100)}%`, backgroundColor: color }]} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const scoreStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 10,
+    marginHorizontal: Spacing.lg,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    marginTop: Spacing.sm,
+  },
+  gradeCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gradeText: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 16,
+  },
+  details: {
+    flex: 1,
+    gap: 4,
+  },
+  label: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  barTrack: {
+    height: 4,
+    backgroundColor: Colors.dark.border,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+});
+
+// --- Streak Milestone Celebrations ---
+const STREAK_MILESTONES: Record<number, { emoji: string; title: string; message: string }> = {
+  3: { emoji: '🔥', title: '3-Day Streak!', message: 'Consistency is building. Keep it up!' },
+  7: { emoji: '⚡', title: 'One Week Strong!', message: 'A full week of showing up. You\'re unstoppable.' },
+  14: { emoji: '💎', title: '2-Week Machine!', message: 'Two weeks straight. Discipline is becoming habit.' },
+  30: { emoji: '🏆', title: '30-Day Legend!', message: 'A full month. You\'re in the top 1%.' },
+  60: { emoji: '🦾', title: '60-Day Titan!', message: 'Two months of relentless execution.' },
+  100: { emoji: '👑', title: '100-Day King!', message: 'One hundred days. Legendary status unlocked.' },
+};
+
+function StreakMilestone({ streak, visible, onDismiss }: { streak: number; visible: boolean; onDismiss: () => void }) {
+  const milestone = STREAK_MILESTONES[streak];
+  const scale = useRef(new RNAnimated.Value(0)).current;
+  const opacity = useRef(new RNAnimated.Value(0)).current;
+
+  useEffect(() => {
+    if (!visible || !milestone) return;
+    scale.setValue(0.5);
+    opacity.setValue(0);
+    RNAnimated.parallel([
+      RNAnimated.spring(scale, { toValue: 1, friction: 4, tension: 60, useNativeDriver: true }),
+      RNAnimated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+    ]).start();
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 200);
+    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 400);
+
+    const timer = setTimeout(onDismiss, 4000);
+    return () => clearTimeout(timer);
+  }, [visible]);
+
+  if (!visible || !milestone) return null;
+
+  return (
+    <RNAnimated.View style={[milestoneStyles.overlay, { opacity }]} pointerEvents="box-none">
+      <TouchableOpacity activeOpacity={1} onPress={onDismiss} style={milestoneStyles.touchArea}>
+        <RNAnimated.View style={[milestoneStyles.card, { transform: [{ scale }] }]}>
+          <Text style={milestoneStyles.emoji}>{milestone.emoji}</Text>
+          <Text style={milestoneStyles.title}>{milestone.title}</Text>
+          <Text style={milestoneStyles.message}>{milestone.message}</Text>
+          <Text style={milestoneStyles.streakNum}>{streak} days</Text>
+        </RNAnimated.View>
+      </TouchableOpacity>
+    </RNAnimated.View>
+  );
+}
+
+const milestoneStyles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    zIndex: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  touchArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  card: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.xl,
+    marginHorizontal: Spacing.xl,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 24,
+    elevation: 24,
+  },
+  emoji: {
+    fontSize: 56,
+    marginBottom: Spacing.md,
+  },
+  title: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 28,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  message: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: Spacing.md,
+  },
+  streakNum: {
+    color: Colors.dark.timer,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 14,
   },
 });
 
@@ -901,6 +1093,9 @@ function TodayScreenContent() {
   const [pomodoroTodo, setPomodoroTodo] = useState<Todo | null>(null);
   const [quickActionTodo, setQuickActionTodo] = useState<Todo | null>(null);
   const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
+  const [focusTodo, setFocusTodo] = useState<Todo | null>(null);
+  const [showMilestone, setShowMilestone] = useState(false);
+  const [milestoneStreak, setMilestoneStreak] = useState(0);
   const [showCarryOver, setShowCarryOver] = useState(false);
   const [carryOverMode, setCarryOverMode] = useState<'prompt' | 'review'>('prompt');
   const [carryOverSelected, setCarryOverSelected] = useState<Set<string>>(new Set());
@@ -1016,6 +1211,48 @@ function TodayScreenContent() {
     syncFromFirestore().catch(() => {}).finally(() => setInitialLoading(false));
     spawnRecurringTasks();
   }, []);
+
+  // Streak milestone check
+  const MILESTONE_KEY = 'untodo-last-milestone';
+  useEffect(() => {
+    if (streak <= 0 || !isToday) return;
+    const milestones = [3, 7, 14, 30, 60, 100];
+    if (!milestones.includes(streak)) return;
+    AsyncStorage.getItem(MILESTONE_KEY).then(val => {
+      const last = parseInt(val || '0', 10);
+      if (streak > last) {
+        setMilestoneStreak(streak);
+        setShowMilestone(true);
+        AsyncStorage.setItem(MILESTONE_KEY, streak.toString());
+      }
+    });
+  }, [streak, isToday]);
+
+  // Compute habit history for recurring tasks (last 7 days completion)
+  const habitHistories = useMemo(() => {
+    const map: Record<string, boolean[]> = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    dateTodos.filter(t => t.recurrence).forEach(todo => {
+      const history: boolean[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        // Check if a task with the same title (or recurringParentId match) was completed on that day
+        const parentId = todo.recurringParentId || todo.id;
+        const found = allTodos.some(t =>
+          t.logicalDate === dateStr &&
+          t.completed &&
+          (t.recurringParentId === parentId || t.id === parentId || (t.title === todo.title && t.recurrence))
+        );
+        history.push(found);
+      }
+      map[todo.id] = history;
+    });
+    return map;
+  }, [dateTodos, allTodos]);
 
   // Progress bar animation
   const progressAnim = useRef(new RNAnimated.Value(0)).current;
@@ -1263,11 +1500,13 @@ function TodayScreenContent() {
           enterSelectionMode(item.id);
         }
       }}
+      onFocus={!item.completed ? () => setFocusTodo(item) : undefined}
       selectionMode={selectionMode}
       isSelected={selectedIds.has(item.id)}
       onSelect={() => toggleSelection(item.id)}
+      habitHistory={habitHistories[item.id]}
     />
-  ), [handleToggle, handleDelete, selectionMode, selectedIds, enterSelectionMode, toggleSelection]);
+  ), [handleToggle, handleDelete, selectionMode, selectedIds, enterSelectionMode, toggleSelection, habitHistories]);
 
   const getItemLayout = useCallback((_: any, index: number) => ({
     length: ITEM_HEIGHT,
@@ -1443,6 +1682,11 @@ function TodayScreenContent() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+      )}
+
+      {/* Daily score */}
+      {isToday && total > 0 && (
+        <DailyScore completed={completed} total={total} streak={streak} />
       )}
 
       {/* Streak banner */}
@@ -1749,6 +1993,26 @@ function TodayScreenContent() {
           onClose={() => setShowCalendar(false)}
         />
       )}
+
+      {/* Focus mode */}
+      {focusTodo && (
+        <FocusMode
+          todo={focusTodo}
+          visible={!!focusTodo}
+          onClose={() => setFocusTodo(null)}
+          onComplete={() => {
+            toggleTodo(focusTodo.id);
+            setFocusTodo(null);
+          }}
+        />
+      )}
+
+      {/* Streak milestone celebration */}
+      <StreakMilestone
+        streak={milestoneStreak}
+        visible={showMilestone}
+        onDismiss={() => setShowMilestone(false)}
+      />
 
       {/* Gesture tutorial */}
       {showGestureTutorial && (

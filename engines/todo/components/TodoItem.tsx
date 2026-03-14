@@ -26,9 +26,11 @@ interface Props {
   onDelete: () => void;
   onPress: () => void;
   onLongPress?: () => void;
+  onFocus?: () => void;
   selectionMode?: boolean;
   isSelected?: boolean;
   onSelect?: () => void;
+  habitHistory?: boolean[]; // last 7 days: true = completed, false = missed
 }
 
 function formatTrackingTime(totalSeconds: number): string {
@@ -132,7 +134,7 @@ function CheckboxConfetti({ visible }: { visible: boolean }) {
   );
 }
 
-function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, selectionMode, isSelected, onSelect }: Props) {
+function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus, selectionMode, isSelected, onSelect, habitHistory }: Props) {
   const translateX = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
@@ -379,13 +381,30 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, selecti
           </View>
         </TouchableOpacity>
 
-        {/* Time tracking button */}
+        {/* Habit tracking dots for recurring tasks */}
+        {todo.recurrence && habitHistory && habitHistory.length > 0 && !selectionMode && (
+          <View style={styles.habitDots}>
+            {habitHistory.map((done, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.habitDot,
+                  done ? styles.habitDotDone : styles.habitDotMissed,
+                  i === habitHistory.length - 1 && done && styles.habitDotToday,
+                ]}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* Focus / Time tracking button */}
         {!todo.completed && (
           <TouchableOpacity
             style={[styles.trackingBtn, isTracking && styles.trackingBtnActive]}
-            onPress={toggleTracking}
+            onPress={onFocus || toggleTracking}
+            onLongPress={onFocus ? toggleTracking : undefined}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel={isTracking ? 'Stop time tracking' : 'Start time tracking'}
+            accessibilityLabel={isTracking ? 'Stop time tracking' : 'Focus on task'}
             accessibilityRole="button"
           >
             <Text style={[styles.trackingBtnText, isTracking && styles.trackingBtnTextActive]}>
@@ -415,7 +434,8 @@ const TodoItem = memo(TodoItemInner, (prev, next) => {
     prev.todo.timeTracking?.startedAt === next.todo.timeTracking?.startedAt &&
     prev.todo.timeTracking?.totalSeconds === next.todo.timeTracking?.totalSeconds &&
     prev.selectionMode === next.selectionMode &&
-    prev.isSelected === next.isSelected
+    prev.isSelected === next.isSelected &&
+    prev.habitHistory === next.habitHistory
   );
 });
 
@@ -616,6 +636,29 @@ const styles = StyleSheet.create({
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 11,
+  },
+  habitDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingRight: 4,
+  },
+  habitDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  habitDotDone: {
+    backgroundColor: Colors.dark.success,
+  },
+  habitDotMissed: {
+    backgroundColor: Colors.dark.border,
+  },
+  habitDotToday: {
+    backgroundColor: Colors.dark.success,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   trackingBtn: {
     width: 26,
