@@ -1,11 +1,11 @@
 import { useEffect, useCallback } from 'react';
-import { Stack, Redirect } from 'expo-router';
+import { Stack, Redirect, useRouter } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Colors } from '../lib/theme';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import { useUserStore } from '../engines/user/store';
 import { setupDefaultNotifications } from '../engines/notifications/service';
 import { useNotificationStore } from '../engines/notifications/store';
@@ -14,6 +14,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const router = useRouter();
   const username = useUserStore(s => s.username);
   const hydrated = useUserStore(s => s._hydrated);
   const notifInitialized = useNotificationStore(s => s.initialized);
@@ -36,18 +37,27 @@ export default function RootLayout() {
     }
   }, [username, notifInitialized]);
 
+  // Deep link: handle notification taps
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const id = response.notification.request.identifier;
+      // Route based on notification type
+      if (id === 'weekly-summary') {
+        router.push('/(tabs)/progress');
+      }
+      // All other notifications → Today screen (default tab)
+    });
+    return () => subscription.remove();
+  }, []);
+
   const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded) {
+    if (fontsLoaded && hydrated) {
       await SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, hydrated]);
 
   if (!fontsLoaded || !hydrated) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color="#fff" />
-      </View>
-    );
+    return null; // Keep native splash screen visible
   }
 
   return (
@@ -63,12 +73,3 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

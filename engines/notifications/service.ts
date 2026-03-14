@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 import { useNotificationStore } from './store';
 import { useTodoStore } from '../todo/store';
 import { getLogicalDate } from '../../lib/date-utils';
@@ -41,12 +42,13 @@ export async function scheduleDailyReminder(
   minute: number,
   title: string,
   body: string,
-  identifier: string
+  identifier: string,
+  channelId?: string
 ): Promise<void> {
   try {
     await Notifications.scheduleNotificationAsync({
       identifier,
-      content: { title, body, sound: true },
+      content: { title, body, sound: true, ...(channelId ? { channelId } : {}) },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour,
@@ -127,6 +129,36 @@ export async function setupDefaultNotifications(): Promise<void> {
   const granted = await requestPermissions();
   if (!granted) return;
 
+  // Setup Android notification channels
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('reminders', {
+      name: 'Reminders',
+      description: 'Morning, afternoon, and evening reminders',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: 'default',
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#4ADE80',
+    });
+    await Notifications.setNotificationChannelAsync('progress', {
+      name: 'Progress',
+      description: 'Persistent progress notification',
+      importance: Notifications.AndroidImportance.LOW,
+      sound: null,
+    });
+    await Notifications.setNotificationChannelAsync('achievements', {
+      name: 'Achievements',
+      description: 'Milestone celebrations and streak alerts',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: 'default',
+    });
+    await Notifications.setNotificationChannelAsync('silicon', {
+      name: 'Silicon',
+      description: 'Nudges from Silicon assistant',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      sound: 'default',
+    });
+  }
+
   const store = useNotificationStore.getState();
   const { total, completed, remaining, pct, streak, carriedOver } = getTaskStats();
 
@@ -160,7 +192,7 @@ export async function setupDefaultNotifications(): Promise<void> {
       },
     ];
     const msg = morningMessages[dayOfMonth % morningMessages.length];
-    await scheduleDailyReminder(8, 0, msg.title, msg.body, 'morning-reminder');
+    await scheduleDailyReminder(8, 0, msg.title, msg.body, 'morning-reminder', 'reminders');
   }
 
   if (store.preferences.afternoonCheck) {
@@ -178,7 +210,7 @@ export async function setupDefaultNotifications(): Promise<void> {
       title = `${remaining} task${remaining !== 1 ? 's' : ''} remaining`;
       body = `${pct}% done so far. Quick push to catch up?`;
     }
-    await scheduleDailyReminder(15, 0, title, body, 'afternoon-check');
+    await scheduleDailyReminder(15, 0, title, body, 'afternoon-check', 'reminders');
   }
 
   if (store.preferences.eveningReminder) {
@@ -198,7 +230,7 @@ export async function setupDefaultNotifications(): Promise<void> {
       title = `${remaining} task${remaining !== 1 ? 's' : ''} unfinished`;
       body = 'Finish what you can, carry over the rest.';
     }
-    await scheduleDailyReminder(21, 0, title, body, 'evening-reminder');
+    await scheduleDailyReminder(21, 0, title, body, 'evening-reminder', 'reminders');
   }
 
   // Weekly summary notification (Sunday 7pm)
@@ -216,6 +248,7 @@ export async function setupDefaultNotifications(): Promise<void> {
           title: 'Weekly Review',
           body,
           sound: true,
+          channelId: 'achievements',
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
@@ -254,6 +287,7 @@ export async function sendPomodoroEndNotification(): Promise<void> {
         title: 'Pomodoro Complete',
         body: 'Time for a break!',
         sound: true,
+        channelId: 'reminders',
       },
       trigger: null,
     });
@@ -285,6 +319,7 @@ export async function updateProgressNotification(): Promise<void> {
         sound: false,
         sticky: true,
         priority: Notifications.AndroidNotificationPriority.LOW,
+        channelId: 'progress',
       },
       trigger: null,
     });
