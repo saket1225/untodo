@@ -855,7 +855,7 @@ function WallpaperContent({
   return (
     <View style={{ width: containerWidth, height: containerHeight, backgroundColor: activeStyle.bg }}>
       <VibeOverlay style={config.wallpaperStyle || 'minimal'} />
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.md * s }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.md * s, paddingBottom: 120 * s }}>
         {config.showDayCount && (
           <Text style={[
             { fontFamily: Fonts.accent, fontSize: 100 * s, marginBottom: -6 * s, letterSpacing: -1 * s, color: activeStyle.textPrimary },
@@ -1140,8 +1140,8 @@ function WallpaperScreenContent() {
               format: 'png',
               quality: 1,
               result: 'tmpfile',
-              width: WALLPAPER_W,
-              height: WALLPAPER_H,
+              width: WALLPAPER_W * PIXEL_RATIO,
+              height: WALLPAPER_H * PIXEL_RATIO,
             }}
           >
             <WallpaperContent
