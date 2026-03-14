@@ -70,6 +70,11 @@ function getDailyQuote(customQuote: string): string {
   return QUOTE_POOL[dayOfYear % QUOTE_POOL.length];
 }
 
+// ─── Layout Constants ────────────────────────────────────────────────────────────
+
+const STATUS_BAR_HEIGHT = 60;   // dp - safe zone for status bar + clock
+const DOCK_HEIGHT = 210;        // dp - safe zone for dock + search bar + nav gesture
+
 // ─── Wallpaper Styles ───────────────────────────────────────────────────────────
 
 interface StyleTheme {
@@ -87,7 +92,9 @@ interface StyleTheme {
   fontOverride?: string;
   gridLines?: boolean;
   cosmicGlow?: boolean;
-  glowCompleted?: boolean; // glow on completed dots
+  glowCompleted?: boolean;
+  todayGlowSize?: number;      // multiplier for today's glow ring (default 2.8)
+  headingWeight?: string;       // font weight override for heading number
 }
 
 const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
@@ -96,139 +103,147 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Ultra clean',
     bg: '#080808',
     dotCompleted: (rate) => {
-      const v = Math.round(60 + 195 * rate);
+      const v = Math.round(110 + 145 * rate);
       return `rgb(${v}, ${v}, ${v})`;
     },
     dotToday: '#FFFFFF',
-    dotTodayGlow: 'rgba(255, 255, 255, 0.35)',
-    dotFuture: '#1E1E1E',
-    dotEmpty: '#2D2D2D',
+    dotTodayGlow: 'rgba(255, 255, 255, 0.4)',
+    dotFuture: '#181818',
+    dotEmpty: '#505050',
     textPrimary: '#FFFFFF',
-    textSecondary: '#555555',
-    textTertiary: '#333333',
+    textSecondary: '#666666',
+    textTertiary: '#444444',
+    todayGlowSize: 3,
   },
   terminal: {
     label: 'Terminal',
     desc: 'Hacker mode',
     bg: '#0A0A0A',
     dotCompleted: (rate) => {
-      const v = Math.round(60 + 195 * rate);
+      const v = Math.round(110 + 145 * rate);
       return `rgb(0, ${v}, ${Math.round(v * 0.25)})`;
     },
     dotToday: '#00FF41',
-    dotTodayGlow: 'rgba(0, 255, 65, 0.6)',
-    dotFuture: '#001A08',
-    dotEmpty: '#002D10',
+    dotTodayGlow: 'rgba(0, 255, 65, 0.65)',
+    dotFuture: '#0A1A0E',
+    dotEmpty: '#005520',
     textPrimary: '#00FF41',
-    textSecondary: '#00AA2A',
-    textTertiary: '#004D15',
+    textSecondary: '#00CC33',
+    textTertiary: '#006620',
     fontOverride: 'monospace',
     glowCompleted: true,
+    todayGlowSize: 3.2,
   },
   gradient: {
     label: 'Gradient',
     desc: 'Deep twilight',
     bg: '#0C0C1E',
     dotCompleted: (rate) => {
-      const r = Math.round(60 + 120 * rate);
-      const g = Math.round(60 + 140 * rate);
-      const b = Math.round(80 + 175 * rate);
+      const r = Math.round(90 + 90 * rate);
+      const g = Math.round(90 + 110 * rate);
+      const b = Math.round(120 + 135 * rate);
       return `rgb(${r}, ${g}, ${b})`;
     },
     dotToday: '#9BABFF',
-    dotTodayGlow: 'rgba(155, 171, 255, 0.5)',
-    dotFuture: '#141428',
-    dotEmpty: '#1E1E38',
+    dotTodayGlow: 'rgba(155, 171, 255, 0.55)',
+    dotFuture: '#131326',
+    dotEmpty: '#3A3A5A',
     textPrimary: '#D0D8FF',
-    textSecondary: '#5B6399',
-    textTertiary: '#2E3355',
+    textSecondary: '#6B73AA',
+    textTertiary: '#3E4466',
+    todayGlowSize: 3,
   },
   neon: {
     label: 'Neon',
     desc: 'Electric glow',
     bg: '#040410',
     dotCompleted: (rate) => {
-      const v = Math.round(60 + 195 * rate);
+      const v = Math.round(110 + 145 * rate);
       return `rgb(${Math.round(v * 0.95)}, ${Math.round(v * 0.15)}, ${v})`;
     },
     dotToday: '#FF33FF',
     dotTodayGlow: 'rgba(255, 51, 255, 0.7)',
-    dotFuture: '#120818',
-    dotEmpty: '#1E0E28',
+    dotFuture: '#100818',
+    dotEmpty: '#3E2050',
     textPrimary: '#FF55FF',
-    textSecondary: '#882288',
-    textTertiary: '#3D1040',
+    textSecondary: '#AA33AA',
+    textTertiary: '#552266',
     glowCompleted: true,
+    todayGlowSize: 3.5,
   },
   paper: {
     label: 'Paper',
     desc: 'Warm & light',
     bg: '#F2EDE4',
     dotCompleted: (rate) => {
-      const v = Math.round(190 - 160 * rate);
+      const v = Math.round(160 - 130 * rate);
       return `rgb(${v}, ${Math.max(0, v - 8)}, ${Math.max(0, v - 18)})`;
     },
     dotToday: '#1A1A1A',
-    dotTodayGlow: 'rgba(26, 26, 26, 0.25)',
-    dotFuture: '#E4DFD6',
-    dotEmpty: '#D4CFC4',
+    dotTodayGlow: 'rgba(26, 26, 26, 0.2)',
+    dotFuture: '#E6E1D8',
+    dotEmpty: '#B8B0A2',
     textPrimary: '#1A1A1A',
-    textSecondary: '#8A8880',
-    textTertiary: '#C0BCB2',
+    textSecondary: '#7A7870',
+    textTertiary: '#A8A498',
+    todayGlowSize: 2.8,
   },
   blueprint: {
     label: 'Blueprint',
     desc: 'Technical feel',
     bg: '#081828',
     dotCompleted: (rate) => {
-      const v = Math.round(60 + 195 * rate);
+      const v = Math.round(110 + 145 * rate);
       return `rgb(${Math.round(v * 0.35)}, ${Math.round(v * 0.65)}, ${v})`;
     },
     dotToday: '#5CACEE',
-    dotTodayGlow: 'rgba(92, 172, 238, 0.5)',
-    dotFuture: '#0C2235',
-    dotEmpty: '#142E42',
+    dotTodayGlow: 'rgba(92, 172, 238, 0.55)',
+    dotFuture: '#0C2030',
+    dotEmpty: '#254A65',
     textPrimary: '#5CACEE',
-    textSecondary: '#2E6898',
-    textTertiary: '#163550',
+    textSecondary: '#3A7AB0',
+    textTertiary: '#1E4A6A',
     gridLines: true,
     glowCompleted: true,
+    todayGlowSize: 3,
   },
   minimal_dark: {
     label: 'Void',
     desc: 'Pure darkness',
     bg: '#000000',
     dotCompleted: (rate) => {
-      const v = Math.round(55 + 200 * rate);
+      const v = Math.round(110 + 145 * rate);
       return `rgb(${v}, ${v}, ${v})`;
     },
     dotToday: '#FFFFFF',
     dotTodayGlow: 'rgba(255, 255, 255, 0.6)',
-    dotFuture: '#141414',
-    dotEmpty: '#242424',
+    dotFuture: '#111111',
+    dotEmpty: '#484848',
     textPrimary: '#FFFFFF',
-    textSecondary: '#3A3A3A',
-    textTertiary: '#1E1E1E',
+    textSecondary: '#4A4A4A',
+    textTertiary: '#2A2A2A',
+    todayGlowSize: 3.2,
   },
   cosmic: {
     label: 'Cosmic',
     desc: 'Purple shimmer',
     bg: '#06041A',
     dotCompleted: (rate) => {
-      const r = Math.round(60 + 160 * rate);
-      const g = Math.round(50 + 170 * rate);
-      const b = Math.round(80 + 175 * rate);
+      const r = Math.round(95 + 125 * rate);
+      const g = Math.round(85 + 135 * rate);
+      const b = Math.round(120 + 135 * rate);
       return `rgb(${r}, ${g}, ${b})`;
     },
     dotToday: '#E8DEFF',
     dotTodayGlow: 'rgba(180, 140, 255, 0.8)',
-    dotFuture: '#0E0A26',
-    dotEmpty: '#181235',
+    dotFuture: '#0C0822',
+    dotEmpty: '#2A2050',
     textPrimary: '#E8DEFF',
-    textSecondary: '#7B5EA7',
-    textTertiary: '#3E2860',
+    textSecondary: '#8B6EBB',
+    textTertiary: '#4E3370',
     cosmicGlow: true,
     glowCompleted: true,
+    todayGlowSize: 3.5,
   },
 };
 
@@ -384,12 +399,13 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
   const sSpacing = spacing * scaleFactor;
   const dotDiameter = sDotSize * 2;
   const totalWidth = cols * dotDiameter + (cols - 1) * sSpacing;
-  const availableWidth = (SCREEN_W - Spacing.md * 2) * scaleFactor;
+  const availableWidth = (SCREEN_W - Spacing.lg * 2) * scaleFactor;
   const scale = Math.min(1, availableWidth / totalWidth);
   const finalDot = Math.round(dotDiameter * scale * 100) / 100;
   const finalSpacing = Math.round(sSpacing * scale * 100) / 100;
   const finalWidth = cols * finalDot + (cols - 1) * finalSpacing;
   const hasGlowEffect = style.glowCompleted || false;
+  const glowSize = style.todayGlowSize || 2.8;
 
   const rows: DayData[][] = [];
   for (let i = 0; i < days.length; i += cols) {
@@ -397,7 +413,7 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
   }
 
   return (
-    <View style={{ alignItems: 'center', paddingVertical: Spacing.xs * scaleFactor }}>
+    <View style={{ alignItems: 'center' }}>
       {/* Blueprint grid overlay */}
       {style.gridLines && (
         <View style={{
@@ -425,7 +441,7 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
               const color = getDotColor(day, style);
               const isCompletedPast = !day.isFuture && !day.isToday && day.completionRate > 0;
               const shouldGlow = hasGlowEffect && isCompletedPast;
-              const dotScale = isCompletedPast ? 1.15 : 1;
+              const dotScale = isCompletedPast ? 1.1 : 1;
 
               if (isToday) {
                 return (
@@ -440,22 +456,20 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
                       overflow: 'visible',
                     }}
                   >
-                    {/* Glow circle behind today's dot */}
+                    {/* Outer glow */}
                     <View style={{
                       position: 'absolute',
-                      width: finalDot * 2.5,
-                      height: finalDot * 2.5,
-                      borderRadius: finalDot * 1.25,
+                      width: finalDot * glowSize,
+                      height: finalDot * glowSize,
+                      borderRadius: finalDot * glowSize,
                       backgroundColor: style.dotTodayGlow,
                     }} />
                     {/* Today dot */}
                     <View style={{
-                      width: finalDot,
-                      height: finalDot,
-                      borderRadius: finalDot,
+                      width: finalDot * 1.2,
+                      height: finalDot * 1.2,
+                      borderRadius: finalDot * 1.2,
                       backgroundColor: color,
-                      borderWidth: finalDot * 0.15,
-                      borderColor: style.dotTodayGlow,
                     }} />
                   </View>
                 );
@@ -644,20 +658,36 @@ function DateInput({ value, onChange, error, label }: { value: string; onChange:
 
 function VibeOverlay({ style: vibeStyle }: { style: WallpaperStyle }) {
   switch (vibeStyle) {
+    case 'minimal':
+      return (
+        <>
+          {/* Subtle radial gradient feel - slightly lighter center */}
+          <View style={{
+            position: 'absolute', top: '20%', left: '15%',
+            width: '70%', height: '40%',
+            borderRadius: 999,
+            backgroundColor: 'rgba(255, 255, 255, 0.008)',
+          }} />
+        </>
+      );
+
     case 'gradient':
       return (
         <>
+          {/* Top: warm purple tint */}
           <View style={{
-            position: 'absolute', top: 0, left: 0, right: 0, height: '35%',
-            backgroundColor: 'rgba(25, 20, 60, 0.35)',
+            position: 'absolute', top: 0, left: 0, right: 0, height: '40%',
+            backgroundColor: 'rgba(30, 20, 70, 0.4)',
           }} />
+          {/* Bottom: deeper fade */}
           <View style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: '45%',
-            backgroundColor: 'rgba(8, 8, 25, 0.5)',
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%',
+            backgroundColor: 'rgba(6, 6, 20, 0.5)',
           }} />
+          {/* Center ambient glow */}
           <View style={{
-            position: 'absolute', top: '40%', left: '10%', width: '80%', height: '20%',
-            borderRadius: 999, backgroundColor: 'rgba(100, 110, 200, 0.04)',
+            position: 'absolute', top: '30%', left: '5%', width: '90%', height: '25%',
+            borderRadius: 999, backgroundColor: 'rgba(100, 110, 200, 0.06)',
           }} />
         </>
       );
@@ -667,24 +697,31 @@ function VibeOverlay({ style: vibeStyle }: { style: WallpaperStyle }) {
         <>
           {/* Large nebula glow */}
           <View style={{
-            position: 'absolute', top: '15%', left: '10%',
-            width: '80%', height: '55%',
+            position: 'absolute', top: '10%', left: '5%',
+            width: '90%', height: '60%',
             borderRadius: 999,
-            backgroundColor: 'rgba(60, 30, 120, 0.1)',
+            backgroundColor: 'rgba(60, 30, 120, 0.12)',
           }} />
-          {/* Inner glow */}
+          {/* Inner bright core */}
           <View style={{
-            position: 'absolute', top: '25%', left: '20%',
-            width: '60%', height: '35%',
+            position: 'absolute', top: '25%', left: '15%',
+            width: '70%', height: '30%',
             borderRadius: 999,
-            backgroundColor: 'rgba(90, 50, 180, 0.08)',
+            backgroundColor: 'rgba(100, 60, 200, 0.08)',
           }} />
-          {/* Top shimmer */}
+          {/* Top right accent */}
           <View style={{
-            position: 'absolute', top: '5%', right: '15%',
-            width: '25%', height: '15%',
+            position: 'absolute', top: '3%', right: '10%',
+            width: '30%', height: '18%',
             borderRadius: 999,
-            backgroundColor: 'rgba(140, 100, 255, 0.04)',
+            backgroundColor: 'rgba(140, 100, 255, 0.05)',
+          }} />
+          {/* Bottom left accent */}
+          <View style={{
+            position: 'absolute', bottom: '15%', left: '5%',
+            width: '35%', height: '15%',
+            borderRadius: 999,
+            backgroundColor: 'rgba(120, 80, 220, 0.04)',
           }} />
         </>
       );
@@ -692,25 +729,35 @@ function VibeOverlay({ style: vibeStyle }: { style: WallpaperStyle }) {
     case 'terminal':
       return (
         <>
-          {/* CRT scanline effect — subtle horizontal lines */}
-          {Array.from({ length: 40 }).map((_, i) => (
+          {/* CRT scanline effect */}
+          {Array.from({ length: 50 }).map((_, i) => (
             <View key={`scan${i}`} style={{
               position: 'absolute',
-              top: `${i * 2.5}%`,
+              top: `${i * 2}%`,
               left: 0, right: 0,
               height: 1,
-              backgroundColor: 'rgba(0, 255, 65, 0.015)',
+              backgroundColor: 'rgba(0, 255, 65, 0.02)',
             }} />
           ))}
-          {/* Green ambient at top */}
+          {/* Green ambient top */}
           <View style={{
-            position: 'absolute', top: 0, left: 0, right: 0, height: '8%',
-            backgroundColor: 'rgba(0, 255, 65, 0.02)',
+            position: 'absolute', top: 0, left: 0, right: 0, height: '10%',
+            backgroundColor: 'rgba(0, 255, 65, 0.025)',
           }} />
-          {/* Green ambient at bottom */}
+          {/* Green ambient bottom */}
           <View style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: '8%',
-            backgroundColor: 'rgba(0, 255, 65, 0.02)',
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '10%',
+            backgroundColor: 'rgba(0, 255, 65, 0.025)',
+          }} />
+          {/* Left edge glow (CRT curvature) */}
+          <View style={{
+            position: 'absolute', top: 0, left: 0, bottom: 0, width: '5%',
+            backgroundColor: 'rgba(0, 255, 65, 0.015)',
+          }} />
+          {/* Right edge glow */}
+          <View style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0, width: '5%',
+            backgroundColor: 'rgba(0, 255, 65, 0.015)',
           }} />
         </>
       );
@@ -718,19 +765,26 @@ function VibeOverlay({ style: vibeStyle }: { style: WallpaperStyle }) {
     case 'neon':
       return (
         <>
-          {/* Bottom ambient glow */}
+          {/* Bottom glow - strong */}
           <View style={{
-            position: 'absolute', bottom: 0, left: '10%',
-            width: '80%', height: '30%',
+            position: 'absolute', bottom: '5%', left: '5%',
+            width: '90%', height: '35%',
             borderRadius: 999,
-            backgroundColor: 'rgba(255, 51, 255, 0.04)',
+            backgroundColor: 'rgba(255, 51, 255, 0.05)',
           }} />
-          {/* Top ambient */}
+          {/* Top glow */}
           <View style={{
-            position: 'absolute', top: '5%', left: '20%',
-            width: '60%', height: '20%',
+            position: 'absolute', top: '5%', left: '15%',
+            width: '70%', height: '25%',
             borderRadius: 999,
-            backgroundColor: 'rgba(255, 51, 255, 0.03)',
+            backgroundColor: 'rgba(255, 51, 255, 0.035)',
+          }} />
+          {/* Center cross-beam */}
+          <View style={{
+            position: 'absolute', top: '40%', left: '20%',
+            width: '60%', height: '10%',
+            borderRadius: 999,
+            backgroundColor: 'rgba(200, 0, 255, 0.03)',
           }} />
         </>
       );
@@ -738,14 +792,21 @@ function VibeOverlay({ style: vibeStyle }: { style: WallpaperStyle }) {
     case 'paper':
       return (
         <>
-          {/* Warm vignette */}
+          {/* Warm vignette edges */}
           <View style={{
-            position: 'absolute', top: 0, left: 0, right: 0, height: '15%',
-            backgroundColor: 'rgba(200, 180, 150, 0.06)',
+            position: 'absolute', top: 0, left: 0, right: 0, height: '18%',
+            backgroundColor: 'rgba(190, 170, 140, 0.08)',
           }} />
           <View style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: '15%',
-            backgroundColor: 'rgba(200, 180, 150, 0.06)',
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '18%',
+            backgroundColor: 'rgba(190, 170, 140, 0.08)',
+          }} />
+          {/* Subtle warm center */}
+          <View style={{
+            position: 'absolute', top: '30%', left: '10%',
+            width: '80%', height: '30%',
+            borderRadius: 999,
+            backgroundColor: 'rgba(220, 200, 160, 0.03)',
           }} />
         </>
       );
@@ -763,7 +824,7 @@ function VibeOverlay({ style: vibeStyle }: { style: WallpaperStyle }) {
               top: `${(i + 1) * 4}%`,
               left: 0, right: 0,
               height: 0.5,
-              backgroundColor: 'rgba(92, 172, 238, 0.04)',
+              backgroundColor: 'rgba(92, 172, 238, 0.05)',
             }} />
           ))}
           {/* Vertical grid lines */}
@@ -773,33 +834,44 @@ function VibeOverlay({ style: vibeStyle }: { style: WallpaperStyle }) {
               left: `${(i + 1) * 7}%`,
               top: 0, bottom: 0,
               width: 0.5,
-              backgroundColor: 'rgba(92, 172, 238, 0.04)',
+              backgroundColor: 'rgba(92, 172, 238, 0.05)',
             }} />
           ))}
           {/* Corner markers */}
           <View style={{
             position: 'absolute', top: 12, left: 12,
-            width: 16, height: 16,
-            borderTopWidth: 1, borderLeftWidth: 1,
-            borderColor: 'rgba(92, 172, 238, 0.12)',
+            width: 20, height: 20,
+            borderTopWidth: 1.5, borderLeftWidth: 1.5,
+            borderColor: 'rgba(92, 172, 238, 0.15)',
           }} />
           <View style={{
             position: 'absolute', top: 12, right: 12,
-            width: 16, height: 16,
-            borderTopWidth: 1, borderRightWidth: 1,
-            borderColor: 'rgba(92, 172, 238, 0.12)',
+            width: 20, height: 20,
+            borderTopWidth: 1.5, borderRightWidth: 1.5,
+            borderColor: 'rgba(92, 172, 238, 0.15)',
           }} />
           <View style={{
             position: 'absolute', bottom: 12, left: 12,
-            width: 16, height: 16,
-            borderBottomWidth: 1, borderLeftWidth: 1,
-            borderColor: 'rgba(92, 172, 238, 0.12)',
+            width: 20, height: 20,
+            borderBottomWidth: 1.5, borderLeftWidth: 1.5,
+            borderColor: 'rgba(92, 172, 238, 0.15)',
           }} />
           <View style={{
             position: 'absolute', bottom: 12, right: 12,
-            width: 16, height: 16,
-            borderBottomWidth: 1, borderRightWidth: 1,
-            borderColor: 'rgba(92, 172, 238, 0.12)',
+            width: 20, height: 20,
+            borderBottomWidth: 1.5, borderRightWidth: 1.5,
+            borderColor: 'rgba(92, 172, 238, 0.15)',
+          }} />
+          {/* Center crosshair */}
+          <View style={{
+            position: 'absolute', top: '49.5%', left: '30%',
+            width: '40%', height: 0.5,
+            backgroundColor: 'rgba(92, 172, 238, 0.06)',
+          }} />
+          <View style={{
+            position: 'absolute', top: '40%', left: '49.5%',
+            width: 0.5, height: '20%',
+            backgroundColor: 'rgba(92, 172, 238, 0.06)',
           }} />
         </View>
       );
@@ -807,14 +879,23 @@ function VibeOverlay({ style: vibeStyle }: { style: WallpaperStyle }) {
     case 'minimal_dark':
       return (
         <>
-          {/* Vignette — darkened edges */}
+          {/* Subtle vignette edges */}
           <View style={{
-            position: 'absolute', top: 0, left: 0, right: 0, height: '20%',
-            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            position: 'absolute', top: 0, left: 0, right: 0, height: '25%',
+            backgroundColor: 'rgba(0, 0, 0, 0.35)',
           }} />
           <View style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: '20%',
-            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '25%',
+            backgroundColor: 'rgba(0, 0, 0, 0.35)',
+          }} />
+          {/* Side vignettes */}
+          <View style={{
+            position: 'absolute', top: 0, left: 0, bottom: 0, width: '8%',
+            backgroundColor: 'rgba(0, 0, 0, 0.15)',
+          }} />
+          <View style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0, width: '8%',
+            backgroundColor: 'rgba(0, 0, 0, 0.15)',
           }} />
         </>
       );
@@ -855,54 +936,70 @@ function WallpaperContent({
   return (
     <View style={{ width: containerWidth, height: containerHeight, backgroundColor: activeStyle.bg }}>
       <VibeOverlay style={config.wallpaperStyle || 'minimal'} />
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.md * s, paddingBottom: 120 * s }}>
-        {config.showDayCount && (
-          <Text style={[
-            { fontFamily: Fonts.accent, fontSize: 100 * s, marginBottom: -6 * s, letterSpacing: -1 * s, color: activeStyle.textPrimary },
-            fontFamily ? { fontFamily } : {},
-            isTerminal ? { letterSpacing: -2 * s, fontSize: 88 * s } : {},
-          ]}>
-            {displayNumber}
-          </Text>
-        )}
-        {config.showDayCount && (
-          <Text style={[
-            { fontFamily: Fonts.headingMedium, fontSize: 12 * s, letterSpacing: 2 * s, textTransform: 'uppercase', marginBottom: Spacing.lg * s, color: activeStyle.textSecondary },
-            fontFamily ? { fontFamily, fontSize: 11 * s, letterSpacing: 3 * s } : {},
-          ]}>{displayLabel}</Text>
-        )}
-        {config.showDayCount && displaySubLabel && (
-          <Text style={[
-            { fontFamily: Fonts.body, fontSize: 10 * s, letterSpacing: 0.5 * s, marginBottom: Spacing.sm * s, opacity: 0.8, color: activeStyle.textTertiary },
-            fontFamily ? { fontFamily, fontSize: 10 * s } : {},
-          ]}>{displaySubLabel}</Text>
-        )}
-        {isStats && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md * s, gap: Spacing.sm * s }}>
-            <Text style={[{ fontFamily: Fonts.bodyMedium, fontSize: 11 * s, letterSpacing: 0.5 * s, color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
-              {weekRate}% this week
+      <View style={{
+        flex: 1,
+        paddingTop: STATUS_BAR_HEIGHT * s,
+        paddingBottom: DOCK_HEIGHT * s,
+        paddingHorizontal: Spacing.lg * s,
+      }}>
+        {/* ── Top: Heading ── */}
+        <View style={{ alignItems: 'center', paddingTop: 16 * s }}>
+          {config.showDayCount && (
+            <Text style={[
+              { fontFamily: Fonts.accent, fontSize: 110 * s, marginBottom: -8 * s, letterSpacing: -1 * s, color: activeStyle.textPrimary },
+              fontFamily ? { fontFamily } : {},
+              isTerminal ? { letterSpacing: -2 * s, fontSize: 92 * s } : {},
+            ]}>
+              {displayNumber}
             </Text>
-            <Text style={{ fontSize: 11 * s, color: activeStyle.textTertiary }}>·</Text>
-            <Text style={[{ fontFamily: Fonts.bodyMedium, fontSize: 11 * s, letterSpacing: 0.5 * s, color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
-              {streak}d streak
+          )}
+          {config.showDayCount && (
+            <Text style={[
+              { fontFamily: Fonts.headingMedium, fontSize: 11 * s, letterSpacing: 3 * s, textTransform: 'uppercase', marginBottom: 6 * s, color: activeStyle.textSecondary },
+              fontFamily ? { fontFamily, fontSize: 10 * s, letterSpacing: 4 * s } : {},
+            ]}>{displayLabel}</Text>
+          )}
+          {config.showDayCount && displaySubLabel && (
+            <Text style={[
+              { fontFamily: Fonts.body, fontSize: 10 * s, letterSpacing: 0.5 * s, color: activeStyle.textTertiary, opacity: 0.7 },
+              fontFamily ? { fontFamily, fontSize: 10 * s } : {},
+            ]}>{displaySubLabel}</Text>
+          )}
+          {isStats && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 * s, gap: Spacing.sm * s }}>
+              <Text style={[{ fontFamily: Fonts.bodyMedium, fontSize: 11 * s, letterSpacing: 0.5 * s, color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
+                {weekRate}% this week
+              </Text>
+              <Text style={{ fontSize: 11 * s, color: activeStyle.textTertiary }}>·</Text>
+              <Text style={[{ fontFamily: Fonts.bodyMedium, fontSize: 11 * s, letterSpacing: 0.5 * s, color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
+                {streak}d streak
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* ── Middle: Dot Grid ── */}
+        <View style={{ flex: 1, justifyContent: 'center', paddingVertical: 12 * s }}>
+          <DotGrid config={config} days={days} style={activeStyle} scaleFactor={s} />
+        </View>
+
+        {/* ── Bottom: Quote + Streak (above dock) ── */}
+        <View style={{ alignItems: 'center', paddingBottom: 8 * s }}>
+          {config.showQuote && (
+            <Text style={[
+              { fontFamily: Fonts.accentItalic, fontSize: 13 * s, textAlign: 'center', paddingHorizontal: Spacing.xl * s, lineHeight: 20 * s, color: activeStyle.textTertiary },
+              fontFamily ? { fontFamily, fontStyle: 'normal', fontSize: 12 * s } : {},
+            ]}>"{quote}"</Text>
+          )}
+          {config.showStreak && !isStats && (
+            <Text style={[
+              { fontFamily: Fonts.body, fontSize: 10 * s, marginTop: 8 * s, letterSpacing: 1 * s, color: activeStyle.textTertiary, opacity: 0.7 },
+              fontFamily ? { fontFamily } : {},
+            ]}>
+              {streak > 0 ? `${streak} day streak` : 'Start your streak'} · day {dayNumber}
             </Text>
-          </View>
-        )}
-        <DotGrid config={config} days={days} style={activeStyle} scaleFactor={s} />
-        {config.showQuote && (
-          <Text style={[
-            { fontFamily: Fonts.accentItalic, fontSize: 12 * s, textAlign: 'center', marginTop: Spacing.lg * s, paddingHorizontal: Spacing.xl * s, lineHeight: 18 * s, opacity: 0.9, color: activeStyle.textTertiary },
-            fontFamily ? { fontFamily, fontStyle: 'normal', fontSize: 11 * s } : {},
-          ]}>"{quote}"</Text>
-        )}
-        {config.showStreak && !isStats && (
-          <Text style={[
-            { fontFamily: Fonts.body, fontSize: 10 * s, marginTop: Spacing.sm * s, letterSpacing: 0.5 * s, color: activeStyle.textTertiary },
-            fontFamily ? { fontFamily } : {},
-          ]}>
-            {streak > 0 ? `${streak} day streak` : 'Start your streak'} · day {dayNumber}
-          </Text>
-        )}
+          )}
+        </View>
       </View>
     </View>
   );
@@ -1140,8 +1237,6 @@ function WallpaperScreenContent() {
               format: 'png',
               quality: 1,
               result: 'tmpfile',
-              width: WALLPAPER_W * PIXEL_RATIO,
-              height: WALLPAPER_H * PIXEL_RATIO,
             }}
           >
             <WallpaperContent

@@ -87,6 +87,7 @@ function SettingsScreenContent() {
   const router = useRouter();
   const [resetHour, setResetHour] = useState(5);
   const [silicon, setSilicon] = useState<SiliconConnection | null>(null);
+  const [siliconLoading, setSiliconLoading] = useState(true);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [messageCopied, setMessageCopied] = useState(false);
@@ -108,6 +109,7 @@ function SettingsScreenContent() {
           setSilicon(conn);
           setPairingCode(conn.pairingCode);
         }
+        setSiliconLoading(false);
       });
     };
     checkConnection();
@@ -384,7 +386,13 @@ function SettingsScreenContent() {
         {/* Silicon Connection - New Flow */}
         <Text style={styles.sectionHeaderText}>SILICON</Text>
         <SectionCard style={styles.siliconCard}>
-          {isConnected ? (
+          {siliconLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: Spacing.lg }}>
+              <RNAnimated.View style={{ opacity: 0.5 }}>
+                <Text style={{ color: Colors.dark.textTertiary, fontFamily: Fonts.body, fontSize: 14 }}>Checking connection...</Text>
+              </RNAnimated.View>
+            </View>
+          ) : isConnected ? (
             <>
               {/* Connected state — clean minimal */}
               <View style={styles.connectedHeader}>
