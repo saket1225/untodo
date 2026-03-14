@@ -13,9 +13,9 @@ class WallpaperSetterModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("WallpaperSetter")
 
-    AsyncFunction("setWallpaper") { imageUri: String, promise: Promise ->
+    AsyncFunction("setWallpaper") { imageUri: String, flags: Int, promise: Promise ->
       try {
-        Log.d("WallpaperSetter", "setWallpaper called with URI: $imageUri")
+        Log.d("WallpaperSetter", "setWallpaper called with URI: $imageUri, flags: $flags")
 
         val context = appContext.reactContext ?: run {
           Log.e("WallpaperSetter", "React context is not available")
@@ -79,8 +79,14 @@ class WallpaperSetterModule : Module() {
 
         Log.d("WallpaperSetter", "Bitmap decoded: ${bitmap.width}x${bitmap.height}")
 
-        wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_SYSTEM)
-        Log.d("WallpaperSetter", "Wallpaper set successfully (home screen)")
+        val wallpaperFlags = if (flags > 0) flags else (WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
+        wallpaperManager.setBitmap(bitmap, null, true, wallpaperFlags)
+        val screenDesc = when (wallpaperFlags) {
+          WallpaperManager.FLAG_SYSTEM -> "home screen"
+          WallpaperManager.FLAG_LOCK -> "lock screen"
+          else -> "home + lock screen"
+        }
+        Log.d("WallpaperSetter", "Wallpaper set successfully ($screenDesc)")
         bitmap.recycle()
 
         promise.resolve(true)

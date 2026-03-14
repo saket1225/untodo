@@ -30,6 +30,8 @@ const DEFAULT_CONFIG: WallpaperConfig = {
   wallpaperStyle: 'minimal',
   startDate: '2026-03-10',
   headingMode: 'remaining_first',
+  wallpaperAutoUpdate: false,
+  cachedWallpaperPath: null,
 };
 
 export const useWallpaperStore = create<WallpaperStore>()(
@@ -47,7 +49,7 @@ export const useWallpaperStore = create<WallpaperStore>()(
     {
       name: 'untodo-wallpaper',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 4,
+      version: 5,
       migrate: (persisted: any, version: number) => {
         try {
           const state = (persisted || {}) as { config?: any };
@@ -63,6 +65,8 @@ export const useWallpaperStore = create<WallpaperStore>()(
               wallpaperStyle: config.wallpaperStyle ?? 'minimal',
               startDate: config.startDate ?? '2026-03-10',
               headingMode: config.headingMode ?? 'remaining_first',
+              wallpaperAutoUpdate: config.wallpaperAutoUpdate ?? false,
+              cachedWallpaperPath: config.cachedWallpaperPath ?? null,
             },
           };
         } catch {

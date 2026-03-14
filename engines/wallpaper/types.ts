@@ -26,6 +26,8 @@ export interface WallpaperConfig {
   wallpaperStyle: WallpaperStyle;
   startDate: string; // YYYY-MM-DD
   headingMode: HeadingMode;
+  wallpaperAutoUpdate: boolean;
+  cachedWallpaperPath: string | null;
 }
 
 export interface DayData {

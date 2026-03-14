@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
-import { setWallpaper } from '../../modules/wallpaper-setter';
+import { setWallpaper, FLAG_BOTH } from '../../modules/wallpaper-setter';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useWallpaperStore } from '../../engines/wallpaper/store';
@@ -12,6 +12,7 @@ import { useTodoStore } from '../../engines/todo/store';
 import { DayData, WallpaperPreset, WallpaperStyle } from '../../engines/wallpaper/types';
 import { getLogicalDate } from '../../lib/date-utils';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import { registerWallpaperTask, unregisterWallpaperTask, cacheWallpaperForBackground } from '../../engines/wallpaper/background-task';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PREVIEW_WIDTH = SCREEN_WIDTH - Spacing.lg * 2;
@@ -630,12 +631,25 @@ function WallpaperScreenContent() {
   const quote = useMemo(() => getDailyQuote(config.customQuote), [config.customQuote]);
 
   // Auto-refresh wallpaper on app open if logical date changed
+  // Also pre-generates and caches wallpaper for background task
   useEffect(() => {
-    const checkAndRefresh = () => {
-      if (!config.wallpaperEnabled) return;
+    const checkAndRefresh = async () => {
+      if (!config.wallpaperEnabled && !config.wallpaperAutoUpdate) return;
       const logicalDate = getLogicalDate();
       if (config.lastWallpaperDate !== logicalDate) {
         handleSaveWallpaper(true);
+      } else if (config.wallpaperAutoUpdate) {
+        // Even if date hasn't changed, ensure we have a cached wallpaper
+        // Pre-generate for background task
+        try {
+          if (viewShotRef.current?.capture) {
+            const uri = await viewShotRef.current.capture();
+            const cachedPath = await cacheWallpaperForBackground(uri);
+            if (cachedPath) updateConfig({ cachedWallpaperPath: cachedPath });
+          }
+        } catch (e) {
+          console.error('Pre-generation cache failed:', e);
+        }
       }
     };
 
@@ -646,7 +660,7 @@ function WallpaperScreenContent() {
     checkAndRefresh();
 
     return () => sub.remove();
-  }, [config.wallpaperEnabled, config.lastWallpaperDate]);
+  }, [config.wallpaperEnabled, config.wallpaperAutoUpdate, config.lastWallpaperDate]);
 
   const handleSaveWallpaper = useCallback(async (silent = false) => {
     try {
@@ -668,14 +682,20 @@ function WallpaperScreenContent() {
         await MediaLibrary.saveToLibraryAsync(uri);
         updateConfig({ lastWallpaperDate: getLogicalDate() });
 
-        // Auto-set wallpaper on Android
+        // Auto-set wallpaper on Android (home + lock)
         if (Platform.OS === 'android') {
           try {
             const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
-            await setWallpaper(fileUri);
+            await setWallpaper(fileUri, FLAG_BOTH);
           } catch (err) {
             console.error('Auto-set wallpaper failed:', err);
           }
+        }
+
+        // Cache for background task
+        if (config.wallpaperAutoUpdate) {
+          const cachedPath = await cacheWallpaperForBackground(uri);
+          if (cachedPath) updateConfig({ cachedWallpaperPath: cachedPath });
         }
 
         if (!silent) {
@@ -693,7 +713,7 @@ function WallpaperScreenContent() {
         Alert.alert('Error', 'Failed to save wallpaper.');
       }
     }
-  }, [updateConfig]);
+  }, [updateConfig, config.wallpaperAutoUpdate]);
 
   const handleSetWallpaper = useCallback(async () => {
     try {
@@ -710,25 +730,33 @@ function WallpaperScreenContent() {
 
       if (viewShotRef.current?.capture) {
         const uri = await viewShotRef.current.capture();
-        const asset = await MediaLibrary.createAssetAsync(uri);
+        await MediaLibrary.createAssetAsync(uri);
         updateConfig({ lastWallpaperDate: getLogicalDate() });
-        setGenerating(false);
 
         if (Platform.OS === 'android') {
           try {
-            // Use file:// URI directly from ViewShot capture instead of content:// URI
-            // Content URIs from FileProvider are not readable by WallpaperManager (system service)
             const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
-            await setWallpaper(fileUri);
-            Alert.alert('Done', 'Wallpaper set successfully!');
+            await setWallpaper(fileUri, FLAG_BOTH);
+
+            // Cache for background task
+            const cachedPath = await cacheWallpaperForBackground(uri);
+            if (cachedPath) updateConfig({ cachedWallpaperPath: cachedPath });
+
+            // Register background task for daily updates
+            const registered = await registerWallpaperTask();
+            updateConfig({ wallpaperAutoUpdate: true, wallpaperEnabled: true });
+
+            setGenerating(false);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch (err: any) {
             console.error('setWallpaper failed:', err);
+            setGenerating(false);
             Alert.alert('Wallpaper Saved', 'Image saved to gallery but could not set wallpaper automatically. Set it manually from your gallery.');
           }
         } else {
+          setGenerating(false);
           Alert.alert('Wallpaper Saved', 'Image saved to gallery. Set it as wallpaper from your Photos app.');
         }
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
         setGenerating(false);
       }
@@ -736,6 +764,12 @@ function WallpaperScreenContent() {
       setGenerating(false);
       Alert.alert('Error', 'Failed to set wallpaper.');
     }
+  }, [updateConfig]);
+
+  const handleDisableAutoUpdate = useCallback(async () => {
+    await unregisterWallpaperTask();
+    updateConfig({ wallpaperAutoUpdate: false, wallpaperEnabled: false });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, [updateConfig]);
 
   const handleShare = useCallback(async () => {
@@ -899,37 +933,73 @@ function WallpaperScreenContent() {
           </View>
         )}
 
-        {/* Action Buttons */}
-        <TouchableOpacity
-          style={[styles.setWallpaperBtn, generating && { opacity: 0.5 }]}
-          disabled={generating}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            handleSetWallpaper();
-          }}
-        >
-          <Text style={styles.setWallpaperBtnText}>{generating ? 'Generating...' : 'Set as Wallpaper'}</Text>
-        </TouchableOpacity>
-        <View style={styles.secondaryActionRow}>
-          <TouchableOpacity
-            style={styles.secondaryBtn}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              handleSaveWallpaper(false);
-            }}
-          >
-            <Text style={styles.secondaryBtnText}>Save to Gallery</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.secondaryBtn}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              handleShare();
-            }}
-          >
-            <Text style={styles.secondaryBtnText}>Share</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Action Buttons — Active/Inactive State */}
+        {config.wallpaperAutoUpdate ? (
+          <>
+            {/* Active state */}
+            <View style={[styles.setWallpaperBtn, { backgroundColor: Colors.dark.surface, borderWidth: 1, borderColor: Colors.dark.success }]}>
+              <Text style={[styles.setWallpaperBtnText, { color: Colors.dark.success }]}>Wallpaper Active</Text>
+              <Text style={{ color: Colors.dark.textTertiary, fontFamily: Fonts.body, fontSize: 12, marginTop: 4 }}>
+                Updates daily at 5:00 AM
+              </Text>
+            </View>
+            <View style={styles.secondaryActionRow}>
+              <TouchableOpacity
+                style={[styles.secondaryBtn, generating && { opacity: 0.5 }]}
+                disabled={generating}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  handleSetWallpaper();
+                }}
+              >
+                <Text style={styles.secondaryBtnText}>{generating ? 'Updating...' : 'Update Now'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.secondaryBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  handleDisableAutoUpdate();
+                }}
+              >
+                <Text style={[styles.secondaryBtnText, { color: Colors.dark.error }]}>Disable</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            {/* Inactive state */}
+            <TouchableOpacity
+              style={[styles.setWallpaperBtn, generating && { opacity: 0.5 }]}
+              disabled={generating}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                handleSetWallpaper();
+              }}
+            >
+              <Text style={styles.setWallpaperBtnText}>{generating ? 'Generating...' : 'Set as Wallpaper'}</Text>
+            </TouchableOpacity>
+            <View style={styles.secondaryActionRow}>
+              <TouchableOpacity
+                style={styles.secondaryBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  handleSaveWallpaper(false);
+                }}
+              >
+                <Text style={styles.secondaryBtnText}>Save to Gallery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.secondaryBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  handleShare();
+                }}
+              >
+                <Text style={styles.secondaryBtnText}>Share</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         {/* Goal date passed notice */}
         {goalInPast && (
