@@ -618,14 +618,12 @@ function WallpaperScreenContent() {
 
   if (headingMode === 'day_first') {
     displayNumber = dayNumber;
-    displayLabel = `Day ${dayNumber}`;
-    displaySubLabel = `${daysLeft} days remaining`;
-    if (goalLabel) displaySubLabel += ` - ${goalLabel}`;
+    displayLabel = `DAY ${dayNumber}`;
+    displaySubLabel = `${daysLeft} days remaining till ${goalLabel}`;
   } else {
     displayNumber = daysLeft;
     displayLabel = `days until ${goalLabel}`;
-    displaySubLabel = `Day ${dayNumber}`;
-    if (goalLabel) displaySubLabel += ` - ${goalLabel}`;
+    displaySubLabel = `DAY ${dayNumber}`;
   }
 
   const quote = useMemo(() => getDailyQuote(config.customQuote), [config.customQuote]);
@@ -1109,7 +1107,7 @@ function WallpaperScreenContent() {
                 }}
               >
                 <Text style={styles.headingToggleBtnText}>
-                  {(config.headingMode || 'remaining_first') === 'day_first' ? `Day ${dayNumber}` : `${daysLeft} days left`}
+                  {(config.headingMode || 'remaining_first') === 'day_first' ? `DAY ${dayNumber}` : `${daysLeft} days left`}
                 </Text>
               </TouchableOpacity>
             </View>
