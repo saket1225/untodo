@@ -3,8 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, Switch, TextInput, StyleSheet
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
-import * as IntentLauncher from 'expo-intent-launcher';
 import * as FileSystem from 'expo-file-system';
+import { setWallpaper } from '../../modules/wallpaper-setter';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useWallpaperStore } from '../../engines/wallpaper/store';
@@ -705,26 +705,11 @@ function WallpaperScreenContent() {
 
         if (Platform.OS === 'android') {
           try {
-            // Get a proper content:// URI from the file URI using expo-file-system
             const contentUri = await FileSystem.getContentUriAsync(asset.uri);
-            await IntentLauncher.startActivityAsync(
-              'android.intent.action.ATTACH_DATA',
-              {
-                data: contentUri,
-                type: 'image/png',
-                flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-                extra: { 'mimeType': 'image/png' },
-              }
-            );
-          } catch {
-            try {
-              // Fallback: open wallpaper picker
-              await IntentLauncher.startActivityAsync(
-                'android.intent.action.SET_WALLPAPER'
-              );
-            } catch {
-              Alert.alert('Wallpaper Saved', 'Image saved to gallery. Open your gallery and long-press to set as wallpaper.');
-            }
+            await setWallpaper(contentUri);
+            Alert.alert('Done', 'Wallpaper set successfully!');
+          } catch (err: any) {
+            Alert.alert('Wallpaper Saved', 'Image saved to gallery but could not set wallpaper automatically. Set it manually from your gallery.');
           }
         } else {
           Alert.alert('Wallpaper Saved', 'Image saved to gallery. Set it as wallpaper from your Photos app.');
