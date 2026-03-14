@@ -667,6 +667,17 @@ function WallpaperScreenContent() {
         const uri = await viewShotRef.current.capture();
         await MediaLibrary.saveToLibraryAsync(uri);
         updateConfig({ lastWallpaperDate: getLogicalDate() });
+
+        // Auto-set wallpaper on Android
+        if (Platform.OS === 'android') {
+          try {
+            const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
+            await setWallpaper(fileUri);
+          } catch (err) {
+            console.error('Auto-set wallpaper failed:', err);
+          }
+        }
+
         if (!silent) {
           setGenerating(false);
           setSavedToast(true);
@@ -705,10 +716,13 @@ function WallpaperScreenContent() {
 
         if (Platform.OS === 'android') {
           try {
-            const contentUri = await FileSystem.getContentUriAsync(asset.uri);
-            await setWallpaper(contentUri);
+            // Use file:// URI directly from ViewShot capture instead of content:// URI
+            // Content URIs from FileProvider are not readable by WallpaperManager (system service)
+            const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
+            await setWallpaper(fileUri);
             Alert.alert('Done', 'Wallpaper set successfully!');
           } catch (err: any) {
+            console.error('setWallpaper failed:', err);
             Alert.alert('Wallpaper Saved', 'Image saved to gallery but could not set wallpaper automatically. Set it manually from your gallery.');
           }
         } else {

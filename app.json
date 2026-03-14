@@ -63,7 +63,8 @@
           "sounds": []
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "./modules/wallpaper-setter/withWallpaperSetter"
     ]
   }
 }
