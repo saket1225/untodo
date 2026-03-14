@@ -85,6 +85,28 @@ export function generateDailyInsight(todos: Todo[]): string | null {
     insights.push(`You've been consistent for ${streak} days — keep it up`);
   }
 
+  // Monthly completed count
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthCompleted = todos.filter(t => {
+    if (!t.completed) return false;
+    const d = new Date(t.logicalDate + 'T12:00:00');
+    return d >= monthStart && d <= today;
+  }).length;
+  if (monthCompleted > 10) {
+    insights.push(`You've completed ${monthCompleted} tasks this month`);
+  }
+
+  // Completion time pattern
+  const completedBefore2pm = todos.filter(t => {
+    if (!t.completed || !t.updatedAt) return false;
+    const updated = new Date(t.updatedAt);
+    return updated.getHours() < 14;
+  }).length;
+  const totalCompleted = todos.filter(t => t.completed).length;
+  if (totalCompleted > 20 && completedBefore2pm / totalCompleted > 0.6) {
+    insights.push('You complete most tasks before 2pm');
+  }
+
   // Best day of week
   const bestDay = dayRates.reduce(
     (max, rate, i) => (rate >= 0 && (max === -1 || rate > dayRates[max])) ? i : max,

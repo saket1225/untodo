@@ -8,7 +8,7 @@ import { useTodoStore } from '../../engines/todo/store';
 import { useProgressStore, getWeekStats, getRecentDays } from '../../engines/progress/store';
 import { DaySummary } from '../../engines/progress/types';
 import { getLogicalDate } from '../../lib/date-utils';
-import { computeAnalytics, AnalyticsData } from '../../lib/insights';
+import { computeAnalytics, generateDailyInsight, AnalyticsData } from '../../lib/insights';
 import { format } from 'date-fns';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import WeeklyReviewComponent from '../../engines/progress/components/WeeklyReview';
@@ -589,7 +589,6 @@ function ShareSection({ analytics }: { analytics: AnalyticsData }) {
 
   const weekStats = useMemo(() => getWeekStats(), [todos]);
   const logicalDate = getLogicalDate();
-  const todayTodos = todos.filter(t => t.logicalDate === logicalDate);
   const streak = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -614,7 +613,7 @@ function ShareSection({ analytics }: { analytics: AnalyticsData }) {
       if (uri) {
         await Share.share({
           url: uri,
-          message: `This week: ${Math.round(weekStats.completionRate * 100)}% completion rate | ${streak} day streak | Powered by untodo`,
+          message: `This week: ${Math.round(weekStats.completionRate * 100)}% completion | ${streak} day streak | untodo`,
         });
       }
     } catch {
@@ -635,32 +634,52 @@ function ShareSection({ analytics }: { analytics: AnalyticsData }) {
     }, 0);
   }, [todos]);
 
+  const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Share Progress</Text>
       <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }}>
         <View style={styles.shareCard}>
+          <Text style={styles.shareCardDate}>{dateLabel}</Text>
           <Text style={styles.shareCardTitle}>Weekly Stats</Text>
           <View style={styles.shareStatsRow}>
             <View style={styles.shareStatItem}>
               <Text style={styles.shareStatValue}>{weekPct}%</Text>
               <Text style={styles.shareStatLabel}>completion</Text>
             </View>
+            <View style={styles.shareDivider} />
             <View style={styles.shareStatItem}>
               <Text style={styles.shareStatValue}>{streak}</Text>
               <Text style={styles.shareStatLabel}>day streak</Text>
             </View>
-            <View style={styles.shareStatItem}>
-              <Text style={[styles.shareStatValue, { color: Colors.dark.timer }]}>{weekPomoMins}m</Text>
-              <Text style={styles.shareStatLabel}>focus time</Text>
-            </View>
+            {weekPomoMins > 0 && (
+              <>
+                <View style={styles.shareDivider} />
+                <View style={styles.shareStatItem}>
+                  <Text style={[styles.shareStatValue, { color: Colors.dark.timer }]}>{weekPomoMins}m</Text>
+                  <Text style={styles.shareStatLabel}>focus time</Text>
+                </View>
+              </>
+            )}
           </View>
-          <Text style={styles.shareWatermark}>Powered by untodo</Text>
+          <Text style={styles.shareWatermark}>untodo</Text>
         </View>
       </ViewShot>
-      <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+      <TouchableOpacity style={styles.shareBtn} onPress={handleShare} activeOpacity={0.7}>
         <Text style={styles.shareBtnText}>Share</Text>
       </TouchableOpacity>
+    </View>
+  );
+}
+
+function DailyInsightBanner({ todos }: { todos: any[] }) {
+  const insight = useMemo(() => generateDailyInsight(todos), [todos]);
+  if (!insight) return null;
+  return (
+    <View style={styles.insightBanner}>
+      <Text style={styles.insightIcon}>◆</Text>
+      <Text style={styles.insightText}>{insight}</Text>
     </View>
   );
 }
@@ -696,6 +715,7 @@ function ProgressScreenContent() {
         ) : (
           <>
             <TodaySummaryCard />
+            <DailyInsightBanner todos={todos} />
             <ContributionGraph heatmap={analytics.heatmap} />
             <WeeklyReviewComponent />
             <AnalyticsSummary analytics={analytics} />
@@ -823,6 +843,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
+  insightBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    marginBottom: Spacing.lg,
+  },
+  insightIcon: {
+    color: Colors.dark.textTertiary,
+    fontSize: 8,
+    opacity: 0.5,
+  },
+  insightText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 20,
+  },
   section: {
     marginBottom: Spacing.xl,
   },
@@ -1246,6 +1290,12 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     alignItems: 'center',
   },
+  shareCardDate: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    marginBottom: Spacing.xs,
+  },
   shareCardTitle: {
     color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
@@ -1271,11 +1321,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
+  shareDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: Colors.dark.border,
+  },
   shareWatermark: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.accentItalic,
     fontSize: 11,
-    opacity: 0.6,
+    opacity: 0.4,
   },
   shareBtn: {
     backgroundColor: Colors.dark.surface,

@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
 import {
   View, Text, FlatList, StyleSheet, Modal, TouchableOpacity, ScrollView,
   Animated as RNAnimated, RefreshControl, TextInput, Dimensions, PanResponder,
-  LayoutAnimation, UIManager, Platform,
+  LayoutAnimation, UIManager, Platform, Share,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -26,6 +26,8 @@ import UndoToast, { showUndoToast } from '../../components/UndoToast';
 import { Todo, Category, CATEGORIES, Priority, Recurrence } from '../../engines/todo/types';
 import { onSyncStateChange } from '../../lib/firebase-sync';
 import { useKeyboardShortcuts } from '../../lib/useKeyboardShortcuts';
+import { generateDailyInsight } from '../../lib/insights';
+import ViewShot from 'react-native-view-shot';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_HEIGHT = 72; // Approximate fixed height for getItemLayout
@@ -258,30 +260,38 @@ function EmptyState({ isToday, allCompleted }: { isToday: boolean; allCompleted:
   }, []);
 
   if (allCompleted) {
+    const tod = getTimeOfDay();
+    const doneMsg = tod === 'night'
+      ? 'All done. Get some rest.'
+      : tod === 'evening'
+        ? 'Everything done. Enjoy your evening.'
+        : 'Everything done! You\'re a machine.';
+    const doneSub = tod === 'night'
+      ? 'Tomorrow will thank you.'
+      : 'Go live your day. You earned it.';
     return (
       <RNAnimated.View style={[styles.empty, { opacity: fadeAnim }]}>
         <Text style={styles.emptyIcon}>🔥</Text>
-        <Text style={styles.emptyQuote}>Everything done! You're a machine.</Text>
-        <Text style={styles.emptySubtext}>Go live your day. You earned it.</Text>
+        <Text style={styles.emptyQuote}>{doneMsg}</Text>
+        <Text style={styles.emptySubtext}>{doneSub}</Text>
       </RNAnimated.View>
     );
   }
 
   if (isToday) {
-    const hour = new Date().getHours();
-    const promptText = hour >= 10 && hour < 17
-      ? "What's the plan for today?"
-      : hour >= 17
-        ? 'Wind down. Tomorrow is a new day.'
-        : 'Nothing on the plate.';
-    const subText = hour >= 10 && hour < 17
-      ? "It's not too late to set your intentions."
-      : 'Add something worth doing.';
+    const tod = getTimeOfDay();
+    const emptyMessages: Record<TimeOfDay, { prompt: string; sub: string }> = {
+      morning: { prompt: 'A blank slate.', sub: 'What matters most today?' },
+      afternoon: { prompt: "What's the plan?", sub: "It's not too late to set your intentions." },
+      evening: { prompt: 'Quiet evening ahead.', sub: 'Plan tomorrow, or just breathe.' },
+      night: { prompt: 'Nothing on the plate.', sub: 'Rest. Tomorrow is a new day.' },
+    };
+    const { prompt, sub } = emptyMessages[tod];
     return (
       <RNAnimated.View style={[styles.empty, { opacity: fadeAnim }]}>
         <Text style={styles.emptyIcon}>○</Text>
-        <Text style={styles.emptyQuote}>{promptText}</Text>
-        <Text style={styles.emptySubtext}>{subText}</Text>
+        <Text style={styles.emptyQuote}>{prompt}</Text>
+        <Text style={styles.emptySubtext}>{sub}</Text>
         <DailyQuote />
       </RNAnimated.View>
     );
@@ -1003,12 +1013,213 @@ const calStyles = StyleSheet.create({
   },
 });
 
-function getGreeting(): string {
+type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
+
+function getTimeOfDay(): TimeOfDay {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (hour >= 5 && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 17) return 'afternoon';
+  if (hour >= 17 && hour < 22) return 'evening';
+  return 'night';
 }
+
+function getGreeting(): string {
+  const tod = getTimeOfDay();
+  switch (tod) {
+    case 'morning': return 'Good morning';
+    case 'afternoon': return 'Good afternoon';
+    case 'evening': return 'Good evening';
+    case 'night': return 'Still up?';
+  }
+}
+
+function getGreetingSub(completed: number, total: number): string | null {
+  const tod = getTimeOfDay();
+  if (total === 0) {
+    switch (tod) {
+      case 'morning': return 'Fresh start. What matters today?';
+      case 'afternoon': return 'Still time to set intentions.';
+      case 'evening': return 'Plan tomorrow before you rest.';
+      case 'night': return 'Rest well. Tomorrow is yours.';
+    }
+  }
+  const remaining = total - completed;
+  if (remaining === 0) return null; // all done - handled elsewhere
+  switch (tod) {
+    case 'morning': return `${total} task${total !== 1 ? 's' : ''} ahead. Let's go.`;
+    case 'afternoon': return remaining <= 3 ? `Just ${remaining} left. Strong finish.` : `${completed}/${total} done. Keep pushing.`;
+    case 'evening': return remaining <= 2 ? `Almost there — ${remaining} to go.` : `${remaining} remaining. Focus up.`;
+    case 'night': return remaining <= 2 ? `Finish ${remaining} or let it rest.` : 'Tomorrow is another day.';
+  }
+}
+
+// --- Task Insight Banner ---
+function TaskInsight({ todos }: { todos: Todo[] }) {
+  const insight = useMemo(() => generateDailyInsight(todos), [todos]);
+  if (!insight) return null;
+
+  return (
+    <View style={insightStyles.container}>
+      <Text style={insightStyles.icon}>◆</Text>
+      <Text style={insightStyles.text}>{insight}</Text>
+    </View>
+  );
+}
+
+const insightStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  icon: {
+    color: Colors.dark.textTertiary,
+    fontSize: 8,
+    opacity: 0.5,
+  },
+  text: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 20,
+    opacity: 0.8,
+  },
+});
+
+// --- Share Your Day Card ---
+function ShareDayCard({ completed, total, streak }: { completed: number; total: number; streak: number }) {
+  const viewShotRef = useRef<ViewShot>(null);
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  const { grade, color } = getDailyScore(completed, total, streak);
+
+  const handleShare = async () => {
+    try {
+      const uri = await viewShotRef.current?.capture?.();
+      if (uri) {
+        await Share.share({
+          url: uri,
+          message: `${dateStr}: ${completed}/${total} tasks done (${pct}%) | ${streak} day streak | untodo`,
+        });
+      }
+    } catch {
+      // Share cancelled
+    }
+  };
+
+  if (total === 0) return null;
+
+  return (
+    <View style={shareCardStyles.wrapper}>
+      <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }}>
+        <View style={shareCardStyles.card}>
+          <Text style={shareCardStyles.date}>{dateStr}</Text>
+          <View style={shareCardStyles.statsRow}>
+            <View style={shareCardStyles.statItem}>
+              <Text style={[shareCardStyles.statValue, { color }]}>{grade}</Text>
+              <Text style={shareCardStyles.statLabel}>score</Text>
+            </View>
+            <View style={shareCardStyles.divider} />
+            <View style={shareCardStyles.statItem}>
+              <Text style={shareCardStyles.statValue}>{completed}/{total}</Text>
+              <Text style={shareCardStyles.statLabel}>tasks</Text>
+            </View>
+            <View style={shareCardStyles.divider} />
+            <View style={shareCardStyles.statItem}>
+              <Text style={shareCardStyles.statValue}>{pct}%</Text>
+              <Text style={shareCardStyles.statLabel}>done</Text>
+            </View>
+            {streak > 0 && (
+              <>
+                <View style={shareCardStyles.divider} />
+                <View style={shareCardStyles.statItem}>
+                  <Text style={[shareCardStyles.statValue, { color: Colors.dark.timer }]}>{streak}</Text>
+                  <Text style={shareCardStyles.statLabel}>streak</Text>
+                </View>
+              </>
+            )}
+          </View>
+          <Text style={shareCardStyles.watermark}>untodo</Text>
+        </View>
+      </ViewShot>
+      <TouchableOpacity style={shareCardStyles.btn} onPress={handleShare} activeOpacity={0.7}>
+        <Text style={shareCardStyles.btnText}>Share your day</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const shareCardStyles = StyleSheet.create({
+  wrapper: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+  },
+  card: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.lg,
+    alignItems: 'center',
+  },
+  date: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 16,
+    marginBottom: Spacing.md,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accent,
+    fontSize: 24,
+    lineHeight: 28,
+  },
+  statLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  divider: {
+    width: 1,
+    height: 28,
+    backgroundColor: Colors.dark.border,
+  },
+  watermark: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 11,
+    opacity: 0.4,
+    marginTop: Spacing.md,
+  },
+  btn: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.sm,
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+  },
+  btnText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 13,
+  },
+});
 
 function formatDayHeader(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -1526,7 +1737,13 @@ function TodayScreenContent() {
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
             {isToday && (
-              <Text style={styles.greetingText}>{getGreeting()}</Text>
+              <View>
+                <Text style={styles.greetingText}>{getGreeting()}</Text>
+                {(() => {
+                  const sub = getGreetingSub(completed, total);
+                  return sub ? <Text style={styles.greetingSubText}>{sub}</Text> : null;
+                })()}
+              </View>
             )}
             <View style={styles.dateRow}>
               <TouchableOpacity
@@ -1694,11 +1911,13 @@ function TodayScreenContent() {
         <StreakBanner streak={streak} atRisk={atRisk} />
       )}
 
-      {/* Evening encouragement */}
-      {isToday && new Date().getHours() >= 19 && activeTodos.length > 0 && activeTodos.length <= 3 && (
+      {/* Evening/night encouragement */}
+      {isToday && (getTimeOfDay() === 'evening' || getTimeOfDay() === 'night') && activeTodos.length > 0 && activeTodos.length <= 3 && (
         <View style={styles.encourageBanner}>
           <Text style={styles.encourageText}>
-            Almost there — just {activeTodos.length} left. Quick finish before bed?
+            {getTimeOfDay() === 'night'
+              ? `${activeTodos.length} left. Finish or let it go — sleep matters.`
+              : `Almost there — just ${activeTodos.length} left. Quick finish?`}
           </Text>
         </View>
       )}
@@ -1744,7 +1963,11 @@ function TodayScreenContent() {
         <View style={styles.allDoneBanner}>
           <Text style={styles.allDoneCheck}>✓</Text>
           <View style={styles.allDoneContent}>
-            <Text style={styles.allDoneText}>Everything done! You're a machine 🔥</Text>
+            <Text style={styles.allDoneText}>
+              {getTimeOfDay() === 'night' ? 'All clear. Rest well.' :
+               getTimeOfDay() === 'evening' ? 'Done for the day. Nice work.' :
+               "Everything done! You're a machine 🔥"}
+            </Text>
             {streak > 0 && (
               <Text style={styles.allDoneStreak}>{streak} day streak</Text>
             )}
@@ -1826,7 +2049,11 @@ function TodayScreenContent() {
                 ))}
               </View>
             )}
+            {isToday && <TaskInsight todos={allTodos} />}
             {isToday && total > 0 && <DailyQuote />}
+            {isToday && total > 0 && completed > 0 && (
+              <ShareDayCard completed={completed} total={total} streak={streak} />
+            )}
           </View>
         }
       />
@@ -2055,6 +2282,13 @@ const styles = StyleSheet.create({
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 13,
+    marginBottom: 2,
+  },
+  greetingSubText: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 12,
+    opacity: 0.7,
     marginBottom: 2,
   },
   dateRow: {

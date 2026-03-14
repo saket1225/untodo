@@ -91,7 +91,7 @@ const celebStyles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0A0A0A',
+    backgroundColor: Colors.dark.background,
     zIndex: 10,
   },
   ring: {
@@ -279,7 +279,7 @@ export default function FocusMode({ todo, visible, onClose, onComplete }: Props)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: Colors.dark.background,
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 60,
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: Colors.dark.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -71,7 +71,7 @@ export default function TabLayout() {
         tabBarShowLabel: false,
         animation: 'fade',
         lazy: false,
-        sceneStyle: { backgroundColor: '#0A0A0A' },
+        sceneStyle: { backgroundColor: Colors.dark.background },
       }}
     >
       <Tabs.Screen
@@ -108,7 +108,7 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#0A0A0A',
+    backgroundColor: Colors.dark.background,
     borderTopColor: Colors.dark.border,
     borderTopWidth: StyleSheet.hairlineWidth,
     height: 88,

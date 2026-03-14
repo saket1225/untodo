@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
   // Immersive fullscreen (when timer is active)
   immersiveContainer: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: Colors.dark.background,
     justifyContent: 'center',
     alignItems: 'center',
   },

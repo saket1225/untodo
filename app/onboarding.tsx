@@ -147,7 +147,7 @@ export default function OnboardingScreen() {
                 styles.decorDot,
                 i < 5 && { backgroundColor: Colors.dark.textTertiary },
                 i >= 5 && i < 10 && { backgroundColor: Colors.dark.border },
-                i >= 10 && { backgroundColor: '#1C1C1C' },
+                i >= 10 && { backgroundColor: Colors.dark.surface },
               ]}
             />
           ))}

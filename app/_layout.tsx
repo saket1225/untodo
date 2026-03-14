@@ -4,6 +4,7 @@ import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Colors } from '../lib/theme';
 import * as SplashScreen from 'expo-splash-screen';
 import { useUserStore } from '../engines/user/store';
 import { setupDefaultNotifications } from '../engines/notifications/service';
@@ -50,10 +51,10 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#0A0A0A' }} onLayout={onLayoutRootView}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: Colors.dark.background }} onLayout={onLayoutRootView}>
       <ErrorBoundary>
         <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0A0A0A' } }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.dark.background } }}>
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="(tabs)" />
         </Stack>
@@ -66,7 +67,7 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   loading: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: Colors.dark.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
