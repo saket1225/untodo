@@ -317,6 +317,21 @@ function SettingsScreenContent() {
               accessibilityRole="switch"
             />
           </View>
+          <View style={styles.cardDivider} />
+          <View style={styles.notifRow}>
+            <View style={styles.notifInfo}>
+              <Text style={styles.notifLabel}>Weekly summary</Text>
+              <Text style={styles.notifTime}>Sunday · 7:00 PM</Text>
+            </View>
+            <Switch
+              value={notifPrefs.weeklySummary}
+              onValueChange={v => handleNotifToggle('weeklySummary', v)}
+              trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
+              thumbColor={notifPrefs.weeklySummary ? Colors.dark.accent : Colors.dark.textTertiary}
+              accessibilityLabel="Weekly summary notification"
+              accessibilityRole="switch"
+            />
+          </View>
         </SectionCard>
 
         {/* Silicon Connection - New Flow */}

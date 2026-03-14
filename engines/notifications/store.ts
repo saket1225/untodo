@@ -7,6 +7,7 @@ interface NotificationPreferences {
   afternoonCheck: boolean;
   eveningReminder: boolean;
   progressNotification: boolean;
+  weeklySummary: boolean;
 }
 
 interface NotificationStore {
@@ -24,6 +25,7 @@ export const useNotificationStore = create<NotificationStore>()(
         afternoonCheck: true,
         eveningReminder: true,
         progressNotification: false,
+        weeklySummary: true,
       },
       initialized: false,
       updatePreference: (key, value) =>
@@ -47,6 +49,7 @@ export const useNotificationStore = create<NotificationStore>()(
               afternoonCheck: prefs.afternoonCheck ?? true,
               eveningReminder: prefs.eveningReminder ?? true,
               progressNotification: prefs.progressNotification ?? false,
+              weeklySummary: prefs.weeklySummary ?? true,
             },
             initialized: state.initialized ?? false,
           };

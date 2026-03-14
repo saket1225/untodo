@@ -94,6 +94,35 @@ function getTaskStats() {
   }
 }
 
+function getWeeklyStats() {
+  try {
+    const todos = useTodoStore.getState().todos;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    let weekTotal = 0, weekCompleted = 0, focusMins = 0;
+    for (const t of todos) {
+      if (!t.logicalDate) continue;
+      const d = new Date(t.logicalDate + 'T00:00:00');
+      if (d >= weekAgo && d <= now) {
+        weekTotal++;
+        if (t.completed) weekCompleted++;
+        focusMins += (t as any).pomodoroMinutesLogged || 0;
+        if ((t as any).timeTracking?.totalSeconds) {
+          focusMins += Math.floor((t as any).timeTracking.totalSeconds / 60);
+        }
+      }
+    }
+    const weekPct = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
+    const { streak } = getTaskStats();
+    return { weekTotal, weekCompleted, weekPct, streak, focusMins };
+  } catch {
+    return { weekTotal: 0, weekCompleted: 0, weekPct: 0, streak: 0, focusMins: 0 };
+  }
+}
+
 export async function setupDefaultNotifications(): Promise<void> {
   const granted = await requestPermissions();
   if (!granted) return;
@@ -170,6 +199,34 @@ export async function setupDefaultNotifications(): Promise<void> {
       body = 'Finish what you can, carry over the rest.';
     }
     await scheduleDailyReminder(21, 0, title, body, 'evening-reminder');
+  }
+
+  // Weekly summary notification (Sunday 7pm)
+  if (store.preferences.weeklySummary) {
+    const { weekTotal, weekCompleted, weekPct, streak, focusMins } = getWeeklyStats();
+    const focusStr = focusMins > 0 ? `, ${focusMins > 60 ? Math.round(focusMins / 60) + 'h' : focusMins + 'm'} focus time` : '';
+    const streakStr = streak > 0 ? `, ${streak} day streak` : '';
+    const body = weekTotal > 0
+      ? `This week: ${weekCompleted}/${weekTotal} tasks done (${weekPct}%)${streakStr}${focusStr}`
+      : 'Start the new week strong. Set your goals!';
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'weekly-summary',
+        content: {
+          title: 'Weekly Review',
+          body,
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          weekday: 1, // Sunday
+          hour: 19,
+          minute: 0,
+        },
+      });
+    } catch (e) {
+      console.warn('[Notifications] Failed to schedule weekly summary:', e);
+    }
   }
 
   // Persistent progress notification

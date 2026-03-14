@@ -1,5 +1,5 @@
-import { useMemo, useState, useCallback, useRef, memo } from 'react';
-import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity, Share, Dimensions } from 'react-native';
+import { useMemo, useState, useCallback, useRef, memo, useEffect } from 'react';
+import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity, Share, Dimensions, Animated as RNAnimated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import ViewShot from 'react-native-view-shot';
@@ -75,8 +75,19 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
   if (graphData.weeks.length === 0) return null;
 
   const numWeeks = graphData.weeks.length;
-  const cellSize = Math.min(Math.floor((SCREEN_WIDTH - Spacing.lg * 2 - 20 - numWeeks * 2) / numWeeks), 14);
+  const cellSize = 14;
   const gap = 2;
+  const gridWidth = numWeeks * (cellSize + gap);
+  const availableWidth = SCREEN_WIDTH - Spacing.lg * 2 - 20;
+  const needsScroll = gridWidth > availableWidth;
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Auto-scroll to the end (most recent) on mount
+  useEffect(() => {
+    if (needsScroll && scrollRef.current) {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 50);
+    }
+  }, [needsScroll]);
 
   return (
     <View style={styles.section}>
@@ -87,49 +98,58 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
         </Text>
       </View>
 
-      {/* Month labels */}
-      <View style={[styles.monthLabelsRow, { marginLeft: 20 }]}>
-        {graphData.weeks.map((_, wi) => {
-          const label = graphData.monthLabels.find(m => m.weekIndex === wi);
-          return (
-            <Text
-              key={wi}
-              style={[styles.monthLabel, { width: cellSize + gap }]}
-              numberOfLines={1}
-            >
-              {label ? label.label : ''}
-            </Text>
-          );
-        })}
-      </View>
+      <ScrollView
+        ref={scrollRef}
+        horizontal={needsScroll}
+        showsHorizontalScrollIndicator={false}
+        scrollEnabled={needsScroll}
+      >
+        <View>
+          {/* Month labels */}
+          <View style={[styles.monthLabelsRow, { marginLeft: 20 }]}>
+            {graphData.weeks.map((_, wi) => {
+              const label = graphData.monthLabels.find(m => m.weekIndex === wi);
+              return (
+                <Text
+                  key={wi}
+                  style={[styles.monthLabel, { width: cellSize + gap }]}
+                  numberOfLines={1}
+                >
+                  {label ? label.label : ''}
+                </Text>
+              );
+            })}
+          </View>
 
-      <View style={styles.heatmapContainer}>
-        {/* Day labels */}
-        <View style={[styles.heatmapDayLabels, { gap }]}>
-          {['M', '', 'W', '', 'F', '', ''].map((d, i) => (
-            <Text key={i} style={[styles.heatmapDayLabel, { height: cellSize, lineHeight: cellSize }]}>{d}</Text>
-          ))}
-        </View>
-
-        {/* Grid */}
-        <View style={[styles.heatmapGrid, { gap }]}>
-          {graphData.weeks.map((week, wi) => (
-            <View key={wi} style={[styles.heatmapWeek, { gap }]}>
-              {week.map((day, di) => (
-                <View
-                  key={di}
-                  style={{
-                    width: cellSize,
-                    height: cellSize,
-                    backgroundColor: getColor(day.rate, day.count, day.date),
-                    borderRadius: 2,
-                  }}
-                />
+          <View style={styles.heatmapContainer}>
+            {/* Day labels */}
+            <View style={[styles.heatmapDayLabels, { gap }]}>
+              {['M', '', 'W', '', 'F', '', ''].map((d, i) => (
+                <Text key={i} style={[styles.heatmapDayLabel, { height: cellSize, lineHeight: cellSize }]}>{d}</Text>
               ))}
             </View>
-          ))}
+
+            {/* Grid */}
+            <View style={[styles.heatmapGrid, { gap }]}>
+              {graphData.weeks.map((week, wi) => (
+                <View key={wi} style={[styles.heatmapWeek, { gap }]}>
+                  {week.map((day, di) => (
+                    <View
+                      key={di}
+                      style={{
+                        width: cellSize,
+                        height: cellSize,
+                        backgroundColor: getColor(day.rate, day.count, day.date),
+                        borderRadius: 2,
+                      }}
+                    />
+                  ))}
+                </View>
+              ))}
+            </View>
+          </View>
         </View>
-      </View>
+      </ScrollView>
 
       <View style={styles.heatmapLegend}>
         <Text style={styles.heatmapLegendText}>Less</Text>
@@ -543,16 +563,22 @@ const DayRow = memo(function DayRow({ day }: { day: DaySummary }) {
 
 function ProgressEmptyHero() {
   const todos = useTodoStore(s => s.todos);
+  const fadeAnim = useRef(new RNAnimated.Value(0)).current;
+
+  useEffect(() => {
+    RNAnimated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+  }, []);
+
   if (todos.length > 0) return null;
 
   return (
-    <View style={styles.emptyHero}>
+    <RNAnimated.View style={[styles.emptyHero, { opacity: fadeAnim }]}>
       <Text style={styles.emptyHeroIcon}>◧</Text>
       <Text style={styles.emptyHeroTitle}>Your progress story starts here</Text>
       <Text style={styles.emptyHeroSubtext}>
         Complete tasks on the Today tab and watch your progress unfold. Every task counts.
       </Text>
-    </View>
+    </RNAnimated.View>
   );
 }
 
