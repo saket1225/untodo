@@ -21,6 +21,10 @@ import PomodoroTimer from '../../engines/todo/components/PomodoroTimer';
 import QuickActions from '../../engines/todo/components/QuickActions';
 import TaskDetail from '../../engines/todo/components/TaskDetail';
 import FocusMode from '../../engines/todo/components/FocusMode';
+import MorningBrief from '../../engines/todo/components/MorningBrief';
+import MilestoneCelebration from '../../engines/milestones/MilestoneCelebration';
+import { useMilestoneStore } from '../../engines/milestones/store';
+import { usePomodoroState } from '../../engines/todo/pomodoroState';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import UndoToast, { showUndoToast } from '../../components/UndoToast';
 import { Todo, Category, CATEGORIES, Priority, Recurrence } from '../../engines/todo/types';
@@ -1228,6 +1232,67 @@ function formatDayHeader(dateStr: string): string {
   return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
 }
 
+// --- Pomodoro Header Indicator ---
+function PomodoroHeaderIndicator() {
+  const { isActive, taskTitle, phase, secondsLeft, isFlowtime } = usePomodoroState();
+
+  if (!isActive) return null;
+
+  const mins = Math.floor(secondsLeft / 60);
+  const secs = secondsLeft % 60;
+  const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  const phaseLabel = phase === 'work' ? (isFlowtime ? 'Flow' : 'Focus') : 'Break';
+  const phaseColor = phase === 'work' ? Colors.dark.text : Colors.dark.timer;
+
+  return (
+    <View style={pomHeaderStyles.container}>
+      <View style={pomHeaderStyles.dot} />
+      <Text style={[pomHeaderStyles.phase, { color: phaseColor }]}>{phaseLabel}</Text>
+      <Text style={pomHeaderStyles.time}>{timeStr}</Text>
+      <Text style={pomHeaderStyles.task} numberOfLines={1}>{taskTitle}</Text>
+    </View>
+  );
+}
+
+const pomHeaderStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: Spacing.lg,
+    marginHorizontal: Spacing.lg,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    marginTop: Spacing.xs,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.dark.success,
+  },
+  phase: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  time: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.heading,
+    fontSize: 16,
+  },
+  task: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    flex: 1,
+  },
+});
+
 function TodayScreenContent() {
   const logicalDate = getLogicalDate();
   const allTodos = useTodoStore(s => s.todos);
@@ -1239,6 +1304,9 @@ function TodayScreenContent() {
   const reorderTodos = useTodoStore(s => s.reorderTodos);
   const carryOverTodos = useTodoStore(s => s.carryOverTodos);
   const autoCarryOldTodos = useTodoStore(s => s.autoCarryOldTodos);
+
+  // Milestone check
+  const checkMilestones = useMilestoneStore(s => s.checkMilestones);
 
   // Streak
   const { streak, atRisk } = useTaskStreak(allTodos);
@@ -1488,6 +1556,11 @@ function TodayScreenContent() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   }, [completed, total, isToday]);
+
+  // Check task milestones when tasks are completed
+  useEffect(() => {
+    if (completed > 0) checkMilestones();
+  }, [completed]);
 
   // Reset celebration tracking when date changes
   useEffect(() => {
@@ -1911,6 +1984,9 @@ function TodayScreenContent() {
         <StreakBanner streak={streak} atRisk={atRisk} />
       )}
 
+      {/* Pomodoro header indicator */}
+      <PomodoroHeaderIndicator />
+
       {/* Evening/night encouragement */}
       {isToday && (getTimeOfDay() === 'evening' || getTimeOfDay() === 'night') && activeTodos.length > 0 && activeTodos.length <= 3 && (
         <View style={styles.encourageBanner}>
@@ -2240,6 +2316,12 @@ function TodayScreenContent() {
         visible={showMilestone}
         onDismiss={() => setShowMilestone(false)}
       />
+
+      {/* Morning brief overlay */}
+      <MorningBrief onDismiss={() => {}} />
+
+      {/* Task milestone celebration */}
+      <MilestoneCelebration />
 
       {/* Gesture tutorial */}
       {showGestureTutorial && (

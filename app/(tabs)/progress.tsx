@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import WeeklyReviewComponent from '../../engines/progress/components/WeeklyReview';
 import { useAchievementStore, Achievement } from '../../engines/achievements/store';
+import { useMilestoneStore, TASK_MILESTONES } from '../../engines/milestones/store';
 import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -865,6 +866,63 @@ function DailyInsightBanner({ todos }: { todos: any[] }) {
   );
 }
 
+// --- Task Milestones Progress ---
+function MilestonesProgress() {
+  const todos = useTodoStore(s => s.todos);
+  const celebrated = useMilestoneStore(s => s.celebratedMilestones);
+  const totalCompleted = useMemo(() => todos.filter(t => t.completed).length, [todos]);
+
+  // Find current milestone (next one to hit)
+  const nextMilestone = TASK_MILESTONES.find(m => totalCompleted < m.threshold);
+  const prevMilestone = [...TASK_MILESTONES].reverse().find(m => totalCompleted >= m.threshold);
+
+  if (totalCompleted < 1) return null;
+
+  const prevThreshold = prevMilestone ? prevMilestone.threshold : 0;
+  const nextThreshold = nextMilestone ? nextMilestone.threshold : totalCompleted;
+  const progressInRange = nextMilestone
+    ? (totalCompleted - prevThreshold) / (nextThreshold - prevThreshold)
+    : 1;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Milestones</Text>
+      <View style={styles.milestoneContainer}>
+        {nextMilestone ? (
+          <>
+            <View style={styles.milestoneProgressRow}>
+              <Text style={styles.milestoneCount}>{totalCompleted}</Text>
+              <Text style={styles.milestoneSeparator}>/</Text>
+              <Text style={styles.milestoneTarget}>{nextMilestone.threshold}</Text>
+            </View>
+            <Text style={styles.milestoneLabel}>tasks to next milestone</Text>
+            <View style={styles.milestoneBarTrack}>
+              <View style={[styles.milestoneBarFill, { width: `${Math.min(progressInRange * 100, 100)}%` }]} />
+            </View>
+            <Text style={styles.milestoneNextTitle}>{nextMilestone.emoji} {nextMilestone.title}</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.milestoneCount}>{totalCompleted}</Text>
+            <Text style={styles.milestoneLabel}>tasks completed — all milestones unlocked!</Text>
+          </>
+        )}
+      </View>
+      <View style={styles.milestoneBadges}>
+        {TASK_MILESTONES.map(m => {
+          const unlocked = totalCompleted >= m.threshold;
+          return (
+            <View key={m.threshold} style={[styles.milestoneBadge, !unlocked && styles.milestoneBadgeLocked]}>
+              <Text style={[styles.milestoneBadgeIcon, !unlocked && { opacity: 0.2 }]}>{m.emoji}</Text>
+              <Text style={[styles.milestoneBadgeNum, !unlocked && { color: Colors.dark.textTertiary }]}>{m.threshold}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function ProgressScreenContent() {
   const [refreshing, setRefreshing] = useState(false);
   const todos = useTodoStore(s => s.todos);
@@ -905,16 +963,12 @@ function ProgressScreenContent() {
           <>
             <TodaySummaryCard />
             <DailyInsightBanner todos={todos} />
+            <MilestonesProgress />
             <ContributionGraph heatmap={analytics.heatmap} />
+            <WeeklyOverview />
+            <WeeklyReviewComponent />
             <AchievementsGrid />
             <DeepStatistics analytics={analytics} todos={todos} />
-            <WeeklyReviewComponent />
-            <AnalyticsSummary analytics={analytics} />
-            <CategoryBreakdown data={analytics.categoryBreakdown} />
-            <TaskCompletionStreak />
-            <WeeklyOverview />
-            <Streaks />
-            <DailyHistory />
             <ShareSection analytics={analytics} />
           </>
         )}
@@ -1654,5 +1708,90 @@ const styles = StyleSheet.create({
     fontSize: 9,
     textAlign: 'center',
     marginTop: 2,
+  },
+  // Milestones
+  milestoneContainer: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  milestoneProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 2,
+  },
+  milestoneCount: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.heading,
+    fontSize: 40,
+  },
+  milestoneSeparator: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 24,
+    marginHorizontal: 2,
+  },
+  milestoneTarget: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.heading,
+    fontSize: 24,
+  },
+  milestoneLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    marginTop: 2,
+    marginBottom: Spacing.md,
+  },
+  milestoneBarTrack: {
+    width: '100%',
+    height: 6,
+    backgroundColor: Colors.dark.border,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: Spacing.sm,
+  },
+  milestoneBarFill: {
+    height: '100%',
+    backgroundColor: Colors.dark.success,
+    borderRadius: 3,
+  },
+  milestoneNextTitle: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 13,
+  },
+  milestoneBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    justifyContent: 'center',
+  },
+  milestoneBadge: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  milestoneBadgeLocked: {
+    opacity: 0.5,
+  },
+  milestoneBadgeIcon: {
+    fontSize: 18,
+    color: Colors.dark.text,
+    marginBottom: 2,
+  },
+  milestoneBadgeNum: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 11,
   },
 });

@@ -4,6 +4,7 @@ import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Todo } from '../types';
 import { sendPomodoroEndNotification } from '../../notifications/service';
 import { useTodoStore } from '../store';
+import { usePomodoroState } from '../pomodoroState';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -83,6 +84,9 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
   const [showLog, setShowLog] = useState(false);
   const [sessionLog, setSessionLog] = useState('');
   const logPomodoroMinutes = useTodoStore(s => s.logPomodoroMinutes);
+  const pomSetActive = usePomodoroState(s => s.setActive);
+  const pomUpdateTimer = usePomodoroState(s => s.updateTimer);
+  const pomClear = usePomodoroState(s => s.clear);
   const sessionStartRef = useRef<number>(Date.now());
 
   // Is the timer in active/immersive mode (running or paused mid-session)
@@ -223,6 +227,21 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
   const displayTime = preset.isFlowtime && phase === 'work' ? flowElapsed : seconds;
   const mins = Math.floor(displayTime / 60);
   const secs = displayTime % 60;
+
+  // Sync timer state to global store for header indicator
+  useEffect(() => {
+    if (isRunning || isActive) {
+      pomSetActive(true, todo.title, todo.id);
+      pomUpdateTimer(displayTime, phase, preset.isFlowtime);
+    } else if (!visible) {
+      pomClear();
+    }
+  }, [isRunning, isActive, displayTime, phase, visible]);
+
+  // Clear global state on unmount
+  useEffect(() => {
+    return () => { pomClear(); };
+  }, []);
 
   const phaseLabel = phase === 'work'
     ? (preset.isFlowtime ? 'Flow' : 'Focus')
