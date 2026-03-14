@@ -48,20 +48,24 @@ export const useWallpaperStore = create<WallpaperStore>()(
       storage: createJSONStorage(() => AsyncStorage),
       version: 3,
       migrate: (persisted: any, version: number) => {
-        const state = persisted as { config?: any };
-        const config = state.config || {};
-        return {
-          ...state,
-          config: {
-            ...DEFAULT_CONFIG,
-            ...config,
-            colorTheme: config.colorTheme ?? 'classic',
-            customQuote: config.customQuote ?? '',
-            preset: config.preset ?? 'full',
-            wallpaperStyle: config.wallpaperStyle ?? 'minimal',
-            startDate: config.startDate ?? '2026-03-10',
-          },
-        };
+        try {
+          const state = (persisted || {}) as { config?: any };
+          const config = (state.config && typeof state.config === 'object') ? state.config : {};
+          return {
+            ...state,
+            config: {
+              ...DEFAULT_CONFIG,
+              ...config,
+              colorTheme: config.colorTheme ?? 'classic',
+              customQuote: typeof config.customQuote === 'string' ? config.customQuote : '',
+              preset: config.preset ?? 'full',
+              wallpaperStyle: config.wallpaperStyle ?? 'minimal',
+              startDate: config.startDate ?? '2026-03-10',
+            },
+          };
+        } catch {
+          return { config: { ...DEFAULT_CONFIG } };
+        }
       },
     }
   )

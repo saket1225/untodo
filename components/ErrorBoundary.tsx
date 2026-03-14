@@ -19,6 +19,10 @@ export default class ErrorBoundary extends React.Component<Props, State> {
     return { hasError: true, error };
   }
 
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.warn('[ErrorBoundary] Caught error:', error.message, errorInfo.componentStack?.slice(0, 500));
+  }
+
   handleRetry = () => {
     this.setState({ hasError: false, error: null });
   };

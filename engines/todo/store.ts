@@ -10,8 +10,13 @@ import {
   fetchAllTodosFromFirestore,
   mergeTodos,
   bulkSyncTodosToFirestore,
+  flushOfflineQueue,
 } from '../../lib/firebase-sync';
 import { refreshNotifications } from '../notifications/service';
+
+// ---- Safety limits ----
+const MAX_TODOS = 5000; // Hard cap to prevent memory issues
+const MAX_TODOS_PER_DAY = 500; // Sanity check per day
 
 interface TodoStore {
   todos: Todo[];
@@ -42,16 +47,34 @@ function sortTodos(todos: Todo[]): Todo[] {
     const pa = a.priority ? { high: 0, medium: 1, low: 2 }[a.priority] : 3;
     const pb = b.priority ? { high: 0, medium: 1, low: 2 }[b.priority] : 3;
     if (pa !== pb) return pa - pb;
-    return a.order - b.order;
+    return (a.order || 0) - (b.order || 0);
   });
 }
 
 function getUsername(): string | null {
-  return useUserStore.getState().username;
+  try {
+    return useUserStore.getState().username;
+  } catch {
+    return null;
+  }
 }
 
 function nowISO(): string {
   return new Date().toISOString();
+}
+
+// Validate a date string is in YYYY-MM-DD format
+function isValidDate(dateStr: string): boolean {
+  return typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+}
+
+// Safe getLogicalDate that never throws
+function safeLogicalDate(): string {
+  try {
+    return getLogicalDate();
+  } catch {
+    return new Date().toISOString().split('T')[0];
+  }
 }
 
 // Debounced sync: batch sync calls within 500ms
@@ -81,7 +104,7 @@ function debouncedNotifRefresh() {
   if (_notifRefreshTimeout) clearTimeout(_notifRefreshTimeout);
   _notifRefreshTimeout = setTimeout(() => {
     _notifRefreshTimeout = null;
-    refreshNotifications().catch(() => {});
+    try { refreshNotifications().catch(() => {}); } catch {}
   }, 2000);
 }
 
@@ -101,18 +124,67 @@ function makeId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+// Sanitize a todo to ensure all required fields exist
+function ensureTodoShape(t: any): Todo {
+  return {
+    id: typeof t.id === 'string' ? t.id : makeId(),
+    title: typeof t.title === 'string' ? t.title : '',
+    completed: typeof t.completed === 'boolean' ? t.completed : false,
+    createdAt: typeof t.createdAt === 'string' ? t.createdAt : nowISO(),
+    updatedAt: typeof t.updatedAt === 'string' ? t.updatedAt : (t.createdAt || nowISO()),
+    logicalDate: isValidDate(t.logicalDate) ? t.logicalDate : safeLogicalDate(),
+    order: typeof t.order === 'number' && isFinite(t.order) ? t.order : 0,
+    type: t.type === 'audio' ? 'audio' : 'task',
+    priority: ['high', 'medium', 'low', null].includes(t.priority) ? t.priority : null,
+    category: ['work', 'personal', 'health', 'learning', 'finance', 'creative', null].includes(t.category) ? t.category : null,
+    pomodoroMinutesLogged: typeof t.pomodoroMinutesLogged === 'number' ? t.pomodoroMinutesLogged : 0,
+    subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
+    notes: typeof t.notes === 'string' ? t.notes : '',
+    syncStatus: (t.syncStatus || 'pending') as SyncStatus,
+    ...(t.carriedOverFrom ? { carriedOverFrom: t.carriedOverFrom } : {}),
+    ...(t.recurrence ? { recurrence: t.recurrence } : {}),
+    ...(t.recurringParentId ? { recurringParentId: t.recurringParentId } : {}),
+    ...(t.timeTracking ? { timeTracking: t.timeTracking } : {}),
+    ...(t.audioUri ? { audioUri: t.audioUri } : {}),
+    ...(t.audioDuration ? { audioDuration: t.audioDuration } : {}),
+    ...(t.estimatedMinutes != null ? { estimatedMinutes: t.estimatedMinutes } : {}),
+    ...(t.pomodoroWork != null ? { pomodoroWork: t.pomodoroWork } : {}),
+    ...(t.pomodoroBreak != null ? { pomodoroBreak: t.pomodoroBreak } : {}),
+    ...(t.pomodoroPreset ? { pomodoroPreset: t.pomodoroPreset } : {}),
+  };
+}
+
 export const useTodoStore = create<TodoStore>()(
   persist(
     (set, get) => ({
       todos: [],
 
       addTodo: (title: string, priority?: Priority, category?: Category, date?: string, recurrence?: Recurrence) => {
-        const logicalDate = date || getLogicalDate();
-        const todayTodos = get().todos.filter(t => t.logicalDate === logicalDate);
+        const trimmedTitle = (title || '').trim();
+        if (!trimmedTitle) return;
+        // Safety: cap title length
+        const safeTitle = trimmedTitle.slice(0, 500);
+
+        const logicalDate = (date && isValidDate(date)) ? date : safeLogicalDate();
+        const currentTodos = get().todos;
+
+        // Safety: prevent exceeding total limit
+        if (currentTodos.length >= MAX_TODOS) {
+          console.warn('[store] Todo limit reached, cannot add more');
+          return;
+        }
+
+        // Safety: prevent too many tasks per day
+        const todayTodos = currentTodos.filter(t => t.logicalDate === logicalDate);
+        if (todayTodos.length >= MAX_TODOS_PER_DAY) {
+          console.warn('[store] Daily todo limit reached');
+          return;
+        }
+
         const now = nowISO();
         const newTodo: Todo = {
           id: makeId(),
-          title,
+          title: safeTitle,
           completed: false,
           createdAt: now,
           updatedAt: now,
@@ -133,6 +205,7 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       toggleTodo: (id: string) => {
+        if (!id) return;
         const now = nowISO();
         set(state => ({
           todos: state.todos.map(t =>
@@ -145,6 +218,7 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       deleteTodo: (id: string) => {
+        if (!id) return;
         set(state => ({
           todos: state.todos.filter(t => t.id !== id),
         }));
@@ -153,11 +227,14 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       restoreTodo: (todo: Todo) => {
-        set(state => ({ todos: [...state.todos, todo] }));
-        debouncedSyncTodo(todo);
+        if (!todo?.id) return;
+        const safeTodo = ensureTodoShape(todo);
+        set(state => ({ todos: [...state.todos, safeTodo] }));
+        debouncedSyncTodo(safeTodo);
       },
 
       updateTodo: (id: string, updates: Partial<Todo>) => {
+        if (!id) return;
         const now = nowISO();
         set(state => ({
           todos: state.todos.map(t =>
@@ -169,6 +246,7 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       reorderTodos: (ids: string[]) => {
+        if (!Array.isArray(ids) || ids.length === 0) return;
         const now = nowISO();
         set(state => ({
           todos: state.todos.map(t => {
@@ -184,20 +262,21 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       getTodayTodos: () => {
-        const logicalDate = getLogicalDate();
+        const logicalDate = safeLogicalDate();
         return sortTodos(
           get().todos.filter(t => t.logicalDate === logicalDate)
         );
       },
 
       getTodosForDate: (date: string) => {
+        if (!isValidDate(date)) return [];
         return sortTodos(
           get().todos.filter(t => t.logicalDate === date)
         );
       },
 
       carryOverTodos: () => {
-        const logicalDate = getLogicalDate();
+        const logicalDate = safeLogicalDate();
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().split('T')[0];
@@ -207,6 +286,7 @@ export const useTodoStore = create<TodoStore>()(
           const incomplete = state.todos.filter(
             t => t.logicalDate === yesterdayStr && !t.completed
           );
+          if (incomplete.length === 0) return state;
           const carried = incomplete.map((t, i) => ({
             ...t,
             id: makeId(),
@@ -226,7 +306,9 @@ export const useTodoStore = create<TodoStore>()(
             const carried = get().todos.filter(
               t => t.logicalDate === logicalDate && t.carriedOverFrom
             );
-            bulkSyncTodosToFirestore(username, carried).catch(() => {});
+            if (carried.length > 0) {
+              bulkSyncTodosToFirestore(username, carried).catch(() => {});
+            }
           }
         } catch {
           // Fail silently — carry-over data stays local
@@ -234,7 +316,7 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       autoCarryOldTodos: () => {
-        const logicalDate = getLogicalDate();
+        const logicalDate = safeLogicalDate();
         const now = nowISO();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -250,12 +332,15 @@ export const useTodoStore = create<TodoStore>()(
         const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0];
 
         const oldIncomplete = get().todos.filter(
-          t => t.logicalDate <= twoDaysAgoStr && !t.completed && !alreadyCarriedIds.has(t.title)
+          t => t.logicalDate && t.logicalDate <= twoDaysAgoStr && !t.completed && !alreadyCarriedIds.has(t.title)
         );
 
         if (oldIncomplete.length === 0) return 0;
 
-        const carried = oldIncomplete.map((t, i) => ({
+        // Safety: don't carry over more than 50 at once
+        const toCarry = oldIncomplete.slice(0, 50);
+
+        const carried = toCarry.map((t, i) => ({
           ...t,
           id: makeId(),
           logicalDate,
@@ -281,10 +366,13 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       logPomodoroMinutes: (id: string, minutes: number) => {
+        if (!id || typeof minutes !== 'number' || minutes <= 0 || !isFinite(minutes)) return;
         const now = nowISO();
+        // Cap at 600 minutes (10 hours) per single log to prevent corrupt data
+        const safeMinutes = Math.min(minutes, 600);
         set(state => ({
           todos: state.todos.map(t =>
-            t.id === id ? { ...t, pomodoroMinutesLogged: (t.pomodoroMinutesLogged || 0) + minutes, updatedAt: now, syncStatus: 'pending' as SyncStatus } : t
+            t.id === id ? { ...t, pomodoroMinutesLogged: (t.pomodoroMinutesLogged || 0) + safeMinutes, updatedAt: now, syncStatus: 'pending' as SyncStatus } : t
           ),
         }));
         const todo = get().todos.find(t => t.id === id);
@@ -292,24 +380,28 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       addSubtask: (todoId: string, title: string) => {
+        if (!todoId || !title?.trim()) return;
         const now = nowISO();
         const subtask: Subtask = {
           id: makeId(),
-          title,
+          title: title.trim().slice(0, 500),
           completed: false,
         };
         set(state => ({
-          todos: state.todos.map(t =>
-            t.id === todoId
-              ? { ...t, subtasks: [...(t.subtasks || []), subtask], updatedAt: now, syncStatus: 'pending' as SyncStatus }
-              : t
-          ),
+          todos: state.todos.map(t => {
+            if (t.id !== todoId) return t;
+            // Safety: cap subtasks at 100
+            const existing = Array.isArray(t.subtasks) ? t.subtasks : [];
+            if (existing.length >= 100) return t;
+            return { ...t, subtasks: [...existing, subtask], updatedAt: now, syncStatus: 'pending' as SyncStatus };
+          }),
         }));
         const todo = get().todos.find(t => t.id === todoId);
         if (todo) debouncedSyncTodo(todo);
       },
 
       toggleSubtask: (todoId: string, subtaskId: string) => {
+        if (!todoId || !subtaskId) return;
         const now = nowISO();
         set(state => ({
           todos: state.todos.map(t =>
@@ -330,6 +422,7 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       deleteSubtask: (todoId: string, subtaskId: string) => {
+        if (!todoId || !subtaskId) return;
         const now = nowISO();
         set(state => ({
           todos: state.todos.map(t =>
@@ -348,6 +441,7 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       startTimeTracking: (id: string) => {
+        if (!id) return;
         const now = nowISO();
         set(state => ({
           todos: state.todos.map(t =>
@@ -367,17 +461,28 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       stopTimeTracking: (id: string) => {
+        if (!id) return;
         const now = nowISO();
         set(state => ({
           todos: state.todos.map(t => {
             if (t.id !== id || !t.timeTracking?.startedAt) return t;
-            const elapsed = Math.floor(
-              (Date.now() - new Date(t.timeTracking.startedAt).getTime()) / 1000
-            );
+            const startTime = new Date(t.timeTracking.startedAt).getTime();
+            // Safety: if startTime is invalid or in the future, don't add elapsed
+            if (isNaN(startTime) || startTime > Date.now()) {
+              return {
+                ...t,
+                timeTracking: { totalSeconds: t.timeTracking.totalSeconds || 0, startedAt: undefined },
+                updatedAt: now,
+                syncStatus: 'pending' as SyncStatus,
+              };
+            }
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            // Cap at 24 hours to prevent corrupt data from bad timestamps
+            const safeElapsed = Math.min(elapsed, 86400);
             return {
               ...t,
               timeTracking: {
-                totalSeconds: (t.timeTracking.totalSeconds || 0) + elapsed,
+                totalSeconds: (t.timeTracking.totalSeconds || 0) + safeElapsed,
                 startedAt: undefined,
               },
               updatedAt: now,
@@ -390,71 +495,68 @@ export const useTodoStore = create<TodoStore>()(
       },
 
       spawnRecurringTasks: () => {
-        const logicalDate = getLogicalDate();
-        const state = get();
-        // Find all tasks with recurrence set (these are templates)
-        const recurringTemplates = state.todos.filter(t => t.recurrence);
-        const todayTodos = state.todos.filter(t => t.logicalDate === logicalDate);
-        const now = nowISO();
-        const dayOfWeek = new Date().getDay(); // 0=Sun, 1=Mon, ...6=Sat
+        try {
+          const logicalDate = safeLogicalDate();
+          const state = get();
+          const recurringTemplates = state.todos.filter(t => t.recurrence);
+          const todayTodos = state.todos.filter(t => t.logicalDate === logicalDate);
+          const now = nowISO();
+          const dayOfWeek = new Date().getDay();
 
-        const newTodos: Todo[] = [];
-        for (const template of recurringTemplates) {
-          if (!template.recurrence) continue;
-          // Check if already spawned for today
-          const alreadyExists = todayTodos.some(
-            t => t.recurringParentId === template.id
-          );
-          if (alreadyExists) continue;
-          // Also skip if the template itself is for today (don't duplicate)
-          if (template.logicalDate === logicalDate && !template.recurringParentId) continue;
+          const newTodos: Todo[] = [];
+          for (const template of recurringTemplates) {
+            if (!template.recurrence) continue;
+            const alreadyExists = todayTodos.some(
+              t => t.recurringParentId === template.id
+            );
+            if (alreadyExists) continue;
+            if (template.logicalDate === logicalDate && !template.recurringParentId) continue;
 
-          let shouldSpawn = false;
-          if (template.recurrence.type === 'daily') {
-            shouldSpawn = true;
-          } else if (template.recurrence.type === 'weekly') {
-            shouldSpawn = (template.recurrence.days || []).includes(dayOfWeek);
-          } else if (template.recurrence.type === 'custom') {
-            shouldSpawn = (template.recurrence.days || []).includes(dayOfWeek);
-          }
-
-          if (shouldSpawn) {
-            newTodos.push({
-              id: makeId(),
-              title: template.title,
-              completed: false,
-              createdAt: now,
-              updatedAt: now,
-              logicalDate,
-              order: todayTodos.length + newTodos.length,
-              type: 'task',
-              priority: template.priority,
-              category: template.category,
-              pomodoroMinutesLogged: 0,
-              subtasks: [],
-              notes: '',
-              syncStatus: 'pending',
-              recurrence: template.recurrence,
-              recurringParentId: template.id,
-            });
-          }
-        }
-
-        if (newTodos.length > 0) {
-          set(state => ({ todos: [...state.todos, ...newTodos] }));
-          try {
-            const username = getUsername();
-            if (username) {
-              bulkSyncTodosToFirestore(username, newTodos).catch(() => {});
+            let shouldSpawn = false;
+            if (template.recurrence.type === 'daily') {
+              shouldSpawn = true;
+            } else if (template.recurrence.type === 'weekly' || template.recurrence.type === 'custom') {
+              shouldSpawn = Array.isArray(template.recurrence.days) && template.recurrence.days.includes(dayOfWeek);
             }
-          } catch {
-            // Fail silently — recurring tasks stay local
+
+            if (shouldSpawn) {
+              newTodos.push({
+                id: makeId(),
+                title: template.title,
+                completed: false,
+                createdAt: now,
+                updatedAt: now,
+                logicalDate,
+                order: todayTodos.length + newTodos.length,
+                type: 'task',
+                priority: template.priority,
+                category: template.category,
+                pomodoroMinutesLogged: 0,
+                subtasks: [],
+                notes: '',
+                syncStatus: 'pending',
+                recurrence: template.recurrence,
+                recurringParentId: template.id,
+              });
+            }
           }
+
+          if (newTodos.length > 0) {
+            set(state => ({ todos: [...state.todos, ...newTodos] }));
+            try {
+              const username = getUsername();
+              if (username) {
+                bulkSyncTodosToFirestore(username, newTodos).catch(() => {});
+              }
+            } catch {}
+          }
+        } catch (e) {
+          console.warn('[store] spawnRecurringTasks error:', e);
         }
       },
 
       addSampleTasks: () => {
-        const logicalDate = getLogicalDate();
+        const logicalDate = safeLogicalDate();
         const now = nowISO();
         const samples = [
           { title: 'Welcome to untodo — tap to start a pomodoro', order: 0 },
@@ -488,6 +590,9 @@ export const useTodoStore = create<TodoStore>()(
         const username = getUsername();
         if (!username) return;
         try {
+          // Also flush any queued offline writes
+          flushOfflineQueue().catch(() => {});
+
           const remote = await fetchAllTodosFromFirestore(username);
           if (remote.length === 0) {
             const local = get().todos;
@@ -498,9 +603,18 @@ export const useTodoStore = create<TodoStore>()(
           }
           const local = get().todos;
           const merged = mergeTodos(local, remote);
-          set({ todos: merged });
+
+          // Safety: deduplicate by ID (shouldn't happen but just in case)
+          const seen = new Set<string>();
+          const deduped = merged.filter(t => {
+            if (!t.id || seen.has(t.id)) return false;
+            seen.add(t.id);
+            return true;
+          });
+
+          set({ todos: deduped });
           const remoteIds = new Set(remote.map(t => t.id));
-          const localOnly = merged.filter(t => !remoteIds.has(t.id));
+          const localOnly = deduped.filter(t => !remoteIds.has(t.id));
           if (localOnly.length > 0) {
             bulkSyncTodosToFirestore(username, localOnly).catch(() => {});
           }
@@ -512,27 +626,35 @@ export const useTodoStore = create<TodoStore>()(
     {
       name: 'untodo-todos',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      version: 2,
       migrate: (persisted: any, version: number) => {
         try {
-          if (version === 0 || !version) {
-            const state = persisted as { todos?: any[] };
-            const todos = (state.todos || []).map((t: any) => ({
-              ...t,
-              updatedAt: t.updatedAt || t.createdAt || new Date().toISOString(),
-              priority: t.priority !== undefined ? t.priority : null,
-              category: t.category !== undefined ? t.category : null,
-              pomodoroMinutesLogged: t.pomodoroMinutesLogged ?? 0,
-              subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
-              notes: t.notes ?? '',
-              syncStatus: t.syncStatus || 'pending',
-            }));
-            return { ...state, todos };
+          const state = persisted as { todos?: any[] };
+          let todos = Array.isArray(state.todos) ? state.todos : [];
+
+          // v0 -> v1: Add missing fields
+          if (version === 0 || !version || version === 1) {
+            todos = todos.map((t: any) => {
+              if (!t || typeof t !== 'object') return null;
+              return ensureTodoShape(t);
+            }).filter(Boolean);
           }
-          return persisted as TodoStore;
-        } catch {
-          // If migration fails on corrupted data, return a safe default
-          return { todos: [], ...(persisted as object) };
+
+          // Deduplicate by ID
+          const seen = new Set<string>();
+          todos = todos.filter((t: any) => {
+            if (!t?.id || seen.has(t.id)) return false;
+            seen.add(t.id);
+            return true;
+          });
+
+          // Remove todos with empty titles (corrupted data)
+          todos = todos.filter((t: any) => t.title && t.title.trim().length > 0);
+
+          return { ...state, todos };
+        } catch (e) {
+          console.warn('[store] Migration failed, starting with safe defaults:', e);
+          return { todos: [] };
         }
       },
     }

@@ -232,6 +232,23 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
           </TouchableOpacity>
         )}
 
+        {/* Template picker - only when focused */}
+        {isFocused && (
+          <TouchableOpacity
+            style={styles.templateBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowTemplates(true);
+            }}
+            accessibilityLabel="Task templates"
+            accessibilityRole="button"
+            accessibilityHint="Open task templates"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.templateBtnText}>⊞</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={[styles.addButton, !text.trim() && styles.addButtonDisabled]}
           onPress={handleAdd}

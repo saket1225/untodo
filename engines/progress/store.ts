@@ -146,21 +146,22 @@ export const useProgressStore = create<ProgressStore>()(
       storage: createJSONStorage(() => AsyncStorage),
       version: 1,
       migrate: (persisted: any, version: number) => {
-        if (version === 0 || !version) {
-          const state = persisted as { daySummaries?: any[]; weeklyReviews?: any[]; habits?: any[] };
+        try {
+          const state = (persisted || {}) as { daySummaries?: any[]; weeklyReviews?: any[]; habits?: any[] };
           return {
             ...state,
-            daySummaries: Array.isArray(state.daySummaries) ? state.daySummaries : [],
-            weeklyReviews: Array.isArray(state.weeklyReviews) ? state.weeklyReviews : [],
-            habits: Array.isArray(state.habits) ? state.habits.map((h: any) => ({
+            daySummaries: Array.isArray(state.daySummaries) ? state.daySummaries.filter((s: any) => s && typeof s.date === 'string') : [],
+            weeklyReviews: Array.isArray(state.weeklyReviews) ? state.weeklyReviews.filter((r: any) => r && typeof r.weekStart === 'string') : [],
+            habits: Array.isArray(state.habits) ? state.habits.filter((h: any) => h && h.id).map((h: any) => ({
               ...h,
-              streak: h.streak ?? 0,
-              lastCompleted: h.lastCompleted ?? '',
+              streak: typeof h.streak === 'number' ? h.streak : 0,
+              lastCompleted: typeof h.lastCompleted === 'string' ? h.lastCompleted : '',
               history: Array.isArray(h.history) ? h.history : [],
             })) : [],
           };
+        } catch {
+          return { daySummaries: [], weeklyReviews: [], habits: [] };
         }
-        return persisted as ProgressStore;
       },
     }
   )
