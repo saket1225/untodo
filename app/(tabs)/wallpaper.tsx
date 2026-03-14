@@ -96,8 +96,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Ultra clean',
     bg: '#080808',
     dotCompleted: (rate) => {
-      const r = Math.max(0.4, rate);
-      const v = Math.round(120 + 135 * r);
+      const v = Math.round(40 + 215 * rate);
       return `rgb(${v}, ${v}, ${v})`;
     },
     dotToday: '#FFFFFF',
@@ -113,8 +112,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Hacker mode',
     bg: '#0A0A0A',
     dotCompleted: (rate) => {
-      const r = Math.max(0.4, rate);
-      const v = Math.round(120 + 135 * r);
+      const v = Math.round(40 + 215 * rate);
       return `rgb(0, ${v}, ${Math.round(v * 0.25)})`;
     },
     dotToday: '#00FF41',
@@ -132,10 +130,9 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Deep twilight',
     bg: '#0C0C1E',
     dotCompleted: (rate) => {
-      const cr = Math.max(0.4, rate);
-      const r = Math.round(110 + 70 * cr);
-      const g = Math.round(110 + 90 * cr);
-      const b = Math.round(150 + 105 * cr);
+      const r = Math.round(60 + 120 * rate);
+      const g = Math.round(60 + 140 * rate);
+      const b = Math.round(80 + 175 * rate);
       return `rgb(${r}, ${g}, ${b})`;
     },
     dotToday: '#9BABFF',
@@ -151,8 +148,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Electric glow',
     bg: '#040410',
     dotCompleted: (rate) => {
-      const r = Math.max(0.4, rate);
-      const v = Math.round(140 + 115 * r);
+      const v = Math.round(40 + 215 * rate);
       return `rgb(${Math.round(v * 0.95)}, ${Math.round(v * 0.15)}, ${v})`;
     },
     dotToday: '#FF33FF',
@@ -169,9 +165,8 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Warm & light',
     bg: '#F2EDE4',
     dotCompleted: (rate) => {
-      const r = Math.max(0.4, rate);
-      const v = Math.round(160 - 130 * r);
-      return `rgb(${v}, ${v - 8}, ${v - 18})`;
+      const v = Math.round(220 - 190 * rate);
+      return `rgb(${v}, ${Math.max(0, v - 8)}, ${Math.max(0, v - 18)})`;
     },
     dotToday: '#1A1A1A',
     dotTodayGlow: 'rgba(26, 26, 26, 0.25)',
@@ -186,8 +181,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Technical feel',
     bg: '#081828',
     dotCompleted: (rate) => {
-      const r = Math.max(0.4, rate);
-      const v = Math.round(120 + 135 * r);
+      const v = Math.round(40 + 215 * rate);
       return `rgb(${Math.round(v * 0.35)}, ${Math.round(v * 0.65)}, ${v})`;
     },
     dotToday: '#5CACEE',
@@ -205,8 +199,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Pure darkness',
     bg: '#000000',
     dotCompleted: (rate) => {
-      const r = Math.max(0.4, rate);
-      const v = Math.round(190 + 65 * r);
+      const v = Math.round(40 + 215 * rate);
       return `rgb(${v}, ${v}, ${v})`;
     },
     dotToday: '#FFFFFF',
@@ -222,10 +215,9 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Purple shimmer',
     bg: '#06041A',
     dotCompleted: (rate) => {
-      const cr = Math.max(0.4, rate);
-      const r = Math.round(155 + 65 * cr);
-      const g = Math.round(135 + 85 * cr);
-      const b = Math.round(205 + 50 * cr);
+      const r = Math.round(60 + 160 * rate);
+      const g = Math.round(50 + 170 * rate);
+      const b = Math.round(80 + 175 * rate);
       return `rgb(${r}, ${g}, ${b})`;
     },
     dotToday: '#E8DEFF',
@@ -380,12 +372,10 @@ function computeWeekCompletionRate(todos: any[]): number {
 function getDotColor(day: DayData, style: StyleTheme): string {
   if (day.isToday) return style.dotToday;
   if (day.isFuture) return style.dotFuture;
-  // Past day with no task data: medium brightness (not as dim as future)
-  if (day.completionRate < 0) return style.dotCompleted(0.4);
-  // Past day with tasks but none completed
-  if (day.completionRate === 0) return style.dotEmpty;
-  // Past completed dots always use full brightness (rate=1)
-  return style.dotCompleted(1);
+  // Past day with no task data: neutral medium tone (distinct from completion levels)
+  if (day.completionRate < 0) return style.dotEmpty;
+  // Past day: GitHub-style intensity based on completion rate
+  return style.dotCompleted(day.completionRate);
 }
 
 function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../../engines/wallpaper/types').WallpaperConfig; days: DayData[]; style: StyleTheme; scaleFactor?: number }) {
@@ -434,12 +424,42 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
               const isToday = day.isToday;
               const color = getDotColor(day, style);
               const isCompletedPast = !day.isFuture && !day.isToday && day.completionRate > 0;
-              const isPastNoData = !day.isFuture && !day.isToday && day.completionRate < 0;
-              const shouldGlow = isToday || (hasGlowEffect && isCompletedPast);
-              const glowRadius = isToday ? finalDot * 2 : finalDot * 0.6;
-              const glowOpacity = isToday ? 1 : 0.5 + day.completionRate * 0.3;
-              // Completed past dots are 15% larger for visual prominence
+              const shouldGlow = hasGlowEffect && isCompletedPast;
               const dotScale = isCompletedPast ? 1.15 : 1;
+
+              if (isToday) {
+                return (
+                  <View
+                    key={colIdx}
+                    style={{
+                      width: finalDot,
+                      height: finalDot,
+                      marginRight: colIdx < cols - 1 ? finalSpacing : 0,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'visible',
+                    }}
+                  >
+                    {/* Glow circle behind today's dot */}
+                    <View style={{
+                      position: 'absolute',
+                      width: finalDot * 2.5,
+                      height: finalDot * 2.5,
+                      borderRadius: finalDot * 1.25,
+                      backgroundColor: style.dotTodayGlow,
+                    }} />
+                    {/* Today dot */}
+                    <View style={{
+                      width: finalDot,
+                      height: finalDot,
+                      borderRadius: finalDot,
+                      backgroundColor: color,
+                      borderWidth: finalDot * 0.15,
+                      borderColor: style.dotTodayGlow,
+                    }} />
+                  </View>
+                );
+              }
 
               return (
                 <View
@@ -452,15 +472,11 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
                     marginRight: colIdx < cols - 1 ? finalSpacing : 0,
                     ...(dotScale !== 1 ? { transform: [{ scale: dotScale }] } : {}),
                     ...(shouldGlow ? {
-                      shadowColor: isToday ? style.dotTodayGlow : color,
+                      shadowColor: color,
                       shadowOffset: { width: 0, height: 0 },
-                      shadowOpacity: glowOpacity,
-                      shadowRadius: glowRadius,
-                      elevation: isToday ? 8 * scaleFactor : 3 * scaleFactor,
-                    } : {}),
-                    ...(isToday ? {
-                      borderWidth: finalDot * 0.15,
-                      borderColor: style.dotTodayGlow,
+                      shadowOpacity: 0.5 + day.completionRate * 0.3,
+                      shadowRadius: finalDot * 0.6,
+                      elevation: 3 * scaleFactor,
                     } : {}),
                   }}
                 />
@@ -1124,8 +1140,8 @@ function WallpaperScreenContent() {
               format: 'png',
               quality: 1,
               result: 'tmpfile',
-              width: Math.round(WALLPAPER_W * PIXEL_RATIO),
-              height: Math.round(WALLPAPER_H * PIXEL_RATIO),
+              width: WALLPAPER_W,
+              height: WALLPAPER_H,
             }}
           >
             <WallpaperContent
