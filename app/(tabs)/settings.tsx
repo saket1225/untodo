@@ -339,7 +339,7 @@ function SettingsScreenContent() {
         <SectionCard style={styles.siliconCard}>
           {isConnected ? (
             <>
-              {/* Connected state */}
+              {/* Connected state — clean minimal */}
               <View style={styles.connectedHeader}>
                 <View style={styles.connectedIconContainer}>
                   <View style={styles.connectedIcon}>
@@ -352,34 +352,7 @@ function SettingsScreenContent() {
                 </View>
               </View>
 
-              {silicon.lastSync && (
-                <Text style={styles.hint}>
-                  Last activity: {new Date(silicon.lastSync).toLocaleString()}
-                </Text>
-              )}
-
-              {/* Tucked away code display */}
               <TouchableOpacity
-                style={styles.showCodeBtn}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setShowCode(!showCode);
-                }}
-                accessibilityLabel={showCode ? 'Hide pairing code' : 'Show pairing code'}
-                accessibilityRole="button"
-              >
-                <Text style={styles.showCodeBtnText}>{showCode ? 'Hide code' : 'Show pairing code'}</Text>
-              </TouchableOpacity>
-
-              {showCode && pairingCode && (
-                <TouchableOpacity style={styles.codeInline} onPress={handleCopyCode} activeOpacity={0.7}>
-                  <Text style={styles.codeInlineValue}>{pairingCode}</Text>
-                  <Text style={styles.codeInlineCopy}>{copied ? 'Copied' : 'Copy'}</Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                style={styles.dangerBtn}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   handleDisconnect();
@@ -387,7 +360,7 @@ function SettingsScreenContent() {
                 accessibilityLabel="Disconnect Silicon"
                 accessibilityRole="button"
               >
-                <Text style={styles.dangerBtnText}>Disconnect</Text>
+                <Text style={styles.disconnectText}>Disconnect</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -886,19 +859,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.success,
   },
 
-  // Danger
-  dangerBtn: {
-    borderWidth: 1,
-    borderColor: Colors.dark.error,
-    borderRadius: 12,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-  },
-  dangerBtnText: {
+  // Disconnect text button
+  disconnectText: {
     color: Colors.dark.error,
-    fontFamily: Fonts.bodyMedium,
+    fontFamily: Fonts.body,
     fontSize: 14,
+    opacity: 0.8,
+    marginTop: Spacing.xs,
   },
   cardRowArrow: {
     color: Colors.dark.textTertiary,

@@ -542,9 +542,8 @@ function TodayScreenContent() {
       onDelete={() => handleDelete(item)}
       onPress={() => setDetailTodo(item)}
       onLongPress={() => {
-        if (!selectionMode) {
-          enterSelectionMode(item.id);
-        }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setQuickActionTodo(item);
       }}
       onFocus={!item.completed ? () => setFocusTodo(item) : undefined}
       selectionMode={selectionMode}

@@ -175,22 +175,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
   const handleLongPress = () => {
     if (selectionMode) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Delete task?',
-      todo.title,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            onDelete();
-          },
-        },
-      ]
-    );
+    onLongPress?.();
   };
 
   const toggleTracking = () => {
