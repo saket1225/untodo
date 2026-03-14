@@ -283,7 +283,8 @@ function computeDayData(startDate: Date, endDate: Date, todos: any[]): DayData[]
       const dayTodos = todos.filter((t: any) => t.logicalDate === dateStr);
       const total = dayTodos.length;
       const completed = dayTodos.filter((t: any) => t.completed).length;
-      const completionRate = total > 0 ? completed / total : 0;
+      // -1 means past day with no data (distinct from 0 which means had tasks but none completed)
+      const completionRate = total > 0 ? completed / total : -1;
 
       const dayTime = new Date(current);
       dayTime.setHours(0, 0, 0, 0);
@@ -379,6 +380,9 @@ function computeWeekCompletionRate(todos: any[]): number {
 function getDotColor(day: DayData, style: StyleTheme): string {
   if (day.isToday) return style.dotToday;
   if (day.isFuture) return style.dotFuture;
+  // Past day with no task data: medium brightness (not as dim as future)
+  if (day.completionRate < 0) return style.dotCompleted(0.4);
+  // Past day with tasks but none completed
   if (day.completionRate === 0) return style.dotEmpty;
   // Past completed dots always use full brightness (rate=1)
   return style.dotCompleted(1);
@@ -390,7 +394,7 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
   const sSpacing = spacing * scaleFactor;
   const dotDiameter = sDotSize * 2;
   const totalWidth = cols * dotDiameter + (cols - 1) * sSpacing;
-  const availableWidth = (WALLPAPER_W - Spacing.md * 2) * scaleFactor;
+  const availableWidth = (SCREEN_W - Spacing.md * 2) * scaleFactor;
   const scale = Math.min(1, availableWidth / totalWidth);
   const finalDot = Math.round(dotDiameter * scale * 100) / 100;
   const finalSpacing = Math.round(sSpacing * scale * 100) / 100;
@@ -430,6 +434,7 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
               const isToday = day.isToday;
               const color = getDotColor(day, style);
               const isCompletedPast = !day.isFuture && !day.isToday && day.completionRate > 0;
+              const isPastNoData = !day.isFuture && !day.isToday && day.completionRate < 0;
               const shouldGlow = isToday || (hasGlowEffect && isCompletedPast);
               const glowRadius = isToday ? finalDot * 2 : finalDot * 0.6;
               const glowOpacity = isToday ? 1 : 0.5 + day.completionRate * 0.3;
@@ -803,6 +808,90 @@ function VibeOverlay({ style: vibeStyle }: { style: WallpaperStyle }) {
   }
 }
 
+// ─── Wallpaper Content (renders at any size) ────────────────────────────────────
+
+interface WallpaperContentProps {
+  containerWidth: number;
+  containerHeight: number;
+  config: import('../../engines/wallpaper/types').WallpaperConfig;
+  activeStyle: StyleTheme;
+  fontFamily?: string;
+  isTerminal: boolean;
+  isStats: boolean;
+  displayNumber: number;
+  displayLabel: string;
+  displaySubLabel: string | null;
+  weekRate: number;
+  streak: number;
+  days: DayData[];
+  quote: string;
+  dayNumber: number;
+}
+
+function WallpaperContent({
+  containerWidth, containerHeight, config, activeStyle, fontFamily,
+  isTerminal, isStats, displayNumber, displayLabel, displaySubLabel,
+  weekRate, streak, days, quote, dayNumber,
+}: WallpaperContentProps) {
+  // Scale factor relative to the reference device width (SCREEN_W)
+  const s = containerWidth / SCREEN_W;
+
+  return (
+    <View style={{ width: containerWidth, height: containerHeight, backgroundColor: activeStyle.bg }}>
+      <VibeOverlay style={config.wallpaperStyle || 'minimal'} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.md * s }}>
+        {config.showDayCount && (
+          <Text style={[
+            { fontFamily: Fonts.accent, fontSize: 100 * s, marginBottom: -6 * s, letterSpacing: -1 * s, color: activeStyle.textPrimary },
+            fontFamily ? { fontFamily } : {},
+            isTerminal ? { letterSpacing: -2 * s, fontSize: 88 * s } : {},
+          ]}>
+            {displayNumber}
+          </Text>
+        )}
+        {config.showDayCount && (
+          <Text style={[
+            { fontFamily: Fonts.headingMedium, fontSize: 12 * s, letterSpacing: 2 * s, textTransform: 'uppercase', marginBottom: Spacing.lg * s, color: activeStyle.textSecondary },
+            fontFamily ? { fontFamily, fontSize: 11 * s, letterSpacing: 3 * s } : {},
+          ]}>{displayLabel}</Text>
+        )}
+        {config.showDayCount && displaySubLabel && (
+          <Text style={[
+            { fontFamily: Fonts.body, fontSize: 10 * s, letterSpacing: 0.5 * s, marginBottom: Spacing.sm * s, opacity: 0.8, color: activeStyle.textTertiary },
+            fontFamily ? { fontFamily, fontSize: 10 * s } : {},
+          ]}>{displaySubLabel}</Text>
+        )}
+        {isStats && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md * s, gap: Spacing.sm * s }}>
+            <Text style={[{ fontFamily: Fonts.bodyMedium, fontSize: 11 * s, letterSpacing: 0.5 * s, color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
+              {weekRate}% this week
+            </Text>
+            <Text style={{ fontSize: 11 * s, color: activeStyle.textTertiary }}>·</Text>
+            <Text style={[{ fontFamily: Fonts.bodyMedium, fontSize: 11 * s, letterSpacing: 0.5 * s, color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
+              {streak}d streak
+            </Text>
+          </View>
+        )}
+        <DotGrid config={config} days={days} style={activeStyle} scaleFactor={s} />
+        {config.showQuote && (
+          <Text style={[
+            { fontFamily: Fonts.accentItalic, fontSize: 12 * s, textAlign: 'center', marginTop: Spacing.lg * s, paddingHorizontal: Spacing.xl * s, lineHeight: 18 * s, opacity: 0.9, color: activeStyle.textTertiary },
+            fontFamily ? { fontFamily, fontStyle: 'normal', fontSize: 11 * s } : {},
+          ]}>"{quote}"</Text>
+        )}
+        {config.showStreak && !isStats && (
+          <Text style={[
+            { fontFamily: Fonts.body, fontSize: 10 * s, marginTop: Spacing.sm * s, letterSpacing: 0.5 * s, color: activeStyle.textTertiary },
+            fontFamily ? { fontFamily } : {},
+          ]}>
+            {streak > 0 ? `${streak} day streak` : 'Start your streak'} · day {dayNumber}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
 // ─── Main Screen ────────────────────────────────────────────────────────────────
 
 function WallpaperScreenContent() {
@@ -1027,94 +1116,59 @@ function WallpaperScreenContent() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <Text style={styles.heading}>Wallpaper</Text>
 
+        {/* ── Hidden full-res ViewShot for capture ── */}
+        <View style={{ position: 'absolute', left: -9999, top: -9999 }} pointerEvents="none">
+          <ViewShot
+            ref={viewShotRef}
+            options={{
+              format: 'png',
+              quality: 1,
+              result: 'tmpfile',
+              width: Math.round(WALLPAPER_W * PIXEL_RATIO),
+              height: Math.round(WALLPAPER_H * PIXEL_RATIO),
+            }}
+          >
+            <WallpaperContent
+              containerWidth={WALLPAPER_W}
+              containerHeight={WALLPAPER_H}
+              config={config}
+              activeStyle={activeStyle}
+              fontFamily={fontFamily}
+              isTerminal={isTerminal}
+              isStats={isStats}
+              displayNumber={displayNumber}
+              displayLabel={displayLabel}
+              displaySubLabel={displaySubLabel}
+              weekRate={weekRate}
+              streak={streak}
+              days={days}
+              quote={quote}
+              dayNumber={dayNumber}
+            />
+          </ViewShot>
+        </View>
+
         {/* ── Live Preview — phone frame ── */}
         <View style={[styles.phoneFrame, { width: PREVIEW_WIDTH + PHONE_BORDER * 2, alignSelf: 'center' }]}>
           <View style={styles.phoneNotch} />
           <View style={{ width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT, overflow: 'hidden' }}>
-            <View style={{
-              transformOrigin: 'top left',
-              transform: [{ scale: PREVIEW_SCALE }],
-            }}>
-              <ViewShot
-                ref={viewShotRef}
-                options={{
-                  format: 'png',
-                  quality: 1,
-                  result: 'tmpfile',
-                  width: Math.round(WALLPAPER_W * PIXEL_RATIO),
-                  height: Math.round(WALLPAPER_H * PIXEL_RATIO),
-                }}
-              >
-                <View style={{ width: WALLPAPER_W, height: WALLPAPER_H, backgroundColor: activeStyle.bg }}>
-                  {/* Vibe-specific overlay effects */}
-                  <VibeOverlay style={config.wallpaperStyle || 'minimal'} />
-
-                  {/* Content */}
-                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: wp(Spacing.md) }}>
-                    {/* Day count number */}
-                    {config.showDayCount && (
-                      <Text style={[
-                        { fontFamily: Fonts.accent, fontSize: wp(100), marginBottom: wp(-6), letterSpacing: wp(-1), color: activeStyle.textPrimary },
-                        fontFamily ? { fontFamily } : {},
-                        isTerminal ? { letterSpacing: wp(-2), fontSize: wp(88) } : {},
-                      ]}>
-                        {displayNumber}
-                      </Text>
-                    )}
-
-                    {/* Label */}
-                    {config.showDayCount && (
-                      <Text style={[
-                        { fontFamily: Fonts.headingMedium, fontSize: wp(12), letterSpacing: wp(2), textTransform: 'uppercase', marginBottom: wp(Spacing.lg), color: activeStyle.textSecondary },
-                        fontFamily ? { fontFamily, fontSize: wp(11), letterSpacing: wp(3) } : {},
-                      ]}>{displayLabel}</Text>
-                    )}
-
-                    {/* Sublabel */}
-                    {config.showDayCount && displaySubLabel && (
-                      <Text style={[
-                        { fontFamily: Fonts.body, fontSize: wp(10), letterSpacing: wp(0.5), marginBottom: wp(Spacing.sm), opacity: 0.8, color: activeStyle.textTertiary },
-                        fontFamily ? { fontFamily, fontSize: wp(10) } : {},
-                      ]}>{displaySubLabel}</Text>
-                    )}
-
-                    {/* Stats line (stats preset only) */}
-                    {isStats && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: wp(Spacing.md), gap: wp(Spacing.sm) }}>
-                        <Text style={[{ fontFamily: Fonts.bodyMedium, fontSize: wp(11), letterSpacing: wp(0.5), color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
-                          {weekRate}% this week
-                        </Text>
-                        <Text style={{ fontSize: wp(11), color: activeStyle.textTertiary }}>·</Text>
-                        <Text style={[{ fontFamily: Fonts.bodyMedium, fontSize: wp(11), letterSpacing: wp(0.5), color: activeStyle.textSecondary }, fontFamily ? { fontFamily } : {}]}>
-                          {streak}d streak
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Dot grid */}
-                    <DotGrid config={config} days={days} style={activeStyle} scaleFactor={WP_SCALE} />
-
-                    {/* Quote */}
-                    {config.showQuote && (
-                      <Text style={[
-                        { fontFamily: Fonts.accentItalic, fontSize: wp(12), textAlign: 'center', marginTop: wp(Spacing.lg), paddingHorizontal: wp(Spacing.xl), lineHeight: wp(18), opacity: 0.9, color: activeStyle.textTertiary },
-                        fontFamily ? { fontFamily, fontStyle: 'normal', fontSize: wp(11) } : {},
-                      ]}>"{quote}"</Text>
-                    )}
-
-                    {/* Streak line */}
-                    {config.showStreak && !isStats && (
-                      <Text style={[
-                        { fontFamily: Fonts.body, fontSize: wp(10), marginTop: wp(Spacing.sm), letterSpacing: wp(0.5), color: activeStyle.textTertiary },
-                        fontFamily ? { fontFamily } : {},
-                      ]}>
-                        {streak > 0 ? `${streak} day streak` : 'Start your streak'} · day {dayNumber}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              </ViewShot>
-            </View>
+            <WallpaperContent
+              containerWidth={PREVIEW_WIDTH}
+              containerHeight={PREVIEW_HEIGHT}
+              config={config}
+              activeStyle={activeStyle}
+              fontFamily={fontFamily}
+              isTerminal={isTerminal}
+              isStats={isStats}
+              displayNumber={displayNumber}
+              displayLabel={displayLabel}
+              displaySubLabel={displaySubLabel}
+              weekRate={weekRate}
+              streak={streak}
+              days={days}
+              quote={quote}
+              dayNumber={dayNumber}
+            />
           </View>
         </View>
 
