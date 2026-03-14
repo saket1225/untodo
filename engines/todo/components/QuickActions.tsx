@@ -79,7 +79,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
   };
 
   const handleDelete = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onDelete(todo.id);
     onClose();

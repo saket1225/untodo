@@ -80,7 +80,7 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
   };
 
   const handleDelete = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     onDelete(todo.id);
   };
 

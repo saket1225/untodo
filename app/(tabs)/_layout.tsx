@@ -79,28 +79,28 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ focused }) => <TodayTabIcon focused={focused} />,
         }}
-        listeners={{ tabPress: () => Haptics.selectionAsync() }}
+        listeners={{ tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) }}
       />
       <Tabs.Screen
         name="progress"
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="Stats" focused={focused} />,
         }}
-        listeners={{ tabPress: () => Haptics.selectionAsync() }}
+        listeners={{ tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) }}
       />
       <Tabs.Screen
         name="wallpaper"
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="Wall" focused={focused} />,
         }}
-        listeners={{ tabPress: () => Haptics.selectionAsync() }}
+        listeners={{ tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="Config" focused={focused} />,
         }}
-        listeners={{ tabPress: () => Haptics.selectionAsync() }}
+        listeners={{ tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) }}
       />
     </Tabs>
   );

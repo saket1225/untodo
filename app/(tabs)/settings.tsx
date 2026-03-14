@@ -557,7 +557,7 @@ function SettingsScreenContent() {
           <TouchableOpacity
             style={styles.dangerRow}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
               handleResetAllData();
             }}
             accessibilityLabel="Reset all data"

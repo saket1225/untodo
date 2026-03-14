@@ -103,13 +103,13 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Ultra clean',
     bg: '#080808',
     dotCompleted: (rate) => {
-      const v = Math.round(110 + 145 * rate);
+      const v = Math.round(60 + 195 * rate);
       return `rgb(${v}, ${v}, ${v})`;
     },
     dotToday: '#FFFFFF',
     dotTodayGlow: 'rgba(255, 255, 255, 0.4)',
-    dotFuture: '#181818',
-    dotEmpty: '#505050',
+    dotFuture: '#0E0E0E',
+    dotEmpty: '#383838',
     textPrimary: '#FFFFFF',
     textSecondary: '#666666',
     textTertiary: '#444444',
@@ -120,13 +120,13 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Hacker mode',
     bg: '#0A0A0A',
     dotCompleted: (rate) => {
-      const v = Math.round(110 + 145 * rate);
+      const v = Math.round(60 + 195 * rate);
       return `rgb(0, ${v}, ${Math.round(v * 0.25)})`;
     },
     dotToday: '#00FF41',
     dotTodayGlow: 'rgba(0, 255, 65, 0.65)',
-    dotFuture: '#0A1A0E',
-    dotEmpty: '#005520',
+    dotFuture: '#0C100D',
+    dotEmpty: '#003314',
     textPrimary: '#00FF41',
     textSecondary: '#00CC33',
     textTertiary: '#006620',
@@ -139,15 +139,15 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Deep twilight',
     bg: '#0C0C1E',
     dotCompleted: (rate) => {
-      const r = Math.round(90 + 90 * rate);
-      const g = Math.round(90 + 110 * rate);
-      const b = Math.round(120 + 135 * rate);
+      const r = Math.round(50 + 130 * rate);
+      const g = Math.round(50 + 150 * rate);
+      const b = Math.round(70 + 185 * rate);
       return `rgb(${r}, ${g}, ${b})`;
     },
     dotToday: '#9BABFF',
     dotTodayGlow: 'rgba(155, 171, 255, 0.55)',
-    dotFuture: '#131326',
-    dotEmpty: '#3A3A5A',
+    dotFuture: '#0E0E1A',
+    dotEmpty: '#282840',
     textPrimary: '#D0D8FF',
     textSecondary: '#6B73AA',
     textTertiary: '#3E4466',
@@ -158,13 +158,13 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Electric glow',
     bg: '#040410',
     dotCompleted: (rate) => {
-      const v = Math.round(110 + 145 * rate);
+      const v = Math.round(60 + 195 * rate);
       return `rgb(${Math.round(v * 0.95)}, ${Math.round(v * 0.15)}, ${v})`;
     },
     dotToday: '#FF33FF',
     dotTodayGlow: 'rgba(255, 51, 255, 0.7)',
-    dotFuture: '#100818',
-    dotEmpty: '#3E2050',
+    dotFuture: '#080612',
+    dotEmpty: '#2A1838',
     textPrimary: '#FF55FF',
     textSecondary: '#AA33AA',
     textTertiary: '#552266',
@@ -176,13 +176,13 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Warm & light',
     bg: '#F2EDE4',
     dotCompleted: (rate) => {
-      const v = Math.round(160 - 130 * rate);
+      const v = Math.round(190 - 160 * rate);
       return `rgb(${v}, ${Math.max(0, v - 8)}, ${Math.max(0, v - 18)})`;
     },
     dotToday: '#1A1A1A',
     dotTodayGlow: 'rgba(26, 26, 26, 0.2)',
-    dotFuture: '#E6E1D8',
-    dotEmpty: '#B8B0A2',
+    dotFuture: '#EBE7DF',
+    dotEmpty: '#C8C0B2',
     textPrimary: '#1A1A1A',
     textSecondary: '#7A7870',
     textTertiary: '#A8A498',
@@ -193,13 +193,13 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Technical feel',
     bg: '#081828',
     dotCompleted: (rate) => {
-      const v = Math.round(110 + 145 * rate);
+      const v = Math.round(60 + 195 * rate);
       return `rgb(${Math.round(v * 0.35)}, ${Math.round(v * 0.65)}, ${v})`;
     },
     dotToday: '#5CACEE',
     dotTodayGlow: 'rgba(92, 172, 238, 0.55)',
-    dotFuture: '#0C2030',
-    dotEmpty: '#254A65',
+    dotFuture: '#0A1A28',
+    dotEmpty: '#1A3548',
     textPrimary: '#5CACEE',
     textSecondary: '#3A7AB0',
     textTertiary: '#1E4A6A',
@@ -212,13 +212,13 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Pure darkness',
     bg: '#000000',
     dotCompleted: (rate) => {
-      const v = Math.round(110 + 145 * rate);
+      const v = Math.round(50 + 205 * rate);
       return `rgb(${v}, ${v}, ${v})`;
     },
     dotToday: '#FFFFFF',
     dotTodayGlow: 'rgba(255, 255, 255, 0.6)',
-    dotFuture: '#111111',
-    dotEmpty: '#484848',
+    dotFuture: '#080808',
+    dotEmpty: '#303030',
     textPrimary: '#FFFFFF',
     textSecondary: '#4A4A4A',
     textTertiary: '#2A2A2A',
@@ -229,15 +229,15 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     desc: 'Purple shimmer',
     bg: '#06041A',
     dotCompleted: (rate) => {
-      const r = Math.round(95 + 125 * rate);
-      const g = Math.round(85 + 135 * rate);
-      const b = Math.round(120 + 135 * rate);
+      const r = Math.round(55 + 165 * rate);
+      const g = Math.round(45 + 175 * rate);
+      const b = Math.round(70 + 185 * rate);
       return `rgb(${r}, ${g}, ${b})`;
     },
     dotToday: '#E8DEFF',
     dotTodayGlow: 'rgba(180, 140, 255, 0.8)',
-    dotFuture: '#0C0822',
-    dotEmpty: '#2A2050',
+    dotFuture: '#08061C',
+    dotEmpty: '#1E1838',
     textPrimary: '#E8DEFF',
     textSecondary: '#8B6EBB',
     textTertiary: '#4E3370',

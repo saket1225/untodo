@@ -393,7 +393,10 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyMedium,
   },
   checkbox: {
-    padding: 2,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     position: 'relative',
   },
   confettiContainer: {
@@ -550,9 +553,9 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   trackingBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: Colors.dark.surface,
     justifyContent: 'center',
     alignItems: 'center',

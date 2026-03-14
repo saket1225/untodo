@@ -505,7 +505,7 @@ function TodayScreenContent() {
   }, [selectedIds, toggleTodo, cancelSelection]);
 
   const batchDelete = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const deletedTodos = allTodos.filter(t => selectedIds.has(t.id));
     selectedIds.forEach(id => deleteTodo(id));

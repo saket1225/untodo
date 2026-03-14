@@ -77,7 +77,7 @@ function TodoInputInner({ onAdd, viewingDate }: Props) {
   const handleAdd = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const { title, quickPriority, quickCategory } = parseShortcuts(trimmed);
     if (!title) return;
     onAdd(title, quickPriority, quickCategory, recurrence, scheduledDate);
@@ -145,8 +145,8 @@ function TodoInputInner({ onAdd, viewingDate }: Props) {
         <TextInput
           ref={inputRef}
           style={[styles.input, isFocused && styles.inputFocused]}
-          placeholder="Add a task..."
-          placeholderTextColor={Colors.dark.textTertiary}
+          placeholder={isFocused ? "What needs to get done?" : "Add a task..."}
+          placeholderTextColor={isFocused ? Colors.dark.textSecondary : Colors.dark.textTertiary}
           value={text}
           onChangeText={setText}
           onSubmitEditing={handleAdd}
@@ -390,7 +390,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   inputFocused: {
-    borderColor: Colors.dark.textTertiary,
+    borderColor: Colors.dark.textSecondary,
+    backgroundColor: '#1E1E1E',
+    shadowColor: Colors.dark.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   priorityBtn: {
     flexDirection: 'row',
@@ -417,7 +423,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.surface,
     borderRadius: 12,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingVertical: 14,
     color: Colors.dark.text,
     fontFamily: Fonts.body,
     fontSize: 16,
