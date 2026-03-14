@@ -612,14 +612,17 @@ function WallpaperScreenContent() {
   const headingMode = config.headingMode || 'remaining_first';
   const goalLabel = config.goalTitle || '20';
 
-  let displayBigText: string;
+  let displayNumber: number;
+  let displayLabel: string;
   let displaySubLabel: string | null = null;
 
   if (headingMode === 'day_first') {
-    displayBigText = `DAY ${dayNumber}`;
+    displayNumber = dayNumber;
+    displayLabel = `DAY ${dayNumber}`;
     displaySubLabel = `${daysLeft} days remaining till ${goalLabel}`;
   } else {
-    displayBigText = `${daysLeft} days remaining till ${goalLabel}`;
+    displayNumber = daysLeft;
+    displayLabel = `days until ${goalLabel}`;
     displaySubLabel = `DAY ${dayNumber}`;
   }
 
@@ -862,10 +865,16 @@ function WallpaperScreenContent() {
                     styles.previewDayCount,
                     { color: activeStyle.textPrimary },
                     activeStyle.fontOverride === 'monospace' && { fontFamily: 'monospace' },
-                    headingMode === 'remaining_first' && { fontSize: 28 },
                   ]}>
-                    {displayBigText}
+                    {displayNumber}
                   </Text>
+                )}
+                {config.showDayCount && (
+                  <Text style={[
+                    styles.previewDayLabel,
+                    { color: activeStyle.textSecondary },
+                    activeStyle.fontOverride === 'monospace' && { fontFamily: 'monospace' },
+                  ]}>{displayLabel}</Text>
                 )}
                 {config.showDayCount && displaySubLabel && (
                   <Text style={[
