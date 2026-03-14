@@ -139,8 +139,16 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
   const [showConfetti, setShowConfetti] = useState(false);
+  const confettiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startTimeTracking = useTodoStore(s => s.startTimeTracking);
   const stopTimeTracking = useTodoStore(s => s.stopTimeTracking);
+
+  // Cleanup confetti timer on unmount
+  useEffect(() => {
+    return () => {
+      if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
+    };
+  }, []);
 
   const isTracking = !!todo.timeTracking?.startedAt;
   const totalSeconds = todo.timeTracking?.totalSeconds || 0;
@@ -160,7 +168,8 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
           // Swipe right -> complete with satisfying animation
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           setShowConfetti(true);
-          setTimeout(() => setShowConfetti(false), 500);
+          if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
+          confettiTimerRef.current = setTimeout(() => setShowConfetti(false), 500);
           Animated.parallel([
             Animated.timing(translateX, { toValue: SCREEN_WIDTH, duration: 250, useNativeDriver: true }),
             Animated.timing(opacityAnim, { toValue: 0.3, duration: 250, useNativeDriver: true }),
@@ -215,7 +224,8 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
       // Completing — satisfying scale pulse + confetti + haptic
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 500);
+      if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
+      confettiTimerRef.current = setTimeout(() => setShowConfetti(false), 500);
       Animated.sequence([
         Animated.timing(scaleAnim, { toValue: 1.02, duration: 120, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4, tension: 300 }),

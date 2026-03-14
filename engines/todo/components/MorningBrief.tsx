@@ -50,12 +50,15 @@ export default function MorningBrief({ onDismiss }: { onDismiss: () => void }) {
   }, [allTodos, logicalDate]);
 
   useEffect(() => {
+    let mounted = true;
+
     // Only show between 5am-12pm
     const hour = new Date().getHours();
     if (hour < 5 || hour >= 12) return;
 
     // Only show once per day
     AsyncStorage.getItem(MORNING_BRIEF_KEY).then(lastShown => {
+      if (!mounted) return;
       if (lastShown === logicalDate) return;
 
       // Only show if there are tasks
@@ -76,7 +79,9 @@ export default function MorningBrief({ onDismiss }: { onDismiss: () => void }) {
         ]),
       ]).start();
     });
-  }, []);
+
+    return () => { mounted = false; };
+  }, [logicalDate, briefData.total]);
 
   const dismiss = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

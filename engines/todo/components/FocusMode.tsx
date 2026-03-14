@@ -138,10 +138,18 @@ export default function FocusMode({ todo, visible, onClose, onComplete }: Props)
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebMessage, setCelebMessage] = useState('');
   const startTimeRef = useRef(Date.now());
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const taskScale = useRef(new Animated.Value(0.95)).current;
   const breatheAnim = useRef(new Animated.Value(0.3)).current;
   const translateY = useRef(new Animated.Value(0)).current;
+
+  // Cleanup auto-dismiss timer on unmount
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    };
+  }, []);
 
   // Swipe down to dismiss
   const panResponder = useRef(
@@ -203,7 +211,8 @@ export default function FocusMode({ todo, visible, onClose, onComplete }: Props)
     setShowCelebration(true);
 
     // Auto-dismiss after 2.5s
-    setTimeout(() => {
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => {
       onComplete();
       onClose();
     }, 2500);
