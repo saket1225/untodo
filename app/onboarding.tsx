@@ -155,7 +155,6 @@ function UsernameScreen({ onComplete }: { onComplete: () => void }) {
             placeholderTextColor={Colors.dark.textTertiary}
             autoCapitalize="none"
             autoCorrect={false}
-            autoFocus
             maxLength={20}
             selectionColor={Colors.dark.accent}
             returnKeyType="done"
@@ -252,7 +251,7 @@ export default function OnboardingScreen() {
         bounces={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        scrollEnabled={currentPage < 2}
+        scrollEnabled={true}
         getItemLayout={(_, index) => ({
           length: SCREEN_WIDTH,
           offset: SCREEN_WIDTH * index,
@@ -295,7 +294,7 @@ const styles = StyleSheet.create({
   },
   screen: {
     width: SCREEN_WIDTH,
-    flex: 1,
+    height: SCREEN_HEIGHT,
   },
   centerContent: {
     justifyContent: 'center',

@@ -112,7 +112,7 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
                   style={styles.titleInput}
                   value={title}
                   onChangeText={setTitle}
-                  autoFocus
+
                   onSubmitEditing={handleSaveTitle}
                   onBlur={handleSaveTitle}
                   returnKeyType="done"
@@ -290,7 +290,7 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
                   onChangeText={setSubtaskTitle}
                   placeholder="Subtask title"
                   placeholderTextColor={Colors.dark.textTertiary}
-                  autoFocus
+
                   onSubmitEditing={handleAddSubtask}
                   returnKeyType="done"
                 />

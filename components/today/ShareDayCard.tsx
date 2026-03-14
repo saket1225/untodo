@@ -1,6 +1,7 @@
 import { useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import ViewShot from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { getDailyScore } from './DailyScore';
 
@@ -22,9 +23,9 @@ export function ShareDayCard({ completed, total, streak }: { completed: number; 
     try {
       const uri = await viewShotRef.current?.capture?.();
       if (uri) {
-        await Share.share({
-          url: uri,
-          message: `${dateStr}: ${completed}/${total} tasks done (${pct}%) | ${streak} day streak | untodo`,
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          dialogTitle: 'Share your day',
         });
       }
     } catch {

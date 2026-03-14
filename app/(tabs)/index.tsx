@@ -197,8 +197,7 @@ function TodayScreenContent() {
 
   useKeyboardShortcuts({
     onNewTask: () => {
-      // Focus the TodoInput - we use a ref indirectly
-      inputRefForFocus.current?.focus?.();
+      // No auto-focus - user taps input to open keyboard
     },
     onNavigateUp: () => {
       setSelectedIndex(prev => Math.max(0, prev - 1));
@@ -428,9 +427,7 @@ function TodayScreenContent() {
   const toggleSearch = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSearchExpanded(prev => {
-      if (!prev) {
-        setTimeout(() => searchInputRef.current?.focus(), 100);
-      } else {
+      if (prev) {
         setSearchQuery('');
       }
       return !prev;
@@ -786,7 +783,7 @@ function TodayScreenContent() {
 
       {/* Input */}
       {!selectionMode && (
-        <TodoInput onAdd={handleAdd} autoFocus={isToday} viewingDate={viewingDate} />
+        <TodoInput onAdd={handleAdd} viewingDate={viewingDate} />
       )}
 
       {/* Skeleton loading */}

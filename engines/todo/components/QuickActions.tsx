@@ -5,6 +5,8 @@ import { format, addDays } from 'date-fns';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Todo, Priority, Category, CATEGORIES, PRIORITY_CONFIG } from '../types';
 import { getLogicalDate } from '../../../lib/date-utils';
+import { useTodoStore } from '../store';
+import { CalendarPicker } from '../../../components/today/CalendarPicker';
 
 interface Props {
   todo: Todo;
@@ -18,6 +20,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(todo.title);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const allTodos = useTodoStore(s => s.todos);
 
   useEffect(() => {
     setTitle(todo.title);
@@ -97,7 +100,6 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
                   style={styles.editInput}
                   value={title}
                   onChangeText={setTitle}
-                  autoFocus
                   onSubmitEditing={handleSaveTitle}
                   returnKeyType="done"
                 />
@@ -206,38 +208,20 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
             )}
 
             {/* Schedule for date */}
-            {showDatePicker ? (
-              <View style={styles.datePickerSection}>
-                <Text style={styles.sectionLabel}>SCHEDULE FOR</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.chipRow}>
-                    {[
-                      { label: 'Today', days: 0 },
-                      { label: 'Tomorrow', days: 1 },
-                      { label: 'In 2 days', days: 2 },
-                      { label: 'In 3 days', days: 3 },
-                      { label: 'Next week', days: 7 },
-                    ].map(opt => {
-                      const d = format(addDays(new Date(today + 'T12:00:00'), opt.days), 'yyyy-MM-dd');
-                      const isActive = todo.logicalDate === d;
-                      return (
-                        <TouchableOpacity
-                          key={opt.label}
-                          style={[styles.chip, isActive && styles.chipActive]}
-                          onPress={() => handleScheduleDate(d)}
-                        >
-                          <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{opt.label}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.actionRow} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowDatePicker(true); }}>
-                <Text style={styles.actionIcon}>📆</Text>
-                <Text style={styles.actionText}>Schedule for date</Text>
-              </TouchableOpacity>
+            <TouchableOpacity style={styles.actionRow} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowDatePicker(true); }}>
+              <Text style={styles.actionIcon}>📆</Text>
+              <Text style={styles.actionText}>Schedule for date</Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <CalendarPicker
+                selectedDate={todo.logicalDate}
+                allTodos={allTodos}
+                onSelectDate={(dateStr) => {
+                  handleScheduleDate(dateStr);
+                  setShowDatePicker(false);
+                }}
+                onClose={() => setShowDatePicker(false)}
+              />
             )}
 
             {/* Move to tomorrow */}

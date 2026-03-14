@@ -12,9 +12,9 @@ import { startSiliconListener } from '../../engines/silicon/bridge';
 function TabIcon({ label, focused, badge }: { label: string; focused: boolean; badge?: number }) {
   const icons: Record<string, string> = {
     'Today': '◉',
-    'Progress': '◧',
-    'Wallpaper': '◫',
-    'Settings': '⚙',
+    'Stats': '◧',
+    'Wall': '◫',
+    'Config': '⚙',
   };
   return (
     <View style={styles.tabIcon}>
@@ -84,21 +84,21 @@ export default function TabLayout() {
       <Tabs.Screen
         name="progress"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon label="Progress" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon label="Stats" focused={focused} />,
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="wallpaper"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon label="Wallpaper" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon label="Wall" focused={focused} />,
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon label="Settings" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon label="Config" focused={focused} />,
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
@@ -156,7 +156,6 @@ const styles = StyleSheet.create({
     lineHeight: 12,
   },
   label: {
-    fontSize: 10,
-    maxWidth: 70,
+    fontSize: 9,
   },
 });

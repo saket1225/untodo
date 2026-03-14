@@ -607,10 +607,24 @@ function WallpaperScreenContent() {
     ? 'Invalid date'
     : null;
 
-  const displayNumber = config.showDaysLeft ? daysLeft : dayNumber;
-  const displayLabel = config.showDaysLeft
-    ? `days until ${config.goalTitle || '20'}`
-    : `day ${dayNumber}`;
+  const headingMode = config.headingMode || 'remaining_first';
+  const goalLabel = config.goalTitle || '20';
+
+  let displayNumber: number;
+  let displayLabel: string;
+  let displaySubLabel: string | null = null;
+
+  if (headingMode === 'day_first') {
+    displayNumber = dayNumber;
+    displayLabel = `Day ${dayNumber}`;
+    displaySubLabel = `${daysLeft} days remaining`;
+    if (goalLabel) displaySubLabel += ` - ${goalLabel}`;
+  } else {
+    displayNumber = daysLeft;
+    displayLabel = `days until ${goalLabel}`;
+    displaySubLabel = `Day ${dayNumber}`;
+    if (goalLabel) displaySubLabel += ` - ${goalLabel}`;
+  }
 
   const quote = useMemo(() => getDailyQuote(config.customQuote), [config.customQuote]);
 
@@ -830,6 +844,13 @@ function WallpaperScreenContent() {
                     activeStyle.fontOverride === 'monospace' && { fontFamily: 'monospace' },
                   ]}>{displayLabel}</Text>
                 )}
+                {config.showDayCount && displaySubLabel && (
+                  <Text style={[
+                    styles.previewSubLabel,
+                    { color: activeStyle.textTertiary },
+                    activeStyle.fontOverride === 'monospace' && { fontFamily: 'monospace' },
+                  ]}>{displaySubLabel}</Text>
+                )}
 
                 {/* Stats line (only in stats preset) */}
                 {isStats && (
@@ -1005,11 +1026,23 @@ function WallpaperScreenContent() {
               value={config.showDayCount}
               onChange={v => updateConfig({ showDayCount: v })}
             />
-            <ToggleControl
-              label="Show Days Left"
-              value={config.showDaysLeft}
-              onChange={v => updateConfig({ showDaysLeft: v })}
-            />
+            {/* Heading mode toggle */}
+            <View style={styles.controlRow}>
+              <Text style={styles.controlLabel}>Heading</Text>
+              <TouchableOpacity
+                style={styles.headingToggleBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateConfig({
+                    headingMode: (config.headingMode || 'remaining_first') === 'remaining_first' ? 'day_first' : 'remaining_first',
+                  });
+                }}
+              >
+                <Text style={styles.headingToggleBtnText}>
+                  {(config.headingMode || 'remaining_first') === 'day_first' ? `Day ${dayNumber}` : `${daysLeft} days left`}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <ToggleControl
               label="Show Streak"
               value={config.showStreak}
@@ -1077,6 +1110,7 @@ function WallpaperScreenContent() {
                   goalTitle: '20', goalDate: '2028-01-12', showDaysLeft: true,
                   preset: 'full', colorTheme: 'classic', customQuote: '',
                   wallpaperStyle: 'minimal', startDate: '2026-03-10',
+                  headingMode: 'remaining_first',
                 }),
               },
             ]);
@@ -1159,6 +1193,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: Spacing.lg,
+  },
+  previewSubLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    marginBottom: Spacing.sm,
   },
   previewQuote: {
     fontFamily: Fonts.accentItalic,
@@ -1392,6 +1431,19 @@ const styles = StyleSheet.create({
     fontSize: 20,
     minWidth: 40,
     textAlign: 'center',
+  },
+  headingToggleBtn: {
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  headingToggleBtnText: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 13,
   },
   divider: {
     height: 1,

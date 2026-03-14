@@ -1,6 +1,6 @@
 import { useRef, memo, useState, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Animated, PanResponder, Alert, Dimensions,
+  View, Text, TouchableOpacity, StyleSheet, Animated, Alert,
   LayoutAnimation, UIManager, Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -12,10 +12,6 @@ import { useTodoStore } from '../store';
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SWIPE_COMPLETE_THRESHOLD = 80;
-const SWIPE_DELETE_THRESHOLD = -100;
 
 const CONFETTI_COLORS = ['#4ADE80', '#60A5FA', '#FBBF24', '#F472B6', '#A78BFA', '#F5F5F5'];
 const NUM_CONFETTI = 8;
@@ -135,9 +131,7 @@ function CheckboxConfetti({ visible }: { visible: boolean }) {
 }
 
 function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus, selectionMode, isSelected, onSelect, habitHistory }: Props) {
-  const translateX = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const opacityAnim = useRef(new Animated.Value(1)).current;
   const [showConfetti, setShowConfetti] = useState(false);
   const confettiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startTimeTracking = useTodoStore(s => s.startTimeTracking);
@@ -152,77 +146,6 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
 
   const isTracking = !!todo.timeTracking?.startedAt;
   const totalSeconds = todo.timeTracking?.totalSeconds || 0;
-
-  // Keep latest values in refs so PanResponder handlers never go stale
-  const latestRef = useRef({ todo, onToggle, onDelete, isTracking, stopTimeTracking });
-  latestRef.current = { todo, onToggle, onDelete, isTracking, stopTimeTracking };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 20 && Math.abs(gs.dy) < 20,
-      onPanResponderMove: (_, gs) => {
-        if (gs.dx > 0 && !latestRef.current.todo.completed) {
-          translateX.setValue(gs.dx);
-        } else if (gs.dx < 0) {
-          translateX.setValue(gs.dx);
-        }
-      },
-      onPanResponderRelease: (_, gs) => {
-        const { todo: t, onToggle: toggle, onDelete: del, isTracking: tracking, stopTimeTracking: stopTracking } = latestRef.current;
-        if (gs.dx > SWIPE_COMPLETE_THRESHOLD && !t.completed) {
-          // Swipe right -> complete with satisfying animation
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          setShowConfetti(true);
-          if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
-          confettiTimerRef.current = setTimeout(() => setShowConfetti(false), 500);
-          Animated.parallel([
-            Animated.timing(translateX, { toValue: SCREEN_WIDTH, duration: 250, useNativeDriver: true }),
-            Animated.timing(opacityAnim, { toValue: 0.3, duration: 250, useNativeDriver: true }),
-          ]).start(() => {
-            if (tracking) stopTracking(t.id);
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            toggle();
-            translateX.setValue(0);
-            opacityAnim.setValue(1);
-          });
-        } else if (gs.dx < SWIPE_DELETE_THRESHOLD) {
-          Animated.spring(translateX, { toValue: -120, useNativeDriver: true, friction: 8 }).start();
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          Alert.alert(
-            'Delete task?',
-            t.title,
-            [
-              {
-                text: 'Cancel',
-                style: 'cancel',
-                onPress: () => {
-                  Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-                },
-              },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                  Animated.parallel([
-                    Animated.timing(translateX, { toValue: -SCREEN_WIDTH, duration: 200, useNativeDriver: true }),
-                    Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-                  ]).start(() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    del();
-                    translateX.setValue(0);
-                    opacityAnim.setValue(1);
-                  });
-                },
-              },
-            ]
-          );
-        } else {
-          Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 8 }).start();
-        }
-      },
-    })
-  ).current;
 
   const handleToggle = () => {
     if (!todo.completed) {
@@ -249,6 +172,27 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
     onToggle();
   };
 
+  const handleLongPress = () => {
+    if (selectionMode) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Delete task?',
+      todo.title,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            onDelete();
+          },
+        },
+      ]
+    );
+  };
+
   const toggleTracking = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isTracking) {
@@ -265,36 +209,12 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
   const subtasksDone = subtasks.filter(s => s.completed).length;
   const subtaskProgress = subtasks.length > 0 ? subtasksDone / subtasks.length : 0;
 
-  const completeBackgroundOpacity = translateX.interpolate({
-    inputRange: [0, SWIPE_COMPLETE_THRESHOLD],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-  const deleteBackgroundOpacity = translateX.interpolate({
-    inputRange: [SWIPE_DELETE_THRESHOLD, 0],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
   return (
-    <Animated.View style={[styles.wrapper, { opacity: opacityAnim }]}>
-      {/* Swipe backgrounds clipped to item bounds */}
-      <View style={styles.swipeBackgrounds}>
-        {/* Complete background (green, left side) */}
-        {!todo.completed && (
-          <Animated.View style={[styles.completeBackground, { opacity: completeBackgroundOpacity }]}>
-            <Text style={styles.completeText}>✓ Done</Text>
-          </Animated.View>
-        )}
-        {/* Delete background (red, right side) */}
-        <Animated.View style={[styles.deleteBackground, { opacity: deleteBackgroundOpacity }]}>
-          <Text style={styles.deleteText}>Delete</Text>
-        </Animated.View>
-      </View>
+    <View style={styles.wrapper}>
       <Animated.View
         style={[
           styles.container,
-          { transform: [{ translateX }, { scale: scaleAnim }] },
+          { transform: [{ scale: scaleAnim }] },
           priorityColor ? { borderLeftWidth: 3, borderLeftColor: priorityColor } : { borderLeftWidth: 3, borderLeftColor: 'transparent' },
           todo.priority === 'high' && !selectionMode && styles.highPriorityContainer,
           todo.priority === 'medium' && !selectionMode && styles.mediumPriorityContainer,
@@ -302,7 +222,6 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
           todo.completed && !selectionMode && { opacity: 0.4 },
           selectionMode && isSelected && styles.selectedContainer,
         ]}
-        {...panResponder.panHandlers}
       >
         {/* Checkbox / Selection */}
         {selectionMode ? (
@@ -341,7 +260,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
         <TouchableOpacity
           style={styles.content}
           onPress={selectionMode ? onSelect : onPress}
-          onLongPress={selectionMode ? undefined : onLongPress}
+          onLongPress={selectionMode ? undefined : handleLongPress}
           activeOpacity={0.7}
           delayLongPress={400}
         >
@@ -431,7 +350,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
           </TouchableOpacity>
         )}
       </Animated.View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -465,42 +384,6 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.dark.border,
-  },
-  swipeBackgrounds: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  completeBackground: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: '100%',
-    backgroundColor: Colors.dark.success,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    paddingLeft: Spacing.lg,
-  },
-  completeText: {
-    color: '#000',
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 14,
-  },
-  deleteBackground: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: '100%',
-    backgroundColor: Colors.dark.error,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    paddingRight: Spacing.lg,
-  },
-  deleteText: {
-    color: '#fff',
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 14,
   },
   container: {
     flexDirection: 'row',
