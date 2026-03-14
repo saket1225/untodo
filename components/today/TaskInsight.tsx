@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
-import { Todo } from '../../../engines/todo/types';
-import { generateDailyInsight } from '../../../lib/insights';
+import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { Todo } from '../../engines/todo/types';
+import { generateDailyInsight } from '../../lib/insights';
 
 export function TaskInsight({ todos }: { todos: Todo[] }) {
   const insight = useMemo(() => generateDailyInsight(todos), [todos]);

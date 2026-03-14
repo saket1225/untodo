@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share } from 'react-native';
 import ViewShot from 'react-native-view-shot';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { getDailyScore } from './DailyScore';
 
 export function formatDayHeader(dateStr: string): string {

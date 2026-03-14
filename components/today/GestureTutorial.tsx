@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated as RNAnimated } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { Colors, Fonts, Spacing } from '../../lib/theme';
 
 export const GESTURE_TUTORIAL_KEY = 'untodo-gesture-tutorial-shown';
 

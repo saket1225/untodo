@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
-import { getLogicalDate } from '../../../lib/date-utils';
-import { Todo } from '../../../engines/todo/types';
+import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { getLogicalDate } from '../../lib/date-utils';
+import { Todo } from '../../engines/todo/types';
 
 export function CalendarPicker({
   selectedDate,

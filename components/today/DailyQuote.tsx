@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { TouchableOpacity, StyleSheet, Animated as RNAnimated } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { Colors, Fonts, Spacing } from '../../lib/theme';
 
 const DAILY_QUOTES = [
   'Memento mori.',

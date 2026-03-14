@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { View, StyleSheet, Animated as RNAnimated } from 'react-native';
-import { Colors, Spacing } from '../../../lib/theme';
+import { Colors, Spacing } from '../../lib/theme';
 
 function SkeletonBar({ width, delay = 0 }: { width: number | string; delay?: number }) {
   const shimmer = useRef(new RNAnimated.Value(0)).current;

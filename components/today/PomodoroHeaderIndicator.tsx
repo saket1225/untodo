@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
-import { usePomodoroState } from '../../../engines/todo/pomodoroState';
+import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { usePomodoroState } from '../../engines/todo/pomodoroState';
 
 export function PomodoroHeaderIndicator() {
   const { isActive, taskTitle, phase, secondsLeft, isFlowtime } = usePomodoroState();

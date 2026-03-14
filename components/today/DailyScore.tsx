@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated as RNAnimated } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { Colors, Fonts, Spacing } from '../../lib/theme';
 
 export function getDailyScore(completed: number, total: number, streak: number): { grade: string; color: string; pct: number } {
   if (total === 0) return { grade: '--', color: Colors.dark.textTertiary, pct: 0 };

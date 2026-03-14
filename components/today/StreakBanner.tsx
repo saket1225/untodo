@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
-import { Todo } from '../../../engines/todo/types';
-import { calculateStreak } from '../../../lib/streak';
+import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { Todo } from '../../engines/todo/types';
+import { calculateStreak } from '../../lib/streak';
 
 export function useTaskStreak(allTodos: Todo[]): { streak: number; atRisk: boolean } {
   return useMemo(() => {

@@ -50,7 +50,7 @@ import {
   ShareDayCard,
   formatDayHeader,
   PomodoroHeaderIndicator,
-} from './_today';
+} from '../../components/today';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Items have variable heights (subtasks, habit dots, metadata) - no getItemLayout

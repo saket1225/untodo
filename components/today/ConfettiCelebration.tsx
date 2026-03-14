@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated as RNAnimated, Dimensions } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { Colors, Fonts, Spacing } from '../../lib/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

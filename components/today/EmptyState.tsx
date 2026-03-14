@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { Text, StyleSheet, Animated as RNAnimated } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { getTimeOfDay, TimeOfDay } from './helpers';
 import { DailyQuote } from './DailyQuote';
 

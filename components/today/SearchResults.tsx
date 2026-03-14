@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
-import { formatDisplayDate } from '../../../lib/date-utils';
-import { Todo } from '../../../engines/todo/types';
+import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { formatDisplayDate } from '../../lib/date-utils';
+import { Todo } from '../../engines/todo/types';
 
 export function SearchResults({
   query,
