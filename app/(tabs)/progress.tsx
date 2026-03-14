@@ -1,49 +1,274 @@
 import { useMemo, useState, useCallback, useRef, memo, useEffect } from 'react';
-import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity, Share, Dimensions, Animated as RNAnimated } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity, Share, Dimensions, Animated as RNAnimated, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import ViewShot from 'react-native-view-shot';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useTodoStore } from '../../engines/todo/store';
-import { useProgressStore, getWeekStats, getRecentDays } from '../../engines/progress/store';
-import { DaySummary } from '../../engines/progress/types';
+import { useProgressStore, getWeekStats } from '../../engines/progress/store';
 import { getLogicalDate } from '../../lib/date-utils';
-import { computeAnalytics, generateDailyInsight, AnalyticsData } from '../../lib/insights';
+import { computeAnalytics, AnalyticsData } from '../../lib/insights';
 import { calculateStreak } from '../../lib/streak';
 import { format } from 'date-fns';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import WeeklyReviewComponent from '../../engines/progress/components/WeeklyReview';
-import { useAchievementStore, Achievement } from '../../engines/achievements/store';
-import { useMilestoneStore, TASK_MILESTONES } from '../../engines/milestones/store';
+import { useAchievementStore } from '../../engines/achievements/store';
 import * as Haptics from 'expo-haptics';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const BAR_MAX_HEIGHT = 120;
+const COLLAPSE_STORAGE_KEY = 'untodo-progress-collapse';
 
-// --- GitHub-style Contribution Graph ---
+// --- Collapse state persistence ---
+function useCollapseState(defaults: Record<string, boolean>) {
+  const [state, setState] = useState(defaults);
+  const loaded = useRef(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(COLLAPSE_STORAGE_KEY).then(raw => {
+      if (raw) {
+        try {
+          const saved = JSON.parse(raw);
+          setState(prev => ({ ...prev, ...saved }));
+        } catch {}
+      }
+      loaded.current = true;
+    });
+  }, []);
+
+  const toggle = useCallback((key: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setState(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      AsyncStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  return { collapsed: state, toggle };
+}
+
+// --- Collapsible Section Header ---
+function CollapsibleHeader({ title, collapsed, onToggle, count }: {
+  title: string; collapsed: boolean; onToggle: () => void; count?: string;
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.collapsibleHeader}
+      onPress={onToggle}
+      activeOpacity={0.7}
+    >
+      <View style={styles.collapsibleHeaderLeft}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {count && <Text style={styles.collapsibleCount}>{count}</Text>}
+      </View>
+      <Text style={styles.collapsibleChevron}>{collapsed ? '\u25B6' : '\u25BC'}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// --- Letter Grade ---
+function getLetterGrade(pct: number): { grade: string; color: string } {
+  if (pct >= 95) return { grade: 'A+', color: Colors.dark.success };
+  if (pct >= 90) return { grade: 'A', color: Colors.dark.success };
+  if (pct >= 85) return { grade: 'A-', color: Colors.dark.success };
+  if (pct >= 80) return { grade: 'B+', color: '#4ADE80CC' };
+  if (pct >= 75) return { grade: 'B', color: '#4ADE80AA' };
+  if (pct >= 70) return { grade: 'B-', color: '#4ADE8088' };
+  if (pct >= 65) return { grade: 'C+', color: Colors.dark.timer };
+  if (pct >= 60) return { grade: 'C', color: Colors.dark.timer };
+  if (pct >= 55) return { grade: 'C-', color: Colors.dark.timer };
+  if (pct >= 50) return { grade: 'D+', color: '#EF444499' };
+  if (pct >= 45) return { grade: 'D', color: Colors.dark.error };
+  if (pct >= 40) return { grade: 'D-', color: Colors.dark.error };
+  return { grade: 'F', color: Colors.dark.error };
+}
+
+// --- 1. Today's Progress Ring ---
+function TodayProgressRing() {
+  const todos = useTodoStore(s => s.todos);
+  const logicalDate = getLogicalDate();
+
+  const { completed, total, focusMins } = useMemo(() => {
+    const todayTodos = todos.filter(t => t.logicalDate === logicalDate);
+    const completed = todayTodos.filter(t => t.completed).length;
+    const total = todayTodos.length;
+    const focusMins = todayTodos.reduce((s, t) => {
+      let mins = t.pomodoroMinutesLogged || 0;
+      if (t.timeTracking?.totalSeconds) mins += Math.floor(t.timeTracking.totalSeconds / 60);
+      return s + mins;
+    }, 0);
+    return { completed, total, focusMins };
+  }, [todos, logicalDate]);
+
+  const progress = total > 0 ? completed / total : 0;
+  const pct = Math.round(progress * 100);
+
+  const size = 160;
+  const strokeWidth = 12;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference * (1 - progress);
+
+  return (
+    <View style={styles.ringSection}>
+      <View style={styles.ringContainer}>
+        <Svg width={size} height={size}>
+          <Circle
+            cx={size / 2} cy={size / 2} r={radius}
+            stroke={Colors.dark.border} strokeWidth={strokeWidth} fill="transparent"
+          />
+          <Circle
+            cx={size / 2} cy={size / 2} r={radius}
+            stroke={progress === 1 ? Colors.dark.success : Colors.dark.accent}
+            strokeWidth={strokeWidth} fill="transparent"
+            strokeDasharray={`${circumference}`}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        </Svg>
+        <View style={styles.ringCenter}>
+          <Text style={styles.ringPct}>{pct}%</Text>
+          <Text style={styles.ringLabel}>{completed}/{total}</Text>
+        </View>
+      </View>
+      {focusMins > 0 && (
+        <Text style={styles.ringFocus}>{focusMins}m focused today</Text>
+      )}
+    </View>
+  );
+}
+
+// --- 2. Daily Score Letter Grade ---
+function DailyScoreGrade() {
+  const todos = useTodoStore(s => s.todos);
+  const logicalDate = getLogicalDate();
+
+  const { grade, color, pct } = useMemo(() => {
+    const todayTodos = todos.filter(t => t.logicalDate === logicalDate);
+    const total = todayTodos.length;
+    const completed = todayTodos.filter(t => t.completed).length;
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const { grade, color } = total > 0 ? getLetterGrade(pct) : { grade: '-', color: Colors.dark.textTertiary };
+    return { grade, color, pct };
+  }, [todos, logicalDate]);
+
+  return (
+    <View style={styles.gradeCard}>
+      <Text style={[styles.gradeValue, { color }]}>{grade}</Text>
+      <View>
+        <Text style={styles.gradeLabel}>Daily Score</Text>
+        <Text style={styles.gradeSub}>{pct}% completion</Text>
+      </View>
+    </View>
+  );
+}
+
+// --- 3. Streak Counter ---
+function StreakCounter() {
+  const todos = useTodoStore(s => s.todos);
+  const streak = useMemo(() => calculateStreak(todos), [todos]);
+
+  return (
+    <View style={styles.streakCard}>
+      <Text style={styles.streakEmoji}>{streak > 0 ? '\uD83D\uDD25' : '\uD83D\uDCA4'}</Text>
+      <Text style={styles.streakNum}>{streak}</Text>
+      <Text style={styles.streakLabel}>day streak</Text>
+    </View>
+  );
+}
+
+// --- 4. Weekly Bar Chart ---
+function WeeklyBarChart() {
+  const todos = useTodoStore(s => s.todos);
+  const stats = useMemo(() => getWeekStats(), [todos]);
+  const hasData = stats.totalTasks > 0;
+
+  if (!hasData) {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>This Week</Text>
+        <View style={styles.emptySection}>
+          <Text style={styles.emptyTitle}>No tasks this week yet</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const pct = Math.round(stats.completionRate * 100);
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.weekHeader}>
+        <Text style={styles.sectionTitle}>This Week</Text>
+        <Text style={styles.weekPct}>{pct}%</Text>
+      </View>
+      <View style={styles.barChart}>
+        {stats.weekDays.map((day, i) => {
+          const rate = day.totalTasks > 0 ? day.completionRate : 0;
+          const height = day.totalTasks > 0 ? Math.max(4, rate * BAR_MAX_HEIGHT) : 4;
+          const isToday = day.date === new Date().toISOString().split('T')[0];
+          const pctLabel = day.totalTasks > 0 ? `${Math.round(rate * 100)}%` : '';
+          return (
+            <View key={day.date} style={styles.barCol}>
+              {pctLabel ? (
+                <Text style={styles.barPctLabel}>{pctLabel}</Text>
+              ) : (
+                <Text style={styles.barPctLabel}> </Text>
+              )}
+              <View style={styles.barTrack}>
+                <View
+                  style={[
+                    styles.barFill,
+                    {
+                      height,
+                      backgroundColor: isToday
+                        ? Colors.dark.accent
+                        : day.totalTasks > 0 ? Colors.dark.textSecondary : Colors.dark.border,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={[styles.barLabel, isToday && { color: Colors.dark.accent }]}>
+                {DAY_LABELS[i]}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+      <View style={styles.weekStatsRow}>
+        <Text style={styles.weekStatText}>{stats.totalCompleted} completed</Text>
+        <View style={styles.weekStatDot} />
+        <Text style={styles.weekStatText}>{stats.totalTasks} total</Text>
+      </View>
+    </View>
+  );
+}
+
+// --- 5. Contribution Graph ---
 function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
   const graphData = useMemo(() => {
     if (heatmap.length === 0) return { weeks: [], monthLabels: [], totalCompleted: 0, activeDays: 0 };
-    // Organize into weeks (columns) with days (rows), GitHub-style
     const firstDate = new Date(heatmap[0].date + 'T12:00:00');
-    const firstDayOfWeek = (firstDate.getDay() + 6) % 7; // 0=Mon, 6=Sun
-
-    // Build padded data
+    const firstDayOfWeek = (firstDate.getDay() + 6) % 7;
     const padded = [
       ...Array(firstDayOfWeek).fill({ date: '', count: 0, rate: 0 }),
       ...heatmap,
     ];
-
-    // Split into weeks (columns)
     const weeks: typeof heatmap[] = [];
     for (let i = 0; i < padded.length; i += 7) {
       const week = padded.slice(i, i + 7);
       while (week.length < 7) week.push({ date: '', count: 0, rate: 0 });
       weeks.push(week);
     }
-
-    // Month labels: find first occurrence of each month
     const monthLabels: { label: string; weekIndex: number }[] = [];
     let lastMonth = -1;
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -59,10 +284,8 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
         }
       }
     });
-
     const totalCompleted = heatmap.reduce((s, d) => s + d.count, 0);
     const activeDays = heatmap.filter(d => d.count > 0).length;
-
     return { weeks, monthLabels, totalCompleted, activeDays };
   }, [heatmap]);
 
@@ -86,7 +309,6 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
   const needsScroll = gridWidth > availableWidth;
   const scrollRef = useRef<ScrollView>(null);
 
-  // Auto-scroll to the end (most recent) on mount
   useEffect(() => {
     if (needsScroll && scrollRef.current) {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 50);
@@ -101,7 +323,6 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
           {graphData.totalCompleted} done in {graphData.activeDays} day{graphData.activeDays !== 1 ? 's' : ''}
         </Text>
       </View>
-
       <ScrollView
         ref={scrollRef}
         horizontal={needsScroll}
@@ -109,31 +330,22 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
         scrollEnabled={needsScroll}
       >
         <View>
-          {/* Month labels */}
           <View style={[styles.monthLabelsRow, { marginLeft: 20 }]}>
             {graphData.weeks.map((_, wi) => {
               const label = graphData.monthLabels.find(m => m.weekIndex === wi);
               return (
-                <Text
-                  key={wi}
-                  style={[styles.monthLabel, { width: cellSize + gap }]}
-                  numberOfLines={1}
-                >
+                <Text key={wi} style={[styles.monthLabel, { width: cellSize + gap }]} numberOfLines={1}>
                   {label ? label.label : ''}
                 </Text>
               );
             })}
           </View>
-
           <View style={styles.heatmapContainer}>
-            {/* Day labels */}
             <View style={[styles.heatmapDayLabels, { gap }]}>
               {['M', '', 'W', '', 'F', '', ''].map((d, i) => (
                 <Text key={i} style={[styles.heatmapDayLabel, { height: cellSize, lineHeight: cellSize }]}>{d}</Text>
               ))}
             </View>
-
-            {/* Grid */}
             <View style={[styles.heatmapGrid, { gap }]}>
               {graphData.weeks.map((week, wi) => (
                 <View key={wi} style={[styles.heatmapWeek, { gap }]}>
@@ -154,7 +366,6 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
           </View>
         </View>
       </ScrollView>
-
       <View style={styles.heatmapLegend}>
         <Text style={styles.heatmapLegendText}>Less</Text>
         {[Colors.dark.border, '#4ADE8033', '#4ADE8066', '#4ADE80AA', Colors.dark.success].map((c, i) => (
@@ -166,418 +377,134 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
   );
 }
 
-// --- Category Breakdown ---
-function CategoryBreakdown({ data }: { data: AnalyticsData['categoryBreakdown'] }) {
-  if (data.length === 0) return null;
-  const maxCount = data[0]?.count || 1;
+// --- 6. Weekly Review (Collapsible) ---
+// Uses the existing WeeklyReviewComponent
+
+// --- 7. Achievements Grid (Collapsible) ---
+function AchievementsGrid() {
+  const achievements = useAchievementStore(s => s.achievements);
+  const unlocked = achievements.filter(a => a.unlockedAt);
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Categories</Text>
-      {data.map(item => (
-        <View key={item.category} style={styles.catBarRow}>
-          <Text style={[styles.catBarLabel, { color: item.color }]}>{item.label}</Text>
-          <View style={styles.catBarTrack}>
-            <View
-              style={[
-                styles.catBarFill,
-                {
-                  width: `${Math.max(4, (item.count / maxCount) * 100)}%`,
-                  backgroundColor: item.color,
-                },
-              ]}
-            />
-          </View>
-          <Text style={styles.catBarCount}>{item.count}</Text>
+    <View style={styles.achievementsGrid}>
+      {achievements.map(a => (
+        <View
+          key={a.id}
+          style={[styles.achievementBadge, !a.unlockedAt && styles.achievementLocked]}
+        >
+          <Text style={[styles.achievementIcon, !a.unlockedAt && { opacity: 0.2 }]}>{a.icon}</Text>
+          <Text style={[styles.achievementTitle, !a.unlockedAt && { color: Colors.dark.textTertiary }]} numberOfLines={1}>
+            {a.title}
+          </Text>
+          <Text style={styles.achievementDesc} numberOfLines={2}>{a.description}</Text>
         </View>
       ))}
     </View>
   );
 }
 
-// --- Analytics Summary Cards ---
-function AnalyticsSummary({ analytics }: { analytics: AnalyticsData }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Insights</Text>
-      <View style={styles.analyticsGrid}>
-        <View style={styles.analyticsCard}>
-          <Text style={styles.analyticsValue}>{analytics.avgDailyCompletion}%</Text>
-          <Text style={styles.analyticsLabel}>avg completion{'\n'}(30 days)</Text>
-        </View>
-        <View style={styles.analyticsCard}>
-          <Text style={styles.analyticsValue}>{analytics.mostProductiveDay.slice(0, 3)}</Text>
-          <Text style={styles.analyticsLabel}>most productive{'\n'}day</Text>
-        </View>
-        <View style={styles.analyticsCard}>
-          <Text style={[styles.analyticsValue, { color: Colors.dark.timer }]}>
-            {analytics.avgPomodoroMinutes}m
-          </Text>
-          <Text style={styles.analyticsLabel}>avg focus{'\n'}per day</Text>
-        </View>
-        <View style={styles.analyticsCard}>
-          <Text style={[styles.analyticsValue, { color: Colors.dark.success }]}>
-            {analytics.longestStreak}
-          </Text>
-          <Text style={styles.analyticsLabel}>longest{'\n'}streak ever</Text>
-        </View>
-        {analytics.totalTimeTrackedMinutes > 0 && (
-          <View style={styles.analyticsCard}>
-            <Text style={[styles.analyticsValue, { color: Colors.dark.timer }]}>
-              {analytics.totalTimeTrackedMinutes}m
-            </Text>
-            <Text style={styles.analyticsLabel}>total time{'\n'}tracked</Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
+// --- 8. Deep Statistics (Collapsible) ---
+function DeepStatistics({ analytics, todos }: { analytics: AnalyticsData; todos: any[] }) {
+  const stats = useMemo(() => {
+    const allCompleted = todos.filter((t: any) => t.completed);
+    const totalCompleted = allCompleted.length;
+    const totalTasks = todos.length;
+    const datesWithTasks = new Set(todos.map((t: any) => t.logicalDate));
+    const avgPerDay = datesWithTasks.size > 0 ? (totalCompleted / datesWithTasks.size).toFixed(1) : '0';
+    const completionRate = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
 
-function TodaySummaryCard() {
-  const todos = useTodoStore(s => s.todos);
-  const logicalDate = getLogicalDate();
-
-  const { completed, total, pomodoroMins, streak, focusToday, weekRate } = useMemo(() => {
-    const todayTodos = todos.filter(t => t.logicalDate === logicalDate);
-    const completed = todayTodos.filter(t => t.completed).length;
-    const total = todayTodos.length;
-    const pomodoroMins = todayTodos.reduce((s, t) => s + (t.pomodoroMinutesLogged || 0), 0);
-
-    // Calculate focus time (pomodoro + time tracking)
-    const focusToday = todayTodos.reduce((s, t) => {
-      let mins = t.pomodoroMinutesLogged || 0;
-      if (t.timeTracking?.totalSeconds) mins += Math.floor(t.timeTracking.totalSeconds / 60);
-      return s + mins;
-    }, 0);
-
-    // Weekly completion rate
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const weekAgo = new Date(today);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    let weekTotal = 0, weekCompleted = 0;
-    for (const t of todos) {
-      if (!t.logicalDate) continue;
-      const d = new Date(t.logicalDate + 'T00:00:00');
-      if (d >= weekAgo && d <= today) {
-        weekTotal++;
-        if (t.completed) weekCompleted++;
+    const hourBuckets: number[] = new Array(24).fill(0);
+    allCompleted.forEach((t: any) => {
+      if (t.updatedAt) {
+        const hour = new Date(t.updatedAt).getHours();
+        hourBuckets[hour]++;
       }
-    }
-    const weekRate = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
+    });
+    const peakHour = hourBuckets.indexOf(Math.max(...hourBuckets));
+    const timeOfDay = peakHour < 6 ? 'Late night' : peakHour < 12 ? 'Morning' : peakHour < 17 ? 'Afternoon' : peakHour < 21 ? 'Evening' : 'Night';
+    const peakHourLabel = peakHour === 0 ? '12am' : peakHour < 12 ? `${peakHour}am` : peakHour === 12 ? '12pm' : `${peakHour - 12}pm`;
 
-    const streak = calculateStreak(todos);
-    return { completed, total, pomodoroMins, streak, focusToday, weekRate };
-  }, [todos, logicalDate]);
+    let totalFocusMins = 0;
+    todos.forEach((t: any) => {
+      totalFocusMins += t.pomodoroMinutesLogged || 0;
+      if (t.timeTracking?.totalSeconds) totalFocusMins += Math.floor(t.timeTracking.totalSeconds / 60);
+    });
+    const focusHours = Math.floor(totalFocusMins / 60);
+    const focusMins = totalFocusMins % 60;
+    const focusLabel = focusHours > 0 ? `${focusHours}h ${focusMins}m` : `${focusMins}m`;
 
-  const progress = total > 0 ? completed / total : 0;
-  const pct = Math.round(progress * 100);
-
-  const size = 140;
-  const strokeWidth = 10;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference * (1 - progress);
-
-  return (
-    <View style={styles.todayCard}>
-      {/* Prominent streak banner */}
-      {streak > 0 && (
-        <View style={styles.streakBanner}>
-          <Text style={styles.streakBannerFire}>🔥</Text>
-          <Text style={styles.streakBannerNum}>{streak}</Text>
-          <Text style={styles.streakBannerLabel}>day streak</Text>
-        </View>
-      )}
-
-      <View style={styles.todayCardInner}>
-        <View style={styles.todayRingContainer}>
-          <Svg width={size} height={size}>
-            <Circle
-              cx={size / 2} cy={size / 2} r={radius}
-              stroke={Colors.dark.border} strokeWidth={strokeWidth} fill="transparent"
-            />
-            <Circle
-              cx={size / 2} cy={size / 2} r={radius}
-              stroke={progress === 1 ? Colors.dark.success : Colors.dark.accent}
-              strokeWidth={strokeWidth} fill="transparent"
-              strokeDasharray={`${circumference}`}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            />
-          </Svg>
-          <View style={styles.todayRingCenter}>
-            <Text style={styles.todayRingPct}>{pct}%</Text>
-          </View>
-        </View>
-        <View style={styles.todayStats}>
-          <Text style={styles.todayCardTitle}>Today</Text>
-          <View style={styles.todayStatRow}>
-            <Text style={styles.todayStatValue}>{completed}/{total}</Text>
-            <Text style={styles.todayStatLabel}>tasks done</Text>
-          </View>
-          {focusToday > 0 && (
-            <View style={styles.todayStatRow}>
-              <Text style={[styles.todayStatValue, { color: Colors.dark.timer }]}>{focusToday}</Text>
-              <Text style={styles.todayStatLabel}>focus mins</Text>
-            </View>
-          )}
-          <View style={styles.todayStatRow}>
-            <Text style={[styles.todayStatValue, { color: Colors.dark.success }]}>{weekRate}%</Text>
-            <Text style={styles.todayStatLabel}>this week</Text>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function TaskCompletionStreak() {
-  const todos = useTodoStore(s => s.todos);
-
-  const { streak, bestDay } = useMemo(() => {
-    const streak = calculateStreak(todos);
-
-    // Find best day (highest completion rate)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    let bestDay: { date: string; rate: number; completed: number; total: number } | null = null;
-    for (let i = 0; i < 365; i++) {
+    let recent7Completed = 0, recent7Total = 0;
+    let prev7Completed = 0, prev7Total = 0;
+    for (let i = 0; i < 14; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
-      const dayTodos = todos.filter(t => t.logicalDate === dateStr);
-      const total = dayTodos.length;
-      const completed = dayTodos.filter(t => t.completed).length;
-      const rate = total > 0 ? completed / total : 0;
-      if (total > 0) {
-        if (!bestDay || rate > bestDay.rate || (rate === bestDay.rate && completed > bestDay.completed)) {
-          bestDay = { date: dateStr, rate, completed, total };
-        }
-      }
+      const dayTodos = todos.filter((t: any) => t.logicalDate === dateStr);
+      const completed = dayTodos.filter((t: any) => t.completed).length;
+      if (i < 7) { recent7Completed += completed; recent7Total += dayTodos.length; }
+      else { prev7Completed += completed; prev7Total += dayTodos.length; }
     }
-    return { streak, bestDay };
-  }, [todos]);
+    const recentRate = recent7Total > 0 ? recent7Completed / recent7Total : 0;
+    const prevRate = prev7Total > 0 ? prev7Completed / prev7Total : 0;
+    const trend = recentRate > prevRate + 0.05 ? 'improving' : recentRate < prevRate - 0.05 ? 'declining' : 'steady';
+    const trendIcon = trend === 'improving' ? '\u2191' : trend === 'declining' ? '\u2193' : '\u2192';
+    const trendColor = trend === 'improving' ? Colors.dark.success : trend === 'declining' ? Colors.dark.error : Colors.dark.textSecondary;
+
+    return {
+      totalCompleted, avgPerDay, completionRate,
+      longestStreak: analytics.longestStreak,
+      mostProductiveDay: analytics.mostProductiveDay,
+      timeOfDay, peakHourLabel,
+      focusLabel, totalFocusMins,
+      trend, trendIcon, trendColor,
+    };
+  }, [todos, analytics]);
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Your Streak</Text>
-      <View style={styles.streakCardRow}>
-        <View style={styles.streakCard}>
-          <View style={styles.streakNumRow}>
-            <Text style={styles.streakFlameIcon}>{streak > 0 ? '🔥' : '💤'}</Text>
-            <Text style={styles.streakBigNum}>{streak}</Text>
-          </View>
-          <Text style={styles.streakCardLabel}>day streak</Text>
-          <Text style={styles.streakCardSub}>consecutive days</Text>
-        </View>
-        {bestDay && (
-          <View style={styles.streakCard}>
-            <Text style={styles.streakBigNum}>{Math.round(bestDay.rate * 100)}%</Text>
-            <Text style={styles.streakCardLabel}>best day</Text>
-            <Text style={styles.streakCardSub}>
-              {format(new Date(bestDay.date + 'T12:00:00'), 'MMM d')} ({bestDay.completed}/{bestDay.total})
-            </Text>
-          </View>
-        )}
+    <View style={styles.deepStatsGrid}>
+      <View style={styles.deepStatCard}>
+        <Text style={styles.deepStatValue}>{stats.totalCompleted}</Text>
+        <Text style={styles.deepStatLabel}>all-time completed</Text>
+      </View>
+      <View style={styles.deepStatCard}>
+        <Text style={styles.deepStatValue}>{stats.avgPerDay}</Text>
+        <Text style={styles.deepStatLabel}>avg tasks/day</Text>
+      </View>
+      <View style={styles.deepStatCard}>
+        <Text style={[styles.deepStatValue, { color: Colors.dark.success }]}>{stats.longestStreak}</Text>
+        <Text style={styles.deepStatLabel}>best streak</Text>
+      </View>
+      <View style={styles.deepStatCard}>
+        <Text style={styles.deepStatValue}>{stats.mostProductiveDay.slice(0, 3)}</Text>
+        <Text style={styles.deepStatLabel}>best day</Text>
+      </View>
+      <View style={styles.deepStatCard}>
+        <Text style={styles.deepStatValue}>{stats.peakHourLabel}</Text>
+        <Text style={styles.deepStatLabel}>{stats.timeOfDay.toLowerCase()}</Text>
+      </View>
+      <View style={styles.deepStatCard}>
+        <Text style={[styles.deepStatValue, { color: Colors.dark.timer }]}>{stats.focusLabel}</Text>
+        <Text style={styles.deepStatLabel}>total focus</Text>
+      </View>
+      <View style={styles.deepStatCard}>
+        <Text style={styles.deepStatValue}>{stats.completionRate}%</Text>
+        <Text style={styles.deepStatLabel}>all-time rate</Text>
+      </View>
+      <View style={styles.deepStatCard}>
+        <Text style={[styles.deepStatValue, { color: stats.trendColor }]}>{stats.trendIcon}</Text>
+        <Text style={styles.deepStatLabel}>trend: {stats.trend}</Text>
       </View>
     </View>
   );
 }
 
-function WeeklyOverview() {
-  const todos = useTodoStore(s => s.todos);
-  const stats = useMemo(() => getWeekStats(), [todos]);
-  const pct = Math.round(stats.completionRate * 100);
-  const hasData = stats.totalTasks > 0;
-
-  const weekPomodoroMins = useMemo(() => {
-    return stats.weekDays.reduce((sum, day) => {
-      const dayTodos = todos.filter(t => t.logicalDate === day.date);
-      return sum + dayTodos.reduce((s, t) => s + (t.pomodoroMinutesLogged || 0), 0);
-    }, 0);
-  }, [todos, stats]);
-
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>This Week</Text>
-      {!hasData ? (
-        <View style={styles.emptySection}>
-          <Text style={styles.emptyTitle}>No tasks this week yet</Text>
-          <Text style={styles.emptySubtext}>Start adding tasks to see your weekly progress</Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.weekHeaderRow}>
-            <View>
-              <Text style={styles.bigPct}>{pct}%</Text>
-              <Text style={styles.bigPctLabel}>completion rate</Text>
-            </View>
-            {weekPomodoroMins > 0 && (
-              <View style={styles.weekPomodoroCard}>
-                <Text style={styles.weekPomodoroNum}>{weekPomodoroMins}</Text>
-                <Text style={styles.weekPomodoroLabel}>focus mins</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.barChart}>
-            {stats.weekDays.map((day, i) => {
-              const rate = day.totalTasks > 0 ? day.completionRate : 0;
-              const height = day.totalTasks > 0 ? Math.max(4, (rate * BAR_MAX_HEIGHT)) : 4;
-              const isToday = day.date === new Date().toISOString().split('T')[0];
-              const pctLabel = day.totalTasks > 0 ? `${Math.round(rate * 100)}%` : '';
-              return (
-                <View key={day.date} style={styles.barCol}>
-                  {pctLabel ? (
-                    <Text style={styles.barPctLabel}>{pctLabel}</Text>
-                  ) : (
-                    <Text style={styles.barPctLabel}> </Text>
-                  )}
-                  <View style={styles.barTrack}>
-                    <View
-                      style={[
-                        styles.barFill,
-                        {
-                          height,
-                          backgroundColor: isToday
-                            ? Colors.dark.accent
-                            : day.totalTasks > 0 ? Colors.dark.textSecondary : Colors.dark.border,
-                        },
-                      ]}
-                    />
-                    {day.totalTasks > 0 && rate > 0 && (
-                      <View
-                        style={[
-                          styles.barGlow,
-                          {
-                            height: Math.min(height + 8, BAR_MAX_HEIGHT),
-                            backgroundColor: isToday ? 'rgba(255,255,255,0.06)' : 'rgba(136,136,136,0.06)',
-                          },
-                        ]}
-                      />
-                    )}
-                  </View>
-                  <Text style={[styles.barLabel, isToday && { color: Colors.dark.accent }]}>
-                    {DAY_LABELS[i]}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.totalCompleted}</Text>
-              <Text style={styles.statLabel}>completed</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.totalTasks}</Text>
-              <Text style={styles.statLabel}>total</Text>
-            </View>
-          </View>
-        </>
-      )}
-    </View>
-  );
-}
-
-function Streaks() {
-  const habits = useProgressStore(s => s.habits);
-  const active = habits.filter(h => h.streak > 0);
-  if (active.length === 0) return null;
-
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Habit Streaks</Text>
-      {active.map(h => (
-        <View key={h.id} style={styles.habitRow}>
-          <Text style={styles.streakFlame}>🔥</Text>
-          <Text style={styles.streakName}>{h.name}</Text>
-          <Text style={styles.streakCount}>{h.streak}d</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function DailyHistory() {
-  const todos = useTodoStore(s => s.todos);
-  const days = useMemo(() => getRecentDays(14), [todos]);
-  const nonEmpty = days.filter(d => d.totalTasks > 0);
-
-  if (nonEmpty.length === 0) {
-    return (
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>History</Text>
-        <View style={styles.emptySection}>
-          <Text style={styles.emptyTitle}>No history yet</Text>
-          <Text style={styles.emptySubtext}>Complete some tasks and your history will appear here</Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>History</Text>
-      {nonEmpty.map(day => (
-        <DayRow key={day.date} day={day} />
-      ))}
-    </View>
-  );
-}
-
-const DayRow = memo(function DayRow({ day }: { day: DaySummary }) {
-  const date = new Date(day.date + 'T12:00:00');
-  const label = format(date, 'EEE, MMM d');
-  const pct = Math.round(day.completionRate * 100);
-
-  return (
-    <View style={styles.dayRow}>
-      <View style={styles.dayInfo}>
-        <Text style={styles.dayDate}>{label}</Text>
-        <Text style={styles.dayMeta}>{day.completedTasks}/{day.totalTasks} tasks</Text>
-      </View>
-      <View style={styles.dayBarContainer}>
-        <View style={styles.dayBarTrack}>
-          <View style={[styles.dayBarFill, { width: `${pct}%` }]} />
-        </View>
-        <Text style={styles.dayPct}>{pct}%</Text>
-      </View>
-    </View>
-  );
-});
-
-function ProgressEmptyHero() {
-  const todos = useTodoStore(s => s.todos);
-  const fadeAnim = useRef(new RNAnimated.Value(0)).current;
-
-  useEffect(() => {
-    RNAnimated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-  }, []);
-
-  if (todos.length > 0) return null;
-
-  return (
-    <RNAnimated.View style={[styles.emptyHero, { opacity: fadeAnim }]}>
-      <Text style={styles.emptyHeroIcon}>◧</Text>
-      <Text style={styles.emptyHeroTitle}>Your progress story starts here</Text>
-      <Text style={styles.emptyHeroSubtext}>
-        Complete tasks on the Today tab and watch your progress unfold. Every task counts.
-      </Text>
-    </RNAnimated.View>
-  );
-}
-
-// --- Share Card ---
+// --- 9. Share Card ---
 function ShareSection({ analytics }: { analytics: AnalyticsData }) {
   const viewShotRef = useRef<ViewShot>(null);
   const todos = useTodoStore(s => s.todos);
-
   const weekStats = useMemo(() => getWeekStats(), [todos]);
-  const logicalDate = getLogicalDate();
   const streak = useMemo(() => calculateStreak(todos), [todos]);
 
   const handleShare = async () => {
@@ -589,9 +516,7 @@ function ShareSection({ analytics }: { analytics: AnalyticsData }) {
           message: `This week: ${Math.round(weekStats.completionRate * 100)}% completion | ${streak} day streak | untodo`,
         });
       }
-    } catch {
-      // Share cancelled or failed
-    }
+    } catch {}
   };
 
   const weekPct = Math.round(weekStats.completionRate * 100);
@@ -688,219 +613,40 @@ function AchievementCelebration() {
   );
 }
 
-// --- Achievements Badge Grid ---
-function AchievementsGrid() {
-  const achievements = useAchievementStore(s => s.achievements);
-  const unlocked = achievements.filter(a => a.unlockedAt);
-  const locked = achievements.filter(a => !a.unlockedAt);
+// --- Empty Hero ---
+function ProgressEmptyHero() {
+  const fadeAnim = useRef(new RNAnimated.Value(0)).current;
+  useEffect(() => {
+    RNAnimated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+  }, []);
 
   return (
-    <View style={styles.section}>
-      <View style={styles.achievementsHeader}>
-        <Text style={styles.sectionTitle}>Achievements</Text>
-        <Text style={styles.achievementsCount}>{unlocked.length}/{achievements.length}</Text>
-      </View>
-      <View style={styles.achievementsGrid}>
-        {achievements.map(a => (
-          <View
-            key={a.id}
-            style={[styles.achievementBadge, !a.unlockedAt && styles.achievementLocked]}
-          >
-            <Text style={[styles.achievementIcon, !a.unlockedAt && { opacity: 0.2 }]}>{a.icon}</Text>
-            <Text style={[styles.achievementTitle, !a.unlockedAt && { color: Colors.dark.textTertiary }]} numberOfLines={1}>
-              {a.title}
-            </Text>
-            <Text style={styles.achievementDesc} numberOfLines={2}>{a.description}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
+    <RNAnimated.View style={[styles.emptyHero, { opacity: fadeAnim }]}>
+      <Text style={styles.emptyHeroIcon}>{'\u25E7'}</Text>
+      <Text style={styles.emptyHeroTitle}>Your progress story starts here</Text>
+      <Text style={styles.emptyHeroSubtext}>
+        Complete tasks on the Today tab and watch your progress unfold. Every task counts.
+      </Text>
+    </RNAnimated.View>
   );
 }
 
-// --- Deep Statistics ---
-function DeepStatistics({ analytics, todos }: { analytics: AnalyticsData; todos: any[] }) {
-  const stats = useMemo(() => {
-    const allCompleted = todos.filter((t: any) => t.completed);
-    const totalCompleted = allCompleted.length;
-    const totalTasks = todos.length;
-
-    // Average tasks per day
-    const datesWithTasks = new Set(todos.map((t: any) => t.logicalDate));
-    const avgPerDay = datesWithTasks.size > 0 ? (totalCompleted / datesWithTasks.size).toFixed(1) : '0';
-
-    // Completion rate
-    const completionRate = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
-
-    // Most productive time of day
-    const hourBuckets: number[] = new Array(24).fill(0);
-    allCompleted.forEach((t: any) => {
-      if (t.updatedAt) {
-        const hour = new Date(t.updatedAt).getHours();
-        hourBuckets[hour]++;
-      }
-    });
-    const peakHour = hourBuckets.indexOf(Math.max(...hourBuckets));
-    const timeOfDay = peakHour < 6 ? 'Late night' : peakHour < 12 ? 'Morning' : peakHour < 17 ? 'Afternoon' : peakHour < 21 ? 'Evening' : 'Night';
-    const peakHourLabel = peakHour === 0 ? '12am' : peakHour < 12 ? `${peakHour}am` : peakHour === 12 ? '12pm' : `${peakHour - 12}pm`;
-
-    // Total focus time (pomodoro + time tracking)
-    let totalFocusMins = 0;
-    todos.forEach((t: any) => {
-      totalFocusMins += t.pomodoroMinutesLogged || 0;
-      if (t.timeTracking?.totalSeconds) totalFocusMins += Math.floor(t.timeTracking.totalSeconds / 60);
-    });
-    const focusHours = Math.floor(totalFocusMins / 60);
-    const focusMins = totalFocusMins % 60;
-    const focusLabel = focusHours > 0 ? `${focusHours}h ${focusMins}m` : `${focusMins}m`;
-
-    // Completion rate trend (last 7 days vs previous 7 days)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    let recent7Completed = 0, recent7Total = 0;
-    let prev7Completed = 0, prev7Total = 0;
-    for (let i = 0; i < 14; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayTodos = todos.filter((t: any) => t.logicalDate === dateStr);
-      const completed = dayTodos.filter((t: any) => t.completed).length;
-      if (i < 7) { recent7Completed += completed; recent7Total += dayTodos.length; }
-      else { prev7Completed += completed; prev7Total += dayTodos.length; }
-    }
-    const recentRate = recent7Total > 0 ? recent7Completed / recent7Total : 0;
-    const prevRate = prev7Total > 0 ? prev7Completed / prev7Total : 0;
-    const trend = recentRate > prevRate + 0.05 ? 'improving' : recentRate < prevRate - 0.05 ? 'declining' : 'steady';
-    const trendIcon = trend === 'improving' ? '↑' : trend === 'declining' ? '↓' : '→';
-    const trendColor = trend === 'improving' ? Colors.dark.success : trend === 'declining' ? Colors.dark.error : Colors.dark.textSecondary;
-
-    return {
-      totalCompleted, avgPerDay, completionRate,
-      longestStreak: analytics.longestStreak,
-      mostProductiveDay: analytics.mostProductiveDay,
-      timeOfDay, peakHourLabel,
-      focusLabel, totalFocusMins,
-      trend, trendIcon, trendColor,
-    };
-  }, [todos, analytics]);
-
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Statistics</Text>
-      <View style={styles.deepStatsGrid}>
-        <View style={styles.deepStatCard}>
-          <Text style={styles.deepStatValue}>{stats.totalCompleted}</Text>
-          <Text style={styles.deepStatLabel}>all-time completed</Text>
-        </View>
-        <View style={styles.deepStatCard}>
-          <Text style={styles.deepStatValue}>{stats.avgPerDay}</Text>
-          <Text style={styles.deepStatLabel}>avg tasks/day</Text>
-        </View>
-        <View style={styles.deepStatCard}>
-          <Text style={[styles.deepStatValue, { color: Colors.dark.success }]}>{stats.longestStreak}</Text>
-          <Text style={styles.deepStatLabel}>best streak ever</Text>
-        </View>
-        <View style={styles.deepStatCard}>
-          <Text style={styles.deepStatValue}>{stats.mostProductiveDay.slice(0, 3)}</Text>
-          <Text style={styles.deepStatLabel}>best day of week</Text>
-        </View>
-        <View style={styles.deepStatCard}>
-          <Text style={styles.deepStatValue}>{stats.peakHourLabel}</Text>
-          <Text style={styles.deepStatLabel}>{stats.timeOfDay.toLowerCase()}</Text>
-        </View>
-        <View style={styles.deepStatCard}>
-          <Text style={[styles.deepStatValue, { color: Colors.dark.timer }]}>{stats.focusLabel}</Text>
-          <Text style={styles.deepStatLabel}>total focus time</Text>
-        </View>
-        <View style={styles.deepStatCard}>
-          <Text style={styles.deepStatValue}>{stats.completionRate}%</Text>
-          <Text style={styles.deepStatLabel}>all-time rate</Text>
-        </View>
-        <View style={styles.deepStatCard}>
-          <Text style={[styles.deepStatValue, { color: stats.trendColor }]}>{stats.trendIcon}</Text>
-          <Text style={styles.deepStatLabel}>trend: {stats.trend}</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function DailyInsightBanner({ todos }: { todos: any[] }) {
-  const insight = useMemo(() => generateDailyInsight(todos), [todos]);
-  if (!insight) return null;
-  return (
-    <View style={styles.insightBanner}>
-      <Text style={styles.insightIcon}>◆</Text>
-      <Text style={styles.insightText}>{insight}</Text>
-    </View>
-  );
-}
-
-// --- Task Milestones Progress ---
-function MilestonesProgress() {
-  const todos = useTodoStore(s => s.todos);
-  const celebrated = useMilestoneStore(s => s.celebratedMilestones);
-  const totalCompleted = useMemo(() => todos.filter(t => t.completed).length, [todos]);
-
-  // Find current milestone (next one to hit)
-  const nextMilestone = TASK_MILESTONES.find(m => totalCompleted < m.threshold);
-  const prevMilestone = [...TASK_MILESTONES].reverse().find(m => totalCompleted >= m.threshold);
-
-  if (totalCompleted < 1) return null;
-
-  const prevThreshold = prevMilestone ? prevMilestone.threshold : 0;
-  const nextThreshold = nextMilestone ? nextMilestone.threshold : totalCompleted;
-  const progressInRange = nextMilestone
-    ? (totalCompleted - prevThreshold) / (nextThreshold - prevThreshold)
-    : 1;
-
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Milestones</Text>
-      <View style={styles.milestoneContainer}>
-        {nextMilestone ? (
-          <>
-            <View style={styles.milestoneProgressRow}>
-              <Text style={styles.milestoneCount}>{totalCompleted}</Text>
-              <Text style={styles.milestoneSeparator}>/</Text>
-              <Text style={styles.milestoneTarget}>{nextMilestone.threshold}</Text>
-            </View>
-            <Text style={styles.milestoneLabel}>tasks to next milestone</Text>
-            <View style={styles.milestoneBarTrack}>
-              <View style={[styles.milestoneBarFill, { width: `${Math.min(progressInRange * 100, 100)}%` }]} />
-            </View>
-            <Text style={styles.milestoneNextTitle}>{nextMilestone.emoji} {nextMilestone.title}</Text>
-          </>
-        ) : (
-          <>
-            <Text style={styles.milestoneCount}>{totalCompleted}</Text>
-            <Text style={styles.milestoneLabel}>tasks completed — all milestones unlocked!</Text>
-          </>
-        )}
-      </View>
-      <View style={styles.milestoneBadges}>
-        {TASK_MILESTONES.map(m => {
-          const unlocked = totalCompleted >= m.threshold;
-          return (
-            <View key={m.threshold} style={[styles.milestoneBadge, !unlocked && styles.milestoneBadgeLocked]}>
-              <Text style={[styles.milestoneBadgeIcon, !unlocked && { opacity: 0.2 }]}>{m.emoji}</Text>
-              <Text style={[styles.milestoneBadgeNum, !unlocked && { color: Colors.dark.textTertiary }]}>{m.threshold}</Text>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
+// --- Main Screen ---
 function ProgressScreenContent() {
   const [refreshing, setRefreshing] = useState(false);
   const todos = useTodoStore(s => s.todos);
   const hasAnyTasks = todos.length > 0;
   const analytics = useMemo(() => computeAnalytics(todos), [todos]);
   const checkAchievements = useAchievementStore(s => s.checkAchievements);
+  const achievements = useAchievementStore(s => s.achievements);
+  const unlockedCount = achievements.filter(a => a.unlockedAt).length;
 
-  // Check achievements when todos change
+  const { collapsed, toggle } = useCollapseState({
+    weeklyReview: false,  // expanded by default
+    achievements: true,   // collapsed by default
+    deepStats: true,      // collapsed by default
+  });
+
   useEffect(() => {
     if (hasAnyTasks) checkAchievements();
   }, [todos.length, todos.filter(t => t.completed).length]);
@@ -931,14 +677,53 @@ function ProgressScreenContent() {
           <ProgressEmptyHero />
         ) : (
           <>
-            <TodaySummaryCard />
-            <DailyInsightBanner todos={todos} />
-            <MilestonesProgress />
+            {/* 1. Today's Progress Ring */}
+            <TodayProgressRing />
+
+            {/* 2. Daily Score + 3. Streak - side by side */}
+            <View style={styles.gradeStreakRow}>
+              <DailyScoreGrade />
+              <StreakCounter />
+            </View>
+
+            {/* 4. Weekly Bar Chart */}
+            <WeeklyBarChart />
+
+            {/* 5. Contribution Graph */}
             <ContributionGraph heatmap={analytics.heatmap} />
-            <WeeklyOverview />
-            <WeeklyReviewComponent />
-            <AchievementsGrid />
-            <DeepStatistics analytics={analytics} todos={todos} />
+
+            {/* 6. Weekly Review (collapsible) */}
+            <View style={styles.section}>
+              <CollapsibleHeader
+                title="Weekly Review"
+                collapsed={collapsed.weeklyReview}
+                onToggle={() => toggle('weeklyReview')}
+              />
+              {!collapsed.weeklyReview && <WeeklyReviewComponent />}
+            </View>
+
+            {/* 7. Achievements (collapsible) */}
+            <View style={styles.section}>
+              <CollapsibleHeader
+                title="Achievements"
+                collapsed={collapsed.achievements}
+                onToggle={() => toggle('achievements')}
+                count={`${unlockedCount}/${achievements.length}`}
+              />
+              {!collapsed.achievements && <AchievementsGrid />}
+            </View>
+
+            {/* 8. Deep Stats (collapsible) */}
+            <View style={styles.section}>
+              <CollapsibleHeader
+                title="Statistics"
+                collapsed={collapsed.deepStats}
+                onToggle={() => toggle('deepStats')}
+              />
+              {!collapsed.deepStats && <DeepStatistics analytics={analytics} todos={todos} />}
+            </View>
+
+            {/* 9. Share Card */}
             <ShareSection analytics={analytics} />
           </>
         )}
@@ -969,119 +754,115 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     marginBottom: Spacing.lg,
   },
-  // Today Summary Card
-  todayCard: {
-    marginBottom: Spacing.xl,
+
+  // --- 1. Ring ---
+  ringSection: {
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
     backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
-    padding: Spacing.lg,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 12,
   },
-  streakBanner: {
+  ringContainer: {
+    position: 'relative',
+    width: 160,
+    height: 160,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ringCenter: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ringPct: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accent,
+    fontSize: 42,
+    lineHeight: 46,
+  },
+  ringLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  ringFocus: {
+    color: Colors.dark.timer,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    marginTop: Spacing.md,
+  },
+
+  // --- 2+3. Grade + Streak Row ---
+  gradeStreakRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
+  gradeCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.md,
+  },
+  gradeValue: {
+    fontFamily: Fonts.accent,
+    fontSize: 36,
+    lineHeight: 40,
+  },
+  gradeLabel: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
+  gradeSub: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  streakCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
-  streakBannerFire: {
-    fontSize: 24,
+  streakEmoji: {
+    fontSize: 22,
   },
-  streakBannerNum: {
+  streakNum: {
     color: Colors.dark.text,
     fontFamily: Fonts.accent,
     fontSize: 32,
     lineHeight: 36,
   },
-  streakBannerLabel: {
+  streakLabel: {
     color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-  },
-  todayCardInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.lg,
-  },
-  todayRingContainer: {
-    position: 'relative',
-    width: 140,
-    height: 140,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  todayRingCenter: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  todayRingPct: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 36,
-    lineHeight: 40,
-  },
-  todayStats: {
-    flex: 1,
-    gap: Spacing.sm,
-  },
-  todayCardTitle: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 13,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.xs,
-  },
-  todayStatRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: Spacing.sm,
-  },
-  todayStatValue: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 22,
-    lineHeight: 26,
-  },
-  todayStatLabel: {
-    color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 12,
   },
 
-  insightBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    marginBottom: Spacing.lg,
-  },
-  insightIcon: {
-    color: Colors.dark.textTertiary,
-    fontSize: 8,
-    opacity: 0.5,
-  },
-  insightText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 13,
-    flex: 1,
-    lineHeight: 20,
-  },
+  // --- Sections ---
   section: {
     marginBottom: Spacing.xl,
   },
@@ -1091,10 +872,102 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    marginBottom: Spacing.md,
   },
 
-  // Contribution Graph (GitHub-style)
+  // --- Collapsible ---
+  collapsibleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  collapsibleHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  collapsibleCount: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.accent,
+    fontSize: 14,
+  },
+  collapsibleChevron: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 18,
+    lineHeight: 20,
+  },
+
+  // --- 4. Bar Chart ---
+  weekHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: Spacing.md,
+  },
+  weekPct: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accent,
+    fontSize: 28,
+  },
+  barChart: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: BAR_MAX_HEIGHT + 44,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.xs,
+    gap: 6,
+  },
+  barCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  barPctLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 9,
+    height: 14,
+  },
+  barTrack: {
+    width: '100%',
+    maxWidth: 36,
+    height: BAR_MAX_HEIGHT,
+    justifyContent: 'flex-end',
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: Colors.dark.surface,
+  },
+  barFill: {
+    width: '100%',
+    borderRadius: 8,
+  },
+  barLabel: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+  },
+  weekStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  weekStatText: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+  },
+  weekStatDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.dark.textTertiary,
+  },
+
+  // --- 5. Contribution Graph ---
   heatmapHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1154,349 +1027,75 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  // Category breakdown
-  catBarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-    gap: Spacing.sm,
-  },
-  catBarLabel: {
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 12,
-    width: 70,
-  },
-  catBarTrack: {
-    flex: 1,
-    height: 8,
-    backgroundColor: Colors.dark.border,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  catBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  catBarCount: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.accent,
-    fontSize: 14,
-    minWidth: 28,
-    textAlign: 'right',
-  },
-
-  // Analytics summary
-  analyticsGrid: {
+  // --- 7. Achievements Grid ---
+  achievementsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
   },
-  analyticsCard: {
+  achievementBadge: {
+    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 4) / 5,
     backgroundColor: Colors.dark.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.dark.border,
-    padding: Spacing.md,
+    padding: Spacing.sm,
     alignItems: 'center',
-    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 2) / 3,
+    minHeight: 80,
   },
-  analyticsValue: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 24,
-    lineHeight: 28,
+  achievementLocked: {
+    opacity: 0.5,
   },
-  analyticsLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-
-  // Streak cards
-  streakCardRow: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  streakCard: {
-    flex: 1,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.md,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  streakNumRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  streakFlameIcon: {
-    fontSize: 28,
-  },
-  streakBigNum: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 42,
-    lineHeight: 48,
-  },
-  streakCardLabel: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  streakCardSub: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    marginTop: 2,
-  },
-
-  // Empty hero
-  emptyHero: {
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingBottom: 40,
-    paddingHorizontal: Spacing.xl,
-  },
-  emptyHeroIcon: {
-    fontSize: 64,
-    color: Colors.dark.textTertiary,
-    marginBottom: Spacing.lg,
-    opacity: 0.4,
-  },
-  emptyHeroTitle: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.accentItalic,
+  achievementIcon: {
     fontSize: 22,
-    textAlign: 'center',
-    marginBottom: Spacing.md,
-  },
-  emptyHeroSubtext: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-
-  // Empty state
-  emptySection: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.xl,
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 16,
-    marginBottom: Spacing.xs,
-  },
-  emptySubtext: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    textAlign: 'center',
-  },
-
-  // Weekly overview
-  weekHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginBottom: Spacing.lg,
-  },
-  bigPct: {
     color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 72,
-    lineHeight: 80,
+    marginBottom: 4,
   },
-  bigPctLabel: {
+  achievementTitle: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 9,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  achievementDesc: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 14,
+    fontSize: 7,
+    textAlign: 'center',
+    lineHeight: 10,
   },
-  weekPomodoroCard: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.md,
-    alignItems: 'center',
-  },
-  weekPomodoroNum: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.accent,
-    fontSize: 28,
-  },
-  weekPomodoroLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  barChart: {
+
+  // --- 8. Deep Statistics ---
+  deepStatsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: BAR_MAX_HEIGHT + 44,
-    marginBottom: Spacing.lg,
-    paddingHorizontal: Spacing.xs,
-    gap: 6,
-  },
-  barCol: {
-    flex: 1,
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: Spacing.sm,
   },
-  barPctLabel: {
+  deepStatCard: {
+    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 3) / 4,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: Spacing.sm,
+    alignItems: 'center',
+  },
+  deepStatValue: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.accent,
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  deepStatLabel: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 9,
-    height: 14,
-  },
-  barTrack: {
-    width: '100%',
-    maxWidth: 36,
-    height: BAR_MAX_HEIGHT,
-    justifyContent: 'flex-end',
-    borderRadius: 8,
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: Colors.dark.surface,
-  },
-  barFill: {
-    width: '100%',
-    borderRadius: 8,
-    zIndex: 2,
-  },
-  barGlow: {
-    position: 'absolute',
-    bottom: 0,
-    left: -4,
-    right: -4,
-    borderRadius: 10,
-    zIndex: 1,
-  },
-  barLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: Colors.dark.border,
-  },
-  statValue: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 28,
-  },
-  statLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
+    textAlign: 'center',
     marginTop: 2,
   },
 
-  // Habit Streaks
-  habitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
-  },
-  streakFlame: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    marginRight: Spacing.sm,
-  },
-  streakName: {
-    flex: 1,
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
-  },
-  streakCount: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.accent,
-    fontSize: 18,
-  },
-
-  // Daily history
-  dayRow: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
-  },
-  dayInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: Spacing.sm,
-  },
-  dayDate: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 14,
-  },
-  dayMeta: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-  },
-  dayBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  dayBarTrack: {
-    flex: 1,
-    height: 3,
-    backgroundColor: Colors.dark.border,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  dayBarFill: {
-    height: '100%',
-    backgroundColor: Colors.dark.success,
-    borderRadius: 2,
-  },
-  dayPct: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.accent,
-    fontSize: 14,
-    minWidth: 36,
-    textAlign: 'right',
-  },
-
-  // Share
+  // --- 9. Share ---
   shareCard: {
     backgroundColor: Colors.dark.surface,
     borderRadius: 16,
@@ -1562,7 +1161,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 
-  // Achievement Celebration Toast
+  // --- Celebration Toast ---
   celebrationToast: {
     position: 'absolute',
     top: 60,
@@ -1601,167 +1200,44 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Achievements Grid
-  achievementsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: Spacing.md,
-  },
-  achievementsCount: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.accent,
-    fontSize: 14,
-  },
-  achievementsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  achievementBadge: {
-    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 4) / 5,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.sm,
+  // --- Empty State ---
+  emptyHero: {
     alignItems: 'center',
-    minHeight: 80,
+    paddingTop: 60,
+    paddingBottom: 40,
+    paddingHorizontal: Spacing.xl,
   },
-  achievementLocked: {
-    opacity: 0.5,
+  emptyHeroIcon: {
+    fontSize: 64,
+    color: Colors.dark.textTertiary,
+    marginBottom: Spacing.lg,
+    opacity: 0.4,
   },
-  achievementIcon: {
+  emptyHeroTitle: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.accentItalic,
     fontSize: 22,
-    color: Colors.dark.text,
-    marginBottom: 4,
-  },
-  achievementTitle: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 9,
     textAlign: 'center',
-    marginBottom: 2,
+    marginBottom: Spacing.md,
   },
-  achievementDesc: {
+  emptyHeroSubtext: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 7,
+    fontSize: 14,
     textAlign: 'center',
-    lineHeight: 10,
+    lineHeight: 22,
   },
-
-  // Deep Statistics
-  deepStatsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  deepStatCard: {
-    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 3) / 4,
+  emptySection: {
     backgroundColor: Colors.dark.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.dark.border,
-    padding: Spacing.sm,
+    padding: Spacing.xl,
     alignItems: 'center',
   },
-  deepStatValue: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 20,
-    lineHeight: 24,
-  },
-  deepStatLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 9,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  // Milestones
-  milestoneContainer: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  milestoneProgressRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 2,
-  },
-  milestoneCount: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.heading,
-    fontSize: 40,
-  },
-  milestoneSeparator: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 24,
-    marginHorizontal: 2,
-  },
-  milestoneTarget: {
+  emptyTitle: {
     color: Colors.dark.textSecondary,
-    fontFamily: Fonts.heading,
-    fontSize: 24,
-  },
-  milestoneLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    marginTop: 2,
-    marginBottom: Spacing.md,
-  },
-  milestoneBarTrack: {
-    width: '100%',
-    height: 6,
-    backgroundColor: Colors.dark.border,
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: Spacing.sm,
-  },
-  milestoneBarFill: {
-    height: '100%',
-    backgroundColor: Colors.dark.success,
-    borderRadius: 3,
-  },
-  milestoneNextTitle: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 13,
-  },
-  milestoneBadges: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-    justifyContent: 'center',
-  },
-  milestoneBadge: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    minWidth: 60,
-  },
-  milestoneBadgeLocked: {
-    opacity: 0.5,
-  },
-  milestoneBadgeIcon: {
-    fontSize: 18,
-    color: Colors.dark.text,
-    marginBottom: 2,
-  },
-  milestoneBadgeNum: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 11,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 16,
   },
 });
