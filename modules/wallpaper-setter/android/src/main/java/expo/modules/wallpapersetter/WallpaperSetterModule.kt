@@ -1,6 +1,7 @@
 package expo.modules.wallpapersetter
 
 import android.app.WallpaperManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
@@ -79,15 +80,30 @@ class WallpaperSetterModule : Module() {
 
         Log.d("WallpaperSetter", "Bitmap decoded: ${bitmap.width}x${bitmap.height}")
 
+        // Scale bitmap to exact screen pixel dimensions to prevent Android from zooming/cropping
+        val metrics = context.resources.displayMetrics
+        val screenW = metrics.widthPixels
+        val screenH = metrics.heightPixels
+        Log.d("WallpaperSetter", "Display metrics: ${screenW}x${screenH}")
+
+        val scaledBitmap = if (bitmap.width != screenW || bitmap.height != screenH) {
+          Log.d("WallpaperSetter", "Scaling bitmap from ${bitmap.width}x${bitmap.height} to ${screenW}x${screenH}")
+          val scaled = Bitmap.createScaledBitmap(bitmap, screenW, screenH, true)
+          bitmap.recycle()
+          scaled
+        } else {
+          bitmap
+        }
+
         val wallpaperFlags = if (flags > 0) flags else (WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
-        wallpaperManager.setBitmap(bitmap, null, true, wallpaperFlags)
+        wallpaperManager.setBitmap(scaledBitmap, null, true, wallpaperFlags)
         val screenDesc = when (wallpaperFlags) {
           WallpaperManager.FLAG_SYSTEM -> "home screen"
           WallpaperManager.FLAG_LOCK -> "lock screen"
           else -> "home + lock screen"
         }
         Log.d("WallpaperSetter", "Wallpaper set successfully ($screenDesc)")
-        bitmap.recycle()
+        scaledBitmap.recycle()
 
         promise.resolve(true)
       } catch (e: Exception) {
