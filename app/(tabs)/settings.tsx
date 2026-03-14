@@ -11,9 +11,14 @@ import {
   disconnectSilicon,
 } from '../../engines/silicon/bridge';
 import { SiliconConnection } from '../../engines/silicon/types';
+import { useRouter } from 'expo-router';
 import { useUserStore } from '../../engines/user/store';
 import { useNotificationStore } from '../../engines/notifications/store';
 import { useTodoStore } from '../../engines/todo/store';
+import { useWallpaperStore } from '../../engines/wallpaper/store';
+import { useProgressStore } from '../../engines/progress/store';
+import { useAchievementStore } from '../../engines/achievements/store';
+import { useMilestoneStore } from '../../engines/milestones/store';
 import { setupDefaultNotifications } from '../../engines/notifications/service';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import Constants from 'expo-constants';
@@ -79,10 +84,12 @@ function PulsingRing() {
 }
 
 function SettingsScreenContent() {
+  const router = useRouter();
   const [resetHour, setResetHour] = useState(5);
   const [silicon, setSilicon] = useState<SiliconConnection | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [messageCopied, setMessageCopied] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const username = useUserStore(s => s.username);
   const notifPrefs = useNotificationStore(s => s.preferences);
@@ -178,6 +185,46 @@ function SettingsScreenContent() {
         },
       ]
     );
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Log out?',
+      'This will remove all your data and start fresh.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              await AsyncStorage.clear();
+              // Reset all zustand stores to initial state
+              useUserStore.setState({ username: null, _hydrated: true });
+              useTodoStore.persist.clearStorage();
+              useWallpaperStore.persist.clearStorage();
+              useProgressStore.persist.clearStorage();
+              useNotificationStore.persist.clearStorage();
+              useAchievementStore.persist.clearStorage();
+              useMilestoneStore.persist.clearStorage();
+              router.replace('/onboarding');
+            } catch {
+              Alert.alert('Error', 'Failed to log out.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCopyMessage = async () => {
+    try {
+      await Clipboard.setStringAsync('Connect to my untodo app. Read the docs at untodo-docs.vercel.app');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setMessageCopied(true);
+      setTimeout(() => setMessageCopied(false), 2000);
+    } catch {}
   };
 
   const handleExportData = async (format: 'json' | 'csv') => {
@@ -386,11 +433,15 @@ function SettingsScreenContent() {
                 <Text style={styles.docsLinkUrl}>untodo-docs.vercel.app</Text>
                 <Text style={styles.docsLinkArrow}>↗</Text>
               </TouchableOpacity>
-              <View style={styles.messageHint}>
+              <TouchableOpacity
+                style={styles.messageHint}
+                onPress={handleCopyMessage}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.messageHintText}>
-                  Tell Silicon: "Connect to my untodo app. Read the docs at untodo-docs.vercel.app"
+                  {messageCopied ? 'Copied!' : 'Tell Silicon: "Connect to my untodo app. Read the docs at untodo-docs.vercel.app"'}
                 </Text>
-              </View>
+              </TouchableOpacity>
 
               {/* Step 2: Share the code when asked */}
               <View style={[styles.flowStep, { marginTop: Spacing.lg }]}>
@@ -509,6 +560,16 @@ function SettingsScreenContent() {
             <Text style={styles.dangerRowArrow}>→</Text>
           </TouchableOpacity>
         </SectionCard>
+
+        {/* Log Out */}
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={handleLogout}
+          accessibilityLabel="Log out"
+          accessibilityRole="button"
+        >
+          <Text style={styles.logoutBtnText}>Log Out</Text>
+        </TouchableOpacity>
 
         <View style={{ height: 120 }} />
       </ScrollView>
@@ -887,6 +948,16 @@ const styles = StyleSheet.create({
     color: Colors.dark.error,
     fontSize: 16,
     opacity: 0.5,
+  },
+  logoutBtn: {
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    marginTop: Spacing.lg,
+  },
+  logoutBtnText: {
+    color: Colors.dark.error,
+    fontFamily: Fonts.body,
+    fontSize: 15,
   },
   footer: {
     marginTop: Spacing.xl,

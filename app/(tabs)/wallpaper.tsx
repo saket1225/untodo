@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as IntentLauncher from 'expo-intent-launcher';
+import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useWallpaperStore } from '../../engines/wallpaper/store';
@@ -704,14 +705,14 @@ function WallpaperScreenContent() {
 
         if (Platform.OS === 'android') {
           try {
-            // Use content URI format that works reliably across Android versions
-            const contentUri = `content://media/external/images/media/${asset.id}`;
+            // Get a proper content:// URI from the file URI using expo-file-system
+            const contentUri = await FileSystem.getContentUriAsync(asset.uri);
             await IntentLauncher.startActivityAsync(
               'android.intent.action.ATTACH_DATA',
               {
                 data: contentUri,
                 type: 'image/png',
-                flags: 1,
+                flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
                 extra: { 'mimeType': 'image/png' },
               }
             );
