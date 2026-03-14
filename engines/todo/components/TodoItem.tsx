@@ -153,18 +153,23 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
   const isTracking = !!todo.timeTracking?.startedAt;
   const totalSeconds = todo.timeTracking?.totalSeconds || 0;
 
+  // Keep latest values in refs so PanResponder handlers never go stale
+  const latestRef = useRef({ todo, onToggle, onDelete, isTracking, stopTimeTracking });
+  latestRef.current = { todo, onToggle, onDelete, isTracking, stopTimeTracking };
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 20 && Math.abs(gs.dy) < 20,
       onPanResponderMove: (_, gs) => {
-        if (gs.dx > 0 && !todo.completed) {
+        if (gs.dx > 0 && !latestRef.current.todo.completed) {
           translateX.setValue(gs.dx);
         } else if (gs.dx < 0) {
           translateX.setValue(gs.dx);
         }
       },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dx > SWIPE_COMPLETE_THRESHOLD && !todo.completed) {
+        const { todo: t, onToggle: toggle, onDelete: del, isTracking: tracking, stopTimeTracking: stopTracking } = latestRef.current;
+        if (gs.dx > SWIPE_COMPLETE_THRESHOLD && !t.completed) {
           // Swipe right -> complete with satisfying animation
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           setShowConfetti(true);
@@ -174,9 +179,9 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
             Animated.timing(translateX, { toValue: SCREEN_WIDTH, duration: 250, useNativeDriver: true }),
             Animated.timing(opacityAnim, { toValue: 0.3, duration: 250, useNativeDriver: true }),
           ]).start(() => {
-            if (isTracking) stopTimeTracking(todo.id);
+            if (tracking) stopTracking(t.id);
             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            onToggle();
+            toggle();
             translateX.setValue(0);
             opacityAnim.setValue(1);
           });
@@ -185,7 +190,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           Alert.alert(
             'Delete task?',
-            todo.title,
+            t.title,
             [
               {
                 text: 'Cancel',
@@ -204,7 +209,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
                     Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
                   ]).start(() => {
                     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    onDelete();
+                    del();
                     translateX.setValue(0);
                     opacityAnim.setValue(1);
                   });
@@ -273,16 +278,19 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
 
   return (
     <Animated.View style={[styles.wrapper, { opacity: opacityAnim }]}>
-      {/* Complete background (green, left side) */}
-      {!todo.completed && (
-        <Animated.View style={[styles.completeBackground, { opacity: completeBackgroundOpacity }]}>
-          <Text style={styles.completeText}>✓ Done</Text>
+      {/* Swipe backgrounds clipped to item bounds */}
+      <View style={styles.swipeBackgrounds}>
+        {/* Complete background (green, left side) */}
+        {!todo.completed && (
+          <Animated.View style={[styles.completeBackground, { opacity: completeBackgroundOpacity }]}>
+            <Text style={styles.completeText}>✓ Done</Text>
+          </Animated.View>
+        )}
+        {/* Delete background (red, right side) */}
+        <Animated.View style={[styles.deleteBackground, { opacity: deleteBackgroundOpacity }]}>
+          <Text style={styles.deleteText}>Delete</Text>
         </Animated.View>
-      )}
-      {/* Delete background (red, right side) */}
-      <Animated.View style={[styles.deleteBackground, { opacity: deleteBackgroundOpacity }]}>
-        <Text style={styles.deleteText}>Delete</Text>
-      </Animated.View>
+      </View>
       <Animated.View
         style={[
           styles.container,
@@ -457,6 +465,9 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.dark.border,
+  },
+  swipeBackgrounds: {
+    ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
   },
   completeBackground: {

@@ -53,7 +53,7 @@ import {
 } from './today';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ITEM_HEIGHT = 72; // Approximate fixed height for getItemLayout
+// Items have variable heights (subtasks, habit dots, metadata) - no getItemLayout
 
 function TodayScreenContent() {
   const logicalDate = getLogicalDate();
@@ -554,11 +554,6 @@ function TodayScreenContent() {
     />
   ), [handleToggle, handleDelete, selectionMode, selectedIds, enterSelectionMode, toggleSelection, habitHistories]);
 
-  const getItemLayout = useCallback((_: any, index: number) => ({
-    length: ITEM_HEIGHT,
-    offset: ITEM_HEIGHT * index,
-    index,
-  }), []);
 
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 1],
@@ -822,7 +817,7 @@ function TodayScreenContent() {
         data={todos}
         keyExtractor={item => item.id}
         renderItem={renderItem}
-        getItemLayout={getItemLayout}
+
         windowSize={5}
         maxToRenderPerBatch={10}
         initialNumToRender={10}

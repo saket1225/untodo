@@ -149,25 +149,11 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
   return (
     <View>
       <Animated.View style={[styles.flashOverlay, { opacity: flashAnim }]} pointerEvents="none" />
+      {/* Main input row - always clean: just input + add button */}
       <View style={styles.container}>
-        {/* Priority toggle - only when focused */}
-        {isFocused && (
-          <TouchableOpacity
-            style={styles.priorityBtn}
-            onPress={cyclePriority}
-            accessibilityLabel={`Priority: ${priorityLabel}`}
-            accessibilityRole="button"
-            accessibilityHint="Cycle through priority levels"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <View style={[styles.priorityDot, { backgroundColor: priorityColor }]} />
-            <Text style={[styles.priorityText, { color: priorityColor }]}>{priorityLabel}</Text>
-          </TouchableOpacity>
-        )}
-
         <TextInput
           ref={inputRef}
-          style={styles.input}
+          style={[styles.input, isFocused && styles.inputFocused]}
           placeholder="Add a task..."
           placeholderTextColor={Colors.dark.textTertiary}
           value={text}
@@ -180,8 +166,33 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
           accessibilityHint="Type a task name and press done to add"
         />
 
-        {/* Repeat toggle - only when focused */}
-        {isFocused && (
+        <TouchableOpacity
+          style={[styles.addButton, !text.trim() && styles.addButtonDisabled]}
+          onPress={handleAdd}
+          disabled={!text.trim()}
+          accessibilityLabel="Add task"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !text.trim() }}
+        >
+          <Text style={styles.addButtonText}>+</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Toolbar row - appears below input when focused */}
+      {isFocused && (
+        <View style={styles.toolbar}>
+          <TouchableOpacity
+            style={styles.priorityBtn}
+            onPress={cyclePriority}
+            accessibilityLabel={`Priority: ${priorityLabel}`}
+            accessibilityRole="button"
+            accessibilityHint="Cycle through priority levels"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View style={[styles.priorityDot, { backgroundColor: priorityColor }]} />
+            <Text style={[styles.priorityText, { color: priorityColor }]}>{priorityLabel}</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.repeatBtn, recurrence && styles.repeatBtnActive]}
             onPress={() => {
@@ -194,10 +205,7 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
           >
             <Text style={[styles.repeatBtnText, recurrence && styles.repeatBtnTextActive]}>↻</Text>
           </TouchableOpacity>
-        )}
 
-        {/* Category toggle - only when focused */}
-        {isFocused && (
           <TouchableOpacity
             style={[styles.catBtn, selectedCat && { borderColor: selectedCat.color }]}
             onPress={() => {
@@ -213,10 +221,7 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
               {selectedCat ? selectedCat.label.charAt(0) : '#'}
             </Text>
           </TouchableOpacity>
-        )}
 
-        {/* Date picker toggle - only when focused */}
-        {isFocused && (
           <TouchableOpacity
             style={[styles.dateBtn, scheduledDate && styles.dateBtnActive]}
             onPress={() => {
@@ -230,10 +235,7 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
           >
             <Text style={[styles.dateBtnText, scheduledDate && styles.dateBtnTextActive]}>{'📅'}</Text>
           </TouchableOpacity>
-        )}
 
-        {/* Template picker - only when focused */}
-        {isFocused && (
           <TouchableOpacity
             style={styles.templateBtn}
             onPress={() => {
@@ -247,23 +249,14 @@ function TodoInputInner({ onAdd, autoFocus, viewingDate }: Props) {
           >
             <Text style={styles.templateBtnText}>⊞</Text>
           </TouchableOpacity>
-        )}
 
-        <TouchableOpacity
-          style={[styles.addButton, !text.trim() && styles.addButtonDisabled]}
-          onPress={handleAdd}
-          disabled={!text.trim()}
-          accessibilityLabel="Add task"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !text.trim() }}
-        >
-          <Text style={styles.addButtonText}>+</Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.toolbarSpacer} />
 
-      {/* Quick-add hint */}
-      {isFocused && !text.trim() && (
-        <Text style={styles.quickAddHint}>! for high priority · #category · ↻ repeat</Text>
+          {/* Quick-add hint inline */}
+          {!text.trim() && (
+            <Text style={styles.quickAddHint}>! · #tag · ↻</Text>
+          )}
+        </View>
       )}
 
       {/* Category chips */}
@@ -456,7 +449,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+  },
+  toolbarSpacer: {
+    flex: 1,
+  },
+  inputFocused: {
+    borderColor: Colors.dark.textTertiary,
   },
   priorityBtn: {
     flexDirection: 'row',
@@ -506,8 +513,8 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
   },
   repeatBtn: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
@@ -527,8 +534,8 @@ const styles = StyleSheet.create({
     color: Colors.dark.background,
   },
   catBtn: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
@@ -542,8 +549,8 @@ const styles = StyleSheet.create({
     color: Colors.dark.textTertiary,
   },
   addButton: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     backgroundColor: Colors.dark.accent,
     justifyContent: 'center',
@@ -562,9 +569,6 @@ const styles = StyleSheet.create({
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 11,
-    paddingHorizontal: Spacing.lg,
-    marginTop: -Spacing.sm,
-    marginBottom: Spacing.xs,
   },
   catScroll: {
     maxHeight: 40,
@@ -596,8 +600,8 @@ const styles = StyleSheet.create({
   },
   // Date picker
   dateBtn: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
