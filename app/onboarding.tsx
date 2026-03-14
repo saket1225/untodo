@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, Animated, Dimensions,
+  KeyboardAvoidingView, Platform, Animated, Dimensions, Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -68,53 +69,63 @@ export default function OnboardingScreen() {
   };
 
   const handleSubmit = () => {
-    if (!sanitized) return;
+    if (!sanitized || sanitized.length < 3) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setUsername(sanitized);
     addSampleTasks();
     router.replace('/(tabs)');
   };
 
+  const isValid = sanitized.length >= 3;
+
   if (step === 'username') {
     return (
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Animated.View style={[
-          styles.content,
-          { opacity: usernameOpacity, transform: [{ translateY: usernameTranslateY }] },
-        ]}>
-          <Text style={styles.usernameHeading}>pick a username</Text>
-          <Text style={styles.usernameSubtext}>this is how you'll be known</Text>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <Animated.View style={[
+            styles.content,
+            { opacity: usernameOpacity, transform: [{ translateY: usernameTranslateY }] },
+          ]}>
+            <Text style={styles.usernameHeading}>pick a username</Text>
+            <Text style={styles.usernameSubtext}>this is how you'll be known</Text>
 
-          <TextInput
-            style={styles.input}
-            value={input}
-            onChangeText={setInput}
-            placeholder="username"
-            placeholderTextColor={Colors.dark.textTertiary}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoFocus
-            maxLength={20}
-            selectionColor={Colors.dark.accent}
-          />
+            <TextInput
+              style={styles.input}
+              value={input}
+              onChangeText={setInput}
+              placeholder="username"
+              placeholderTextColor={Colors.dark.textTertiary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+              maxLength={20}
+              selectionColor={Colors.dark.accent}
+              returnKeyType="done"
+              onSubmitEditing={isValid ? handleSubmit : undefined}
+            />
 
-          {input.length > 0 && sanitized !== input && (
-            <Text style={styles.sanitizedHint}>{sanitized}</Text>
-          )}
+            {input.length > 0 && sanitized !== input && (
+              <Text style={styles.sanitizedHint}>{sanitized}</Text>
+            )}
 
-          <TouchableOpacity
-            style={[styles.continueButton, !sanitized && { opacity: 0.3 }]}
-            onPress={handleSubmit}
-            disabled={!sanitized}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.continueButtonText}>Let's go</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </KeyboardAvoidingView>
+            {input.length > 0 && sanitized.length > 0 && sanitized.length < 3 && (
+              <Text style={styles.sanitizedHint}>at least 3 characters</Text>
+            )}
+
+            <TouchableOpacity
+              style={[styles.continueButton, !isValid && { opacity: 0.3 }]}
+              onPress={handleSubmit}
+              disabled={!isValid}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.continueButtonText}>Let's go</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     );
   }
 

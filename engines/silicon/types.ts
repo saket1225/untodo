@@ -1,6 +1,6 @@
 export interface SiliconCommand {
   id: string;
-  type: 'add_task' | 'complete_task' | 'delete_task' | 'get_tasks' | 'write_daily_summary' | 'write_weekly_review' | 'update_wallpaper_config' | 'nudge' | 'get_progress';
+  type: 'add_task' | 'complete_task' | 'delete_task' | 'get_tasks' | 'write_daily_summary' | 'write_weekly_review' | 'update_wallpaper_config' | 'nudge' | 'get_progress' | 'get_habits' | 'get_streak' | 'set_focus';
   payload: Record<string, any>;
   status: 'pending' | 'processing' | 'done';
   createdAt: number;

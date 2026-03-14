@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface UserStore {
   username: string | null;
+  _hydrated: boolean;
   setUsername: (name: string) => void;
 }
 
@@ -11,11 +12,18 @@ export const useUserStore = create<UserStore>()(
   persist(
     (set) => ({
       username: null,
+      _hydrated: false,
       setUsername: (name: string) => set({ username: name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9_]/g, '') }),
     }),
     {
       name: 'untodo-user',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          useUserStore.setState({ _hydrated: true });
+        }
+      },
+      partialize: (state) => ({ username: state.username }),
     }
   )
 );

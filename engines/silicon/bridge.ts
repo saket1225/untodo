@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { collection, query, where, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
+import * as Notifications from 'expo-notifications';
 import { db } from '../../lib/firebase';
 import { SiliconCommand, SiliconConnection } from './types';
 import { useTodoStore } from '../todo/store';
@@ -8,6 +9,14 @@ import { useWallpaperStore } from '../wallpaper/store';
 import { getLogicalDate } from '../../lib/date-utils';
 
 const SILICON_KEY = 'untodo-silicon-connection';
+
+// Track focus state for set_focus command
+let _focusCallback: ((taskId: string | null) => void) | null = null;
+
+export function onSiliconFocus(cb: (taskId: string | null) => void) {
+  _focusCallback = cb;
+  return () => { _focusCallback = null; };
+}
 
 export function generatePairingCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -41,6 +50,34 @@ export async function disconnectSilicon(): Promise<void> {
   await AsyncStorage.removeItem(SILICON_KEY);
 }
 
+function calculateStreak(): { streak: number; bestStreak: number } {
+  const todos = useTodoStore.getState().todos;
+  let streak = 0;
+  let bestStreak = 0;
+  const today = getLogicalDate();
+
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today + 'T12:00:00');
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    const dayTodos = todos.filter(t => t.logicalDate === dateStr);
+    if (dayTodos.length === 0) {
+      if (i === 0) continue; // Today might not have tasks yet
+      break;
+    }
+    const completed = dayTodos.filter(t => t.completed).length;
+    if (completed / dayTodos.length >= 0.5) {
+      streak++;
+      bestStreak = Math.max(bestStreak, streak);
+    } else {
+      if (i === 0) continue; // Today is still in progress
+      break;
+    }
+  }
+
+  return { streak, bestStreak };
+}
+
 async function processCommand(command: SiliconCommand, username: string): Promise<void> {
   let result: Record<string, any> = {};
   let status: 'success' | 'error' = 'success';
@@ -54,7 +91,10 @@ async function processCommand(command: SiliconCommand, username: string): Promis
       case 'add_task': {
         const title = command.payload.title || command.payload.text;
         if (title) {
-          useTodoStore.getState().addTodo(title);
+          const priority = command.payload.priority || null;
+          const category = command.payload.category || null;
+          const date = command.payload.date || undefined;
+          useTodoStore.getState().addTodo(title, priority, category, date);
           result = { message: `Task added: ${title}` };
         } else {
           status = 'error';
@@ -133,13 +173,86 @@ async function processCommand(command: SiliconCommand, username: string): Promis
         break;
       }
       case 'nudge': {
-        result = { message: 'Nudge received (notifications coming soon)' };
+        const message = command.payload.message || command.payload.text || 'Silicon says: Time to focus!';
+        try {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: 'Silicon',
+              body: String(message),
+              sound: true,
+            },
+            trigger: null, // Immediate
+          });
+          result = { message: `Nudge sent: ${message}` };
+        } catch (e: any) {
+          result = { message: `Nudge displayed (notification failed: ${e?.message})` };
+        }
         break;
       }
       case 'get_progress': {
         const summaries = useProgressStore.getState().daySummaries;
         const reviews = useProgressStore.getState().weeklyReviews;
         result = { summaries, reviews };
+        break;
+      }
+      case 'get_habits': {
+        const habits = useProgressStore.getState().habits || [];
+        // Also find recurring tasks as "habits"
+        const recurringTasks = useTodoStore.getState().todos.filter(t => t.recurrence && !t.recurringParentId);
+        const recurringHabits = recurringTasks.map(t => {
+          // Count how many spawned instances were completed
+          const allSpawned = useTodoStore.getState().todos.filter(
+            st => st.recurringParentId === t.id
+          );
+          const completedCount = allSpawned.filter(st => st.completed).length;
+          return {
+            id: t.id,
+            name: t.title,
+            recurrence: t.recurrence,
+            totalSpawned: allSpawned.length,
+            totalCompleted: completedCount,
+            completionRate: allSpawned.length > 0 ? Math.round((completedCount / allSpawned.length) * 100) : 0,
+          };
+        });
+        result = { habits, recurringHabits };
+        break;
+      }
+      case 'get_streak': {
+        const { streak, bestStreak } = calculateStreak();
+        const todayDate = getLogicalDate();
+        const todayTodos = useTodoStore.getState().getTodosForDate(todayDate);
+        const completed = todayTodos.filter(t => t.completed).length;
+        result = {
+          currentStreak: streak,
+          bestStreak,
+          todayProgress: {
+            completed,
+            total: todayTodos.length,
+            completionRate: todayTodos.length > 0 ? Math.round((completed / todayTodos.length) * 100) : 0,
+          },
+        };
+        break;
+      }
+      case 'set_focus': {
+        const taskId = command.payload.taskId || command.payload.id;
+        if (!taskId) {
+          status = 'error';
+          result = { message: 'No taskId provided' };
+          break;
+        }
+        const task = useTodoStore.getState().todos.find(t => t.id === taskId);
+        if (!task) {
+          status = 'error';
+          result = { message: `Task not found: ${taskId}` };
+          break;
+        }
+        // Trigger focus mode via callback
+        if (_focusCallback) {
+          _focusCallback(taskId);
+          result = { message: `Focus mode activated for: ${task.title}` };
+        } else {
+          result = { message: `Focus requested for: ${task.title} (app must be in foreground)` };
+        }
         break;
       }
       default:

@@ -143,6 +143,11 @@ export async function flushOfflineQueue(): Promise<void> {
 // Initialize offline queue on module load
 loadOfflineQueue();
 
+// ---- Sync guard: prevent concurrent syncFromFirestore calls ----
+let _syncFromFirestoreInProgress = false;
+export function isSyncFromFirestoreInProgress() { return _syncFromFirestoreInProgress; }
+export function setSyncFromFirestoreInProgress(v: boolean) { _syncFromFirestoreInProgress = v; }
+
 // ---- Todo sync ----
 
 export async function syncTodoToFirestore(username: string, todo: Todo): Promise<void> {

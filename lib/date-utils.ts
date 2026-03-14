@@ -32,6 +32,20 @@ export function formatDisplayDate(dateStr: string): string {
   }
 }
 
+// Get the logical "yesterday" date string (respects 5am reset)
+export function getLogicalYesterday(): string {
+  const logicalToday = getLogicalDate();
+  const todayDate = new Date(logicalToday + 'T12:00:00');
+  return format(subDays(todayDate, 1), 'yyyy-MM-dd');
+}
+
+// Get the day-of-week for the logical date (0=Sun, 6=Sat)
+export function getLogicalDayOfWeek(): number {
+  const logicalToday = getLogicalDate();
+  const date = new Date(logicalToday + 'T12:00:00');
+  return date.getDay();
+}
+
 export function shiftDate(dateStr: string, days: number): string {
   try {
     if (!dateStr || typeof dateStr !== 'string') return getLogicalDate();

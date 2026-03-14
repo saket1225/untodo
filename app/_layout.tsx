@@ -14,6 +14,7 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const username = useUserStore(s => s.username);
+  const hydrated = useUserStore(s => s._hydrated);
   const notifInitialized = useNotificationStore(s => s.initialized);
 
   const [fontsLoaded] = useFonts({
@@ -40,7 +41,7 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || !hydrated) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color="#fff" />

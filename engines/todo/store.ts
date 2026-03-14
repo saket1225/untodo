@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Todo, Priority, Category, Subtask, SyncStatus, Recurrence, TimeTracking } from './types';
-import { getLogicalDate } from '../../lib/date-utils';
+import { getLogicalDate, getLogicalYesterday, getLogicalDayOfWeek } from '../../lib/date-utils';
 import { useUserStore } from '../user/store';
 import {
   syncTodoToFirestore,
@@ -11,6 +11,8 @@ import {
   mergeTodos,
   bulkSyncTodosToFirestore,
   flushOfflineQueue,
+  isSyncFromFirestoreInProgress,
+  setSyncFromFirestoreInProgress,
 } from '../../lib/firebase-sync';
 import { refreshNotifications } from '../notifications/service';
 
@@ -277,9 +279,7 @@ export const useTodoStore = create<TodoStore>()(
 
       carryOverTodos: () => {
         const logicalDate = safeLogicalDate();
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        const yesterdayStr = getLogicalYesterday();
         const now = nowISO();
 
         set(state => {
@@ -318,21 +318,21 @@ export const useTodoStore = create<TodoStore>()(
       autoCarryOldTodos: () => {
         const logicalDate = safeLogicalDate();
         const now = nowISO();
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
 
         // Find all incomplete tasks from 2+ days ago that haven't been carried over to today
         const todayTodos = get().todos.filter(t => t.logicalDate === logicalDate);
-        const alreadyCarriedIds = new Set(
+        const alreadyCarriedTitles = new Set(
           todayTodos.filter(t => t.carriedOverFrom).map(t => t.title)
         );
 
-        const twoDaysAgo = new Date(today);
+        // Use logical date for 2-days-ago calculation (respects 5am boundary)
+        const logicalToday = new Date(logicalDate + 'T12:00:00');
+        const twoDaysAgo = new Date(logicalToday);
         twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
         const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0];
 
         const oldIncomplete = get().todos.filter(
-          t => t.logicalDate && t.logicalDate <= twoDaysAgoStr && !t.completed && !alreadyCarriedIds.has(t.title)
+          t => t.logicalDate && t.logicalDate <= twoDaysAgoStr && !t.completed && !alreadyCarriedTitles.has(t.title)
         );
 
         if (oldIncomplete.length === 0) return 0;
@@ -501,7 +501,7 @@ export const useTodoStore = create<TodoStore>()(
           const recurringTemplates = state.todos.filter(t => t.recurrence);
           const todayTodos = state.todos.filter(t => t.logicalDate === logicalDate);
           const now = nowISO();
-          const dayOfWeek = new Date().getDay();
+          const dayOfWeek = getLogicalDayOfWeek();
 
           const newTodos: Todo[] = [];
           for (const template of recurringTemplates) {
@@ -589,9 +589,12 @@ export const useTodoStore = create<TodoStore>()(
       syncFromFirestore: async () => {
         const username = getUsername();
         if (!username) return;
+        // Guard against concurrent sync calls (e.g. pull-to-refresh + auto-sync)
+        if (isSyncFromFirestoreInProgress()) return;
+        setSyncFromFirestoreInProgress(true);
         try {
           // Also flush any queued offline writes
-          flushOfflineQueue().catch(() => {});
+          await flushOfflineQueue().catch(() => {});
 
           const remote = await fetchAllTodosFromFirestore(username);
           if (remote.length === 0) {
@@ -601,6 +604,7 @@ export const useTodoStore = create<TodoStore>()(
             }
             return;
           }
+          // Re-read local AFTER flush to get the freshest state
           const local = get().todos;
           const merged = mergeTodos(local, remote);
 
@@ -620,6 +624,8 @@ export const useTodoStore = create<TodoStore>()(
           }
         } catch {
           // Fail silently — data stays local
+        } finally {
+          setSyncFromFirestoreInProgress(false);
         }
       },
     }),
