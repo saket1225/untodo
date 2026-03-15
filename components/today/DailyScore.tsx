@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated as RNAnimated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 
 export function getDailyScore(completed: number, total: number, streak: number): { grade: string; color: string; pct: number } {
   if (total === 0) return { grade: '--', color: Colors.dark.textTertiary, pct: 0 };
@@ -20,6 +21,7 @@ export function getDailyScore(completed: number, total: number, streak: number):
 }
 
 export function DailyScore({ completed, total, streak }: { completed: number; total: number; streak: number }) {
+  const { colors } = useTheme();
   const { grade, color, pct } = getDailyScore(completed, total, streak);
   const scaleAnim = useRef(new RNAnimated.Value(0.8)).current;
 
@@ -30,13 +32,13 @@ export function DailyScore({ completed, total, streak }: { completed: number; to
   if (total === 0) return null;
 
   return (
-    <View style={scoreStyles.container}>
+    <View style={[scoreStyles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <RNAnimated.View style={[scoreStyles.gradeCircle, { borderColor: color, transform: [{ scale: scaleAnim }] }]}>
         <Text style={[scoreStyles.gradeText, { color }]}>{grade}</Text>
       </RNAnimated.View>
       <View style={scoreStyles.details}>
-        <Text style={scoreStyles.label}>Today's score</Text>
-        <View style={scoreStyles.barTrack}>
+        <Text style={[scoreStyles.label, { color: colors.textTertiary }]}>Today's score</Text>
+        <View style={[scoreStyles.barTrack, { backgroundColor: colors.border }]}>
           <View style={[scoreStyles.barFill, { width: `${Math.min(pct, 100)}%`, backgroundColor: color }]} />
         </View>
       </View>
@@ -52,10 +54,8 @@ const scoreStyles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: 12,
     marginHorizontal: Spacing.lg,
-    backgroundColor: Colors.dark.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
     marginTop: Spacing.sm,
   },
   gradeCircle: {
@@ -75,7 +75,6 @@ const scoreStyles = StyleSheet.create({
     gap: 4,
   },
   label: {
-    color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 11,
     textTransform: 'uppercase',
@@ -83,7 +82,6 @@ const scoreStyles = StyleSheet.create({
   },
   barTrack: {
     height: 4,
-    backgroundColor: Colors.dark.border,
     borderRadius: 2,
     overflow: 'hidden',
   },
@@ -104,6 +102,7 @@ const STREAK_MILESTONES: Record<number, { emoji: string; title: string; message:
 };
 
 export function StreakMilestone({ streak, visible, onDismiss }: { streak: number; visible: boolean; onDismiss: () => void }) {
+  const { colors } = useTheme();
   const milestone = STREAK_MILESTONES[streak];
   const scale = useRef(new RNAnimated.Value(0)).current;
   const opacity = useRef(new RNAnimated.Value(0)).current;
@@ -129,11 +128,11 @@ export function StreakMilestone({ streak, visible, onDismiss }: { streak: number
   return (
     <RNAnimated.View style={[milestoneStyles.overlay, { opacity }]} pointerEvents="box-none">
       <TouchableOpacity activeOpacity={1} onPress={onDismiss} style={milestoneStyles.touchArea}>
-        <RNAnimated.View style={[milestoneStyles.card, { transform: [{ scale }] }]}>
+        <RNAnimated.View style={[milestoneStyles.card, { backgroundColor: colors.surface, borderColor: colors.border, transform: [{ scale }] }]}>
           <Text style={milestoneStyles.emoji}>{milestone.emoji}</Text>
-          <Text style={milestoneStyles.title}>{milestone.title}</Text>
-          <Text style={milestoneStyles.message}>{milestone.message}</Text>
-          <Text style={milestoneStyles.streakNum}>{streak} days</Text>
+          <Text style={[milestoneStyles.title, { color: colors.text }]}>{milestone.title}</Text>
+          <Text style={[milestoneStyles.message, { color: colors.textSecondary }]}>{milestone.message}</Text>
+          <Text style={[milestoneStyles.streakNum, { color: colors.timer }]}>{streak} days</Text>
         </RNAnimated.View>
       </TouchableOpacity>
     </RNAnimated.View>
@@ -155,10 +154,8 @@ const milestoneStyles = StyleSheet.create({
     width: '100%',
   },
   card: {
-    backgroundColor: Colors.dark.surface,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
     padding: Spacing.xl,
     marginHorizontal: Spacing.xl,
     alignItems: 'center',
@@ -173,14 +170,12 @@ const milestoneStyles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   title: {
-    color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
     fontSize: 28,
     textAlign: 'center',
     marginBottom: Spacing.sm,
   },
   message: {
-    color: Colors.dark.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 15,
     textAlign: 'center',
@@ -188,7 +183,6 @@ const milestoneStyles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   streakNum: {
-    color: Colors.dark.timer,
     fontFamily: Fonts.bodyMedium,
     fontSize: 14,
   },

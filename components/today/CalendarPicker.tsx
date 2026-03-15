@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { Fonts, Spacing } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 import { getLogicalDate } from '../../lib/date-utils';
 import { Todo } from '../../engines/todo/types';
 
@@ -16,6 +17,7 @@ export function CalendarPicker({
   onSelectDate: (date: string) => void;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
   const selected = new Date(selectedDate + 'T12:00:00');
   const [viewMonth, setViewMonth] = useState(selected.getMonth());
   const [viewYear, setViewYear] = useState(selected.getFullYear());
@@ -69,22 +71,22 @@ export function CalendarPicker({
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={calStyles.overlay} activeOpacity={1} onPress={onClose}>
-        <View style={calStyles.container} onStartShouldSetResponder={() => true}>
+        <View style={[calStyles.container, { backgroundColor: colors.surface, borderColor: colors.border }]} onStartShouldSetResponder={() => true}>
           {/* Month navigation */}
           <View style={calStyles.monthRow}>
             <TouchableOpacity onPress={prevMonth} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Text style={calStyles.monthArrow}>‹</Text>
+              <Text style={[calStyles.monthArrow, { color: colors.textSecondary }]}>‹</Text>
             </TouchableOpacity>
-            <Text style={calStyles.monthTitle}>{monthNames[viewMonth]} {viewYear}</Text>
+            <Text style={[calStyles.monthTitle, { color: colors.text }]}>{monthNames[viewMonth]} {viewYear}</Text>
             <TouchableOpacity onPress={nextMonth} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Text style={calStyles.monthArrow}>›</Text>
+              <Text style={[calStyles.monthArrow, { color: colors.textSecondary }]}>›</Text>
             </TouchableOpacity>
           </View>
 
           {/* Day headers */}
           <View style={calStyles.weekRow}>
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-              <Text key={i} style={calStyles.weekDay}>{d}</Text>
+              <Text key={i} style={[calStyles.weekDay, { color: colors.textTertiary }]}>{d}</Text>
             ))}
           </View>
 
@@ -101,7 +103,7 @@ export function CalendarPicker({
               return (
                 <TouchableOpacity
                   key={i}
-                  style={[calStyles.dayCell, isSelected && calStyles.dayCellSelected]}
+                  style={[calStyles.dayCell, isSelected && { backgroundColor: colors.accent, borderRadius: 100 }]}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     onSelectDate(dateStr);
@@ -110,13 +112,14 @@ export function CalendarPicker({
                 >
                   <Text style={[
                     calStyles.dayText,
-                    isCurrentDay && !isSelected && calStyles.dayTextToday,
-                    isSelected && calStyles.dayTextSelected,
+                    { color: colors.textSecondary },
+                    isCurrentDay && !isSelected && { color: colors.accent, fontFamily: Fonts.bodyMedium },
+                    isSelected && { color: colors.background, fontFamily: Fonts.bodyMedium },
                   ]}>
                     {day}
                   </Text>
                   {hasTasks && !isSelected && (
-                    <View style={[calStyles.taskDot, hasIncomplete ? calStyles.taskDotIncomplete : calStyles.taskDotComplete]} />
+                    <View style={[calStyles.taskDot, { backgroundColor: hasIncomplete ? colors.timer : colors.success }]} />
                   )}
                 </TouchableOpacity>
               );
@@ -125,14 +128,14 @@ export function CalendarPicker({
 
           {/* Quick jump to today */}
           <TouchableOpacity
-            style={calStyles.todayBtn}
+            style={[calStyles.todayBtn, { borderColor: colors.border }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onSelectDate(today);
               onClose();
             }}
           >
-            <Text style={calStyles.todayBtnText}>Today</Text>
+            <Text style={[calStyles.todayBtnText, { color: colors.textSecondary }]}>Today</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -149,12 +152,10 @@ const calStyles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
   },
   container: {
-    backgroundColor: Colors.dark.surface,
     borderRadius: 20,
     padding: Spacing.lg,
     width: '100%',
     borderWidth: 1,
-    borderColor: Colors.dark.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.6,
@@ -168,12 +169,10 @@ const calStyles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   monthArrow: {
-    color: Colors.dark.textSecondary,
     fontSize: 28,
     paddingHorizontal: 8,
   },
   monthTitle: {
-    color: Colors.dark.text,
     fontFamily: Fonts.headingMedium,
     fontSize: 18,
   },
@@ -184,7 +183,6 @@ const calStyles = StyleSheet.create({
   weekDay: {
     flex: 1,
     textAlign: 'center',
-    color: Colors.dark.textTertiary,
     fontFamily: Fonts.bodyMedium,
     fontSize: 12,
   },
@@ -198,34 +196,15 @@ const calStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dayCellSelected: {
-    backgroundColor: Colors.dark.accent,
-    borderRadius: 100,
-  },
   dayText: {
-    color: Colors.dark.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 14,
-  },
-  dayTextToday: {
-    color: Colors.dark.accent,
-    fontFamily: Fonts.bodyMedium,
-  },
-  dayTextSelected: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
   },
   taskDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
     marginTop: 2,
-  },
-  taskDotIncomplete: {
-    backgroundColor: Colors.dark.timer,
-  },
-  taskDotComplete: {
-    backgroundColor: Colors.dark.success,
   },
   todayBtn: {
     alignSelf: 'center',
@@ -234,10 +213,8 @@ const calStyles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
   },
   todayBtnText: {
-    color: Colors.dark.textSecondary,
     fontFamily: Fonts.bodyMedium,
     fontSize: 13,
   },

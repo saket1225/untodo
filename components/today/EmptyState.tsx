@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { Text, StyleSheet, Animated as RNAnimated, TouchableOpacity } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { Fonts, Spacing } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 import { getTimeOfDay, TimeOfDay } from './helpers';
 import { DailyQuote } from './DailyQuote';
 
@@ -32,6 +33,7 @@ const ROTATING_PROMPTS: Record<TimeOfDay, { prompt: string; sub: string }[]> = {
 };
 
 export function EmptyState({ isToday, allCompleted }: { isToday: boolean; allCompleted: boolean }) {
+  const { colors } = useTheme();
   const fadeAnim = useRef(new RNAnimated.Value(0)).current;
   const breatheAnim = useRef(new RNAnimated.Value(0.4)).current;
   const textFade = useRef(new RNAnimated.Value(1)).current;
@@ -87,8 +89,8 @@ export function EmptyState({ isToday, allCompleted }: { isToday: boolean; allCom
     return (
       <RNAnimated.View style={[emptyStyles.empty, { opacity: fadeAnim }]}>
         <Text style={emptyStyles.emptyIcon}>🔥</Text>
-        <Text style={emptyStyles.emptyQuote}>{doneMsg}</Text>
-        <Text style={emptyStyles.emptySubtext}>{doneSub}</Text>
+        <Text style={[emptyStyles.emptyQuote, { color: colors.textSecondary }]}>{doneMsg}</Text>
+        <Text style={[emptyStyles.emptySubtext, { color: colors.textTertiary }]}>{doneSub}</Text>
       </RNAnimated.View>
     );
   }
@@ -97,10 +99,10 @@ export function EmptyState({ isToday, allCompleted }: { isToday: boolean; allCom
     const { prompt, sub } = prompts[promptIdx];
     return (
       <RNAnimated.View style={[emptyStyles.empty, { opacity: fadeAnim }]}>
-        <RNAnimated.Text style={[emptyStyles.emptyIcon, { opacity: breatheAnim }]}>○</RNAnimated.Text>
+        <RNAnimated.Text style={[emptyStyles.emptyIcon, { color: colors.textTertiary, opacity: breatheAnim }]}>○</RNAnimated.Text>
         <RNAnimated.View style={{ opacity: textFade }}>
-          <Text style={emptyStyles.emptyQuote}>{prompt}</Text>
-          <Text style={emptyStyles.emptySubtext}>{sub}</Text>
+          <Text style={[emptyStyles.emptyQuote, { color: colors.textSecondary }]}>{prompt}</Text>
+          <Text style={[emptyStyles.emptySubtext, { color: colors.textTertiary }]}>{sub}</Text>
         </RNAnimated.View>
         <DailyQuote />
       </RNAnimated.View>
@@ -109,8 +111,8 @@ export function EmptyState({ isToday, allCompleted }: { isToday: boolean; allCom
 
   return (
     <RNAnimated.View style={[emptyStyles.empty, { opacity: fadeAnim }]}>
-      <Text style={emptyStyles.emptyQuote}>Nothing here yet</Text>
-      <Text style={emptyStyles.emptySubtext}>Add a task or navigate to another day</Text>
+      <Text style={[emptyStyles.emptyQuote, { color: colors.textSecondary }]}>Nothing here yet</Text>
+      <Text style={[emptyStyles.emptySubtext, { color: colors.textTertiary }]}>Add a task or navigate to another day</Text>
     </RNAnimated.View>
   );
 }
@@ -122,19 +124,16 @@ const emptyStyles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
   },
   emptyIcon: {
-    color: Colors.dark.textTertiary,
     fontSize: 40,
     marginBottom: Spacing.lg,
   },
   emptyQuote: {
-    color: Colors.dark.textSecondary,
     fontFamily: Fonts.accentItalic,
     fontSize: 22,
     textAlign: 'center',
     lineHeight: 32,
   },
   emptySubtext: {
-    color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 14,
     marginTop: Spacing.md,

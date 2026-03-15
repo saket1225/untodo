@@ -1,11 +1,13 @@
 import { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated as RNAnimated, Dimensions } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { Fonts, Spacing } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export function ConfettiCelebration({ visible, onDismiss, streak }: { visible: boolean; onDismiss: () => void; streak: number }) {
+  const { colors } = useTheme();
   const opacity = useRef(new RNAnimated.Value(0)).current;
   const textScale = useRef(new RNAnimated.Value(0.5)).current;
   const textOpacity = useRef(new RNAnimated.Value(0)).current;
@@ -88,12 +90,12 @@ export function ConfettiCelebration({ visible, onDismiss, streak }: { visible: b
           />
         );
       })}
-      <RNAnimated.View style={[confettiStyles.celebrationTextContainer, { opacity: textOpacity, transform: [{ scale: textScale }] }]}>
+      <RNAnimated.View style={[confettiStyles.celebrationTextContainer, { backgroundColor: colors.surface, borderColor: colors.border, opacity: textOpacity, transform: [{ scale: textScale }] }]}>
         <Text style={confettiStyles.celebrationEmoji}>🔥</Text>
-        <Text style={confettiStyles.celebrationText}>Everything done!</Text>
-        <Text style={confettiStyles.celebrationSubtext}>You're a machine.</Text>
+        <Text style={[confettiStyles.celebrationText, { color: colors.text }]}>Everything done!</Text>
+        <Text style={[confettiStyles.celebrationSubtext, { color: colors.textSecondary }]}>You're a machine.</Text>
         {streak > 0 && (
-          <Text style={confettiStyles.celebrationStreak}>{streak} day streak</Text>
+          <Text style={[confettiStyles.celebrationStreak, { color: colors.timer }]}>{streak} day streak</Text>
         )}
       </RNAnimated.View>
     </RNAnimated.View>
@@ -111,12 +113,10 @@ const confettiStyles = StyleSheet.create({
     position: 'absolute',
   },
   celebrationTextContainer: {
-    backgroundColor: Colors.dark.surface,
     borderRadius: 20,
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
@@ -129,20 +129,17 @@ const confettiStyles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   celebrationText: {
-    color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
     fontSize: 24,
     textAlign: 'center',
   },
   celebrationSubtext: {
-    color: Colors.dark.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 15,
     textAlign: 'center',
     marginTop: Spacing.xs,
   },
   celebrationStreak: {
-    color: Colors.dark.timer,
     fontFamily: Fonts.bodyMedium,
     fontSize: 14,
     marginTop: Spacing.sm,

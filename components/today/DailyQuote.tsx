@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { TouchableOpacity, StyleSheet, Animated as RNAnimated } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { Fonts, Spacing } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 
 const DAILY_QUOTES = [
   'Memento mori.',
@@ -42,6 +43,7 @@ function getDailyQuoteIndex(): number {
 }
 
 export function DailyQuote() {
+  const { colors } = useTheme();
   const [quoteIndex, setQuoteIndex] = useState(getDailyQuoteIndex);
   const fadeAnim = useRef(new RNAnimated.Value(1)).current;
 
@@ -54,7 +56,7 @@ export function DailyQuote() {
 
   return (
     <TouchableOpacity onPress={handleTap} activeOpacity={0.6} style={quoteStyles.container}>
-      <RNAnimated.Text style={[quoteStyles.text, { opacity: fadeAnim }]}>
+      <RNAnimated.Text style={[quoteStyles.text, { color: colors.textTertiary, opacity: fadeAnim }]}>
         "{DAILY_QUOTES[quoteIndex]}"
       </RNAnimated.Text>
     </TouchableOpacity>
@@ -69,7 +71,6 @@ const quoteStyles = StyleSheet.create({
     marginTop: Spacing.md,
   },
   text: {
-    color: Colors.dark.textTertiary,
     fontFamily: Fonts.accentItalic,
     fontSize: 14,
     textAlign: 'center',

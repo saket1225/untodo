@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, Animated, Dimensions, Keyboard,
@@ -6,7 +6,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Colors, Fonts, Spacing } from '../lib/theme';
+import { Fonts, Spacing } from '../lib/theme';
+import { useTheme } from '../lib/ThemeContext';
 import { useUserStore } from '../engines/user/store';
 import { useTodoStore } from '../engines/todo/store';
 
@@ -14,6 +15,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // --- Screen 1: Brand ---
 function BrandScreen() {
+  const { colors, fonts, isDark } = useTheme();
   const logoScale = useRef(new Animated.Value(0.7)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
@@ -39,9 +41,9 @@ function BrandScreen() {
             key={i}
             style={[
               styles.decorDot,
-              i < 5 && { backgroundColor: Colors.dark.textTertiary },
-              i >= 5 && i < 10 && { backgroundColor: Colors.dark.border },
-              i >= 10 && { backgroundColor: Colors.dark.surface },
+              i < 5 && { backgroundColor: colors.textTertiary },
+              i >= 5 && i < 10 && { backgroundColor: colors.border },
+              i >= 10 && { backgroundColor: colors.surface },
             ]}
           />
         ))}
@@ -49,12 +51,15 @@ function BrandScreen() {
 
       <Animated.Text style={[
         styles.logo,
-        { opacity: logoOpacity, transform: [{ scale: logoScale }] },
+        { color: colors.text, opacity: logoOpacity, transform: [{ scale: logoScale }] },
       ]}>
         untodo
       </Animated.Text>
 
-      <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>
+      <Animated.Text style={[
+        styles.tagline,
+        { color: colors.textTertiary, opacity: taglineOpacity },
+      ]}>
         Do less. Mean more.
       </Animated.Text>
     </View>
@@ -63,6 +68,7 @@ function BrandScreen() {
 
 // --- Screen 2: Features ---
 function FeaturesScreen() {
+  const { colors } = useTheme();
   const anim1 = useRef(new Animated.Value(0)).current;
   const anim2 = useRef(new Animated.Value(0)).current;
   const anim3 = useRef(new Animated.Value(0)).current;
@@ -83,7 +89,7 @@ function FeaturesScreen() {
 
   return (
     <View style={[styles.screen, styles.centerContent]}>
-      <Text style={styles.featuresHeading}>Built for focus</Text>
+      <Text style={[styles.featuresHeading, { color: colors.text }]}>Built for focus</Text>
       <View style={styles.featuresList}>
         {features.map((f, i) => (
           <Animated.View
@@ -96,10 +102,10 @@ function FeaturesScreen() {
               },
             ]}
           >
-            <Text style={styles.featureIcon}>{f.icon}</Text>
+            <Text style={[styles.featureIcon, { color: colors.textSecondary }]}>{f.icon}</Text>
             <View style={styles.featureText}>
-              <Text style={styles.featureTitle}>{f.title}</Text>
-              <Text style={styles.featureDesc}>{f.desc}</Text>
+              <Text style={[styles.featureTitle, { color: colors.text }]}>{f.title}</Text>
+              <Text style={[styles.featureDesc, { color: colors.textTertiary }]}>{f.desc}</Text>
             </View>
           </Animated.View>
         ))}
@@ -110,6 +116,7 @@ function FeaturesScreen() {
 
 // --- Screen 3: Username ---
 function UsernameScreen({ onComplete }: { onComplete: () => void }) {
+  const { colors } = useTheme();
   const [input, setInput] = useState('');
   const setUsername = useUserStore(s => s.setUsername);
   const addSampleTasks = useTodoStore(s => s.addSampleTasks);
@@ -144,38 +151,42 @@ function UsernameScreen({ onComplete }: { onComplete: () => void }) {
           styles.usernameContainer,
           { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
         ]}>
-          <Text style={styles.usernameHeading}>pick a username</Text>
-          <Text style={styles.usernameSubtext}>this is how you'll be known</Text>
+          <Text style={[styles.usernameHeading, { color: colors.text }]}>pick a username</Text>
+          <Text style={[styles.usernameSubtext, { color: colors.textTertiary }]}>this is how you'll be known</Text>
 
           <TextInput
-            style={styles.input}
+            style={[styles.input, {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              color: colors.text,
+            }]}
             value={input}
             onChangeText={setInput}
             placeholder="username"
-            placeholderTextColor={Colors.dark.textTertiary}
+            placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
             autoCorrect={false}
             maxLength={20}
-            selectionColor={Colors.dark.accent}
+            selectionColor={colors.accent}
             returnKeyType="done"
             onSubmitEditing={isValid ? handleSubmit : undefined}
           />
 
           {input.length > 0 && sanitized !== input && (
-            <Text style={styles.sanitizedHint}>{sanitized}</Text>
+            <Text style={[styles.sanitizedHint, { color: colors.textTertiary }]}>{sanitized}</Text>
           )}
 
           {input.length > 0 && sanitized.length > 0 && sanitized.length < 3 && (
-            <Text style={styles.sanitizedHint}>at least 3 characters</Text>
+            <Text style={[styles.sanitizedHint, { color: colors.textTertiary }]}>at least 3 characters</Text>
           )}
 
           <TouchableOpacity
-            style={[styles.continueButton, !isValid && { opacity: 0.3 }]}
+            style={[styles.continueButton, { backgroundColor: colors.accent }, !isValid && { opacity: 0.3 }]}
             onPress={handleSubmit}
             disabled={!isValid}
             activeOpacity={0.8}
           >
-            <Text style={styles.continueButtonText}>Let's go</Text>
+            <Text style={[styles.continueButtonText, { color: colors.background }]}>Let's go</Text>
           </TouchableOpacity>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -185,6 +196,7 @@ function UsernameScreen({ onComplete }: { onComplete: () => void }) {
 
 // --- Page Indicator Dots ---
 function PageDots({ current, total }: { current: number; total: number }) {
+  const { colors } = useTheme();
   return (
     <View style={styles.dotsContainer}>
       {Array.from({ length: total }).map((_, i) => (
@@ -192,7 +204,8 @@ function PageDots({ current, total }: { current: number; total: number }) {
           key={i}
           style={[
             styles.pageDot,
-            i === current && styles.pageDotActive,
+            { backgroundColor: colors.border },
+            i === current && { backgroundColor: colors.text, width: 24 },
           ]}
         />
       ))}
@@ -202,6 +215,7 @@ function PageDots({ current, total }: { current: number; total: number }) {
 
 // --- Main Onboarding ---
 export default function OnboardingScreen() {
+  const { colors } = useTheme();
   const [currentPage, setCurrentPage] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const router = useRouter();
@@ -239,7 +253,7 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         ref={flatListRef}
         data={screens}
@@ -270,15 +284,15 @@ export default function OnboardingScreen() {
               onPress={() => goToPage(2)}
               activeOpacity={0.7}
             >
-              <Text style={styles.skipText}>Skip</Text>
+              <Text style={[styles.skipText, { color: colors.textTertiary }]}>Skip</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.nextButton}
+              style={[styles.nextButton, { backgroundColor: colors.accent }]}
               onPress={() => goToPage(currentPage + 1)}
               activeOpacity={0.8}
             >
-              <Text style={styles.nextText}>Next</Text>
+              <Text style={[styles.nextText, { color: colors.background }]}>Next</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -290,7 +304,6 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
   },
   screen: {
     width: SCREEN_WIDTH,
@@ -309,37 +322,34 @@ const styles = StyleSheet.create({
     width: 90,
     gap: 12,
     justifyContent: 'center',
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.xxl,
   },
   decorDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.dark.border,
   },
   logo: {
-    color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
-    fontSize: 72,
-    letterSpacing: -1,
+    fontSize: 80,
+    letterSpacing: -2,
   },
   tagline: {
-    color: Colors.dark.textTertiary,
     fontFamily: Fonts.accentItalic,
-    fontSize: 18,
-    marginTop: Spacing.sm,
+    fontSize: 19,
+    marginTop: Spacing.md,
+    letterSpacing: 0.5,
   },
 
   // Features screen
   featuresHeading: {
-    color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
-    fontSize: 36,
-    marginBottom: Spacing.xxl,
+    fontSize: 40,
+    marginBottom: Spacing.xxl + 8,
   },
   featuresList: {
     width: '100%',
-    gap: Spacing.xl,
+    gap: Spacing.xl + 4,
   },
   featureRow: {
     flexDirection: 'row',
@@ -348,24 +358,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   featureIcon: {
-    color: Colors.dark.textSecondary,
-    fontSize: 32,
-    width: 48,
+    fontSize: 34,
+    width: 52,
     textAlign: 'center',
   },
   featureText: {
     flex: 1,
   },
   featureTitle: {
-    color: Colors.dark.text,
     fontFamily: Fonts.bodyMedium,
-    fontSize: 18,
-    marginBottom: 4,
+    fontSize: 19,
+    marginBottom: 5,
   },
   featureDesc: {
-    color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 14,
+    fontSize: 15,
+    lineHeight: 21,
   },
 
   // Username screen
@@ -374,49 +382,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   usernameHeading: {
-    color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
-    fontSize: 32,
+    fontSize: 36,
     marginBottom: Spacing.sm,
   },
   usernameSubtext: {
-    color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 15,
-    marginBottom: Spacing.xxl,
+    fontSize: 16,
+    marginBottom: Spacing.xxl + 4,
   },
   input: {
     width: '100%',
-    backgroundColor: Colors.dark.surface,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: 18,
-    color: Colors.dark.text,
+    paddingVertical: 20,
     fontFamily: Fonts.body,
-    fontSize: 20,
+    fontSize: 22,
     textAlign: 'center',
     marginBottom: Spacing.sm,
   },
   sanitizedHint: {
-    color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 13,
     marginBottom: Spacing.md,
   },
   continueButton: {
     width: '100%',
-    backgroundColor: Colors.dark.accent,
-    borderRadius: 14,
-    paddingVertical: 18,
+    borderRadius: 16,
+    paddingVertical: 20,
     alignItems: 'center',
     marginTop: Spacing.lg,
   },
   continueButtonText: {
-    color: Colors.dark.background,
     fontFamily: Fonts.bodyMedium,
-    fontSize: 17,
+    fontSize: 18,
   },
 
   // Bottom bar
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 50,
+    paddingBottom: 54,
     paddingHorizontal: Spacing.xl,
     alignItems: 'center',
     gap: Spacing.lg,
@@ -438,11 +438,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.dark.border,
-  },
-  pageDotActive: {
-    backgroundColor: Colors.dark.text,
-    width: 24,
   },
   bottomButtons: {
     flexDirection: 'row',
@@ -455,19 +450,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   skipText: {
-    color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 15,
   },
   nextButton: {
-    backgroundColor: Colors.dark.accent,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 36,
   },
   nextText: {
-    color: Colors.dark.background,
     fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
+    fontSize: 16,
   },
 });

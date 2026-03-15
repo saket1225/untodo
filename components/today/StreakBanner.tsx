@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { Fonts, Spacing } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 import { Todo } from '../../engines/todo/types';
 import { calculateStreak } from '../../lib/streak';
 
@@ -21,21 +22,23 @@ export function useTaskStreak(allTodos: Todo[]): { streak: number; atRisk: boole
 }
 
 export function StreakBanner({ streak, atRisk }: { streak: number; atRisk: boolean }) {
+  const { colors } = useTheme();
+
   if (streak <= 0 && !atRisk) return null;
 
   if (atRisk) {
     return (
-      <View style={[streakStyles.banner, streakStyles.bannerWarning]}>
+      <View style={[streakStyles.banner, { backgroundColor: colors.error + '12', borderColor: colors.error + '25' }]}>
         <Text style={streakStyles.streakEmoji}>⚠️</Text>
-        <Text style={streakStyles.warningText}>Your streak is about to break! Complete a task.</Text>
+        <Text style={[streakStyles.warningText, { color: colors.error }]}>Your streak is about to break! Complete a task.</Text>
       </View>
     );
   }
 
   return (
-    <View style={streakStyles.banner}>
+    <View style={[streakStyles.banner, { backgroundColor: colors.timer + '12', borderColor: colors.timer + '20' }]}>
       <Text style={streakStyles.streakEmoji}>🔥</Text>
-      <Text style={streakStyles.streakText}>
+      <Text style={[streakStyles.streakText, { color: colors.timer }]}>
         {streak} day streak
       </Text>
     </View>
@@ -51,26 +54,20 @@ export const streakStyles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: Spacing.lg,
     marginHorizontal: Spacing.lg,
-    backgroundColor: Colors.dark.timer + '12',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.timer + '20',
     marginTop: Spacing.sm,
   },
   bannerWarning: {
-    backgroundColor: Colors.dark.error + '12',
-    borderColor: Colors.dark.error + '25',
   },
   streakEmoji: {
     fontSize: 14,
   },
   streakText: {
-    color: Colors.dark.timer,
     fontFamily: Fonts.bodyMedium,
     fontSize: 13,
   },
   warningText: {
-    color: Colors.dark.error,
     fontFamily: Fonts.bodyMedium,
     fontSize: 13,
   },
