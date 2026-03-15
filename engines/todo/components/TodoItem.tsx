@@ -1,12 +1,15 @@
 import { useRef, memo, useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Animated, Alert,
-  LayoutAnimation, UIManager, Platform,
+  LayoutAnimation, UIManager, Platform, PanResponder, Dimensions,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
 import { Todo, CATEGORIES, PRIORITY_CONFIG } from '../types';
 import { useTodoStore } from '../store';
+
+const SWIPE_THRESHOLD = 80;
+const ICON_FADE_START = 40;
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -137,6 +140,119 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
   const startTimeTracking = useTodoStore(s => s.startTimeTracking);
   const stopTimeTracking = useTodoStore(s => s.stopTimeTracking);
 
+  // Swipe gesture state
+  const translateX = useRef(new Animated.Value(0)).current;
+  const hasTriggeredHaptic = useRef(false);
+  const swipeDirection = useRef<'left' | 'right' | null>(null);
+
+  const canSwipe = !todo.completed && !selectionMode;
+  const canSwipeRef = useRef(canSwipe);
+  canSwipeRef.current = canSwipe;
+
+  const onToggleRef = useRef(onToggle);
+  onToggleRef.current = onToggle;
+  const onDeleteRef = useRef(onDelete);
+  onDeleteRef.current = onDelete;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return canSwipeRef.current && Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
+      },
+      onMoveShouldSetPanResponderCapture: () => false,
+      onPanResponderGrant: () => {
+        hasTriggeredHaptic.current = false;
+        swipeDirection.current = null;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (!canSwipeRef.current) return;
+
+        const { dx } = gestureState;
+        swipeDirection.current = dx > 0 ? 'right' : 'left';
+        translateX.setValue(dx);
+
+        // Trigger haptic at threshold
+        if (Math.abs(dx) >= SWIPE_THRESHOLD && !hasTriggeredHaptic.current) {
+          hasTriggeredHaptic.current = true;
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+        // Reset haptic if user swipes back below threshold
+        if (Math.abs(dx) < SWIPE_THRESHOLD && hasTriggeredHaptic.current) {
+          hasTriggeredHaptic.current = false;
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (!canSwipeRef.current) return;
+
+        const { dx } = gestureState;
+        if (dx >= SWIPE_THRESHOLD) {
+          // Swipe right → complete
+          Animated.timing(translateX, {
+            toValue: Dimensions.get('window').width,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            translateX.setValue(0);
+            onToggleRef.current();
+          });
+        } else if (dx <= -SWIPE_THRESHOLD) {
+          // Swipe left → delete
+          Animated.timing(translateX, {
+            toValue: -Dimensions.get('window').width,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            translateX.setValue(0);
+            onDeleteRef.current();
+          });
+        } else {
+          // Spring back
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 200,
+            friction: 15,
+          }).start();
+        }
+        swipeDirection.current = null;
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 200,
+          friction: 15,
+        }).start();
+        swipeDirection.current = null;
+      },
+    })
+  ).current;
+
+  // Interpolations for swipe backgrounds and icons
+  const rightSwipeOpacity = translateX.interpolate({
+    inputRange: [0, ICON_FADE_START, SWIPE_THRESHOLD],
+    outputRange: [0, 0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const leftSwipeOpacity = translateX.interpolate({
+    inputRange: [-SWIPE_THRESHOLD, -ICON_FADE_START, 0],
+    outputRange: [1, 0, 0],
+    extrapolate: 'clamp',
+  });
+
+  const rightBgOpacity = translateX.interpolate({
+    inputRange: [0, 20],
+    outputRange: [0, 0.1],
+    extrapolate: 'clamp',
+  });
+
+  const leftBgOpacity = translateX.interpolate({
+    inputRange: [-20, 0],
+    outputRange: [0.1, 0],
+    extrapolate: 'clamp',
+  });
+
   // Cleanup confetti timer on unmount
   useEffect(() => {
     return () => {
@@ -196,10 +312,42 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
 
   return (
     <View style={styles.wrapper}>
+      {/* Swipe action backgrounds */}
+      {canSwipe && (
+        <>
+          {/* Right swipe - complete (green) */}
+          <Animated.View
+            style={[
+              styles.swipeBackground,
+              styles.swipeBackgroundLeft,
+              { opacity: rightBgOpacity, backgroundColor: Colors.dark.success },
+            ]}
+            pointerEvents="none"
+          >
+            <Animated.Text style={[styles.swipeIcon, { opacity: rightSwipeOpacity }]}>
+              ✓
+            </Animated.Text>
+          </Animated.View>
+          {/* Left swipe - delete (red) */}
+          <Animated.View
+            style={[
+              styles.swipeBackground,
+              styles.swipeBackgroundRight,
+              { opacity: leftBgOpacity, backgroundColor: Colors.dark.error },
+            ]}
+            pointerEvents="none"
+          >
+            <Animated.Text style={[styles.swipeIcon, styles.swipeIconDelete, { opacity: leftSwipeOpacity }]}>
+              ✕
+            </Animated.Text>
+          </Animated.View>
+        </>
+      )}
       <Animated.View
+        {...(canSwipe ? panResponder.panHandlers : {})}
         style={[
           styles.container,
-          { transform: [{ scale: scaleAnim }] },
+          { transform: [{ scale: scaleAnim }, ...(canSwipe ? [{ translateX }] : [])] },
           priorityColor ? { borderLeftWidth: 3, borderLeftColor: priorityColor } : { borderLeftWidth: 3, borderLeftColor: 'transparent' },
           todo.priority === 'high' && !selectionMode && styles.highPriorityContainer,
           todo.priority === 'medium' && !selectionMode && styles.mediumPriorityContainer,
@@ -371,6 +519,27 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.dark.border,
+    overflow: 'hidden',
+  },
+  swipeBackground: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+  },
+  swipeBackgroundLeft: {
+    alignItems: 'flex-start',
+    paddingLeft: 24,
+  },
+  swipeBackgroundRight: {
+    alignItems: 'flex-end',
+    paddingRight: 24,
+  },
+  swipeIcon: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  swipeIconDelete: {
+    color: Colors.dark.error,
   },
   container: {
     flexDirection: 'row',
