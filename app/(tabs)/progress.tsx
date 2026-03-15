@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import ViewShot from 'react-native-view-shot';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { Colors, Fonts, Spacing, type ColorPalette } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 import { useTodoStore } from '../../engines/todo/store';
 import { useProgressStore, getWeekStats } from '../../engines/progress/store';
 import { getLogicalDate } from '../../lib/date-utils';
@@ -24,6 +25,434 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const BAR_MAX_HEIGHT = 120;
 const COLLAPSE_STORAGE_KEY = 'untodo-progress-collapse';
+
+// --- Dynamic styles factory ---
+function createStyles(colors: ColorPalette) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+      paddingHorizontal: Spacing.lg,
+    },
+    heading: {
+      color: colors.text,
+      fontFamily: Fonts.accentItalic,
+      fontSize: 36,
+      paddingTop: Spacing.lg,
+      marginBottom: Spacing.xl,
+      letterSpacing: -0.5,
+    },
+
+    // --- 1. Hero Card ---
+    heroCard: {
+      alignItems: 'center',
+      marginBottom: Spacing.xl,
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      paddingVertical: Spacing.xl,
+      paddingHorizontal: Spacing.lg,
+    },
+    ringContainer: {
+      position: 'relative',
+      width: 120,
+      height: 120,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    ringCenter: {
+      position: 'absolute',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    ringGrade: {
+      fontFamily: Fonts.accent,
+      fontSize: 36,
+      lineHeight: 40,
+    },
+    ringTaskInfo: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.body,
+      fontSize: 13,
+      marginTop: Spacing.sm,
+    },
+    ringStreak: {
+      color: colors.text,
+      fontFamily: Fonts.body,
+      fontSize: 14,
+      marginTop: Spacing.xs,
+    },
+    ringFocus: {
+      color: colors.timer,
+      fontFamily: Fonts.body,
+      fontSize: 13,
+      marginTop: Spacing.xs,
+    },
+
+    // --- Sections ---
+    section: {
+      marginBottom: Spacing.xl,
+    },
+    sectionTitle: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.headingMedium,
+      fontSize: 13,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+    },
+
+    // --- Collapsible ---
+    collapsibleHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: Spacing.sm,
+      marginBottom: Spacing.sm,
+    },
+    collapsibleHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+    },
+    collapsibleCount: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.accent,
+      fontSize: 14,
+    },
+    collapsibleChevron: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 18,
+      lineHeight: 20,
+    },
+
+    // --- 2. Bar Chart ---
+    weekHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+      marginBottom: Spacing.md,
+    },
+    weekPct: {
+      color: colors.text,
+      fontFamily: Fonts.accent,
+      fontSize: 28,
+    },
+    barChart: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-end',
+      height: BAR_MAX_HEIGHT + 44,
+      marginBottom: Spacing.md,
+      paddingHorizontal: Spacing.xs,
+      gap: 6,
+    },
+    barCol: {
+      flex: 1,
+      alignItems: 'center',
+      gap: Spacing.sm,
+    },
+    barPctLabel: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+      height: 14,
+    },
+    barTrack: {
+      width: '100%',
+      maxWidth: 28,
+      height: BAR_MAX_HEIGHT,
+      justifyContent: 'flex-end',
+      borderRadius: 6,
+      overflow: 'hidden',
+      backgroundColor: colors.border,
+    },
+    barFill: {
+      width: '100%',
+      borderTopLeftRadius: 6,
+      borderTopRightRadius: 6,
+    },
+    barLabel: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+    },
+    weekSummary: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 13,
+      textAlign: 'center',
+    },
+
+    // --- 3. Contribution Graph ---
+    heatmapHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+      marginBottom: Spacing.md,
+    },
+    heatmapSummary: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+    },
+    monthLabelsRow: {
+      flexDirection: 'row',
+      marginBottom: 2,
+    },
+    monthLabel: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+    },
+    heatmapContainer: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    heatmapDayLabels: {
+      width: 16,
+      justifyContent: 'flex-start',
+    },
+    heatmapDayLabel: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+      textAlign: 'right',
+    },
+    heatmapGrid: {
+      flexDirection: 'row',
+      flex: 1,
+    },
+    heatmapWeek: {
+      flexDirection: 'column',
+    },
+    heatmapLegend: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 4,
+      marginTop: Spacing.sm,
+    },
+    heatmapLegendText: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+    },
+    heatmapLegendDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 3,
+    },
+
+    // --- 5. Achievements Grid ---
+    achievementsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: Spacing.sm,
+    },
+    achievementBadge: {
+      width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 2) / 3,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: Spacing.md,
+      alignItems: 'center',
+      minHeight: 100,
+    },
+    achievementLocked: {
+      opacity: 0.3,
+    },
+    achievementIcon: {
+      fontSize: 32,
+      color: colors.text,
+      marginBottom: 6,
+    },
+    achievementTitle: {
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 12,
+      textAlign: 'center',
+      marginBottom: 4,
+    },
+    achievementDesc: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+      textAlign: 'center',
+      lineHeight: 15,
+    },
+
+    // --- 6. Deep Statistics ---
+    deepStatsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: Spacing.md,
+    },
+    deepStatCard: {
+      width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.md) / 2,
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: Spacing.md,
+      alignItems: 'center',
+    },
+    deepStatValue: {
+      color: colors.text,
+      fontFamily: Fonts.accent,
+      fontSize: 28,
+      lineHeight: 32,
+    },
+    deepStatLabel: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+      textAlign: 'center',
+      marginTop: 4,
+    },
+
+    // --- 7. Share ---
+    shareCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: Spacing.lg,
+      alignItems: 'center',
+    },
+    shareCardDate: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+      marginBottom: Spacing.xs,
+    },
+    shareCardTitle: {
+      color: colors.text,
+      fontFamily: Fonts.accentItalic,
+      fontSize: 20,
+      marginBottom: Spacing.md,
+    },
+    shareStatsRow: {
+      flexDirection: 'row',
+      gap: Spacing.xl,
+      marginBottom: Spacing.md,
+    },
+    shareStatItem: {
+      alignItems: 'center',
+    },
+    shareStatValue: {
+      color: colors.text,
+      fontFamily: Fonts.accent,
+      fontSize: 28,
+    },
+    shareStatLabel: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+      marginTop: 2,
+    },
+    shareDivider: {
+      width: 1,
+      height: 28,
+      backgroundColor: colors.border,
+    },
+    shareWatermark: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.accentItalic,
+      fontSize: 11,
+      opacity: 0.4,
+    },
+    shareBtn: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: Spacing.md,
+      alignItems: 'center',
+      marginTop: Spacing.sm,
+    },
+    shareBtnText: {
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 15,
+    },
+
+    // --- Celebration Toast ---
+    celebrationToast: {
+      position: 'absolute',
+      top: 60,
+      left: Spacing.lg,
+      right: Spacing.lg,
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.success,
+      padding: Spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
+      zIndex: 100,
+    },
+    celebrationIcon: {
+      fontSize: 32,
+      color: colors.success,
+    },
+    celebrationTitle: {
+      color: colors.success,
+      fontFamily: Fonts.headingMedium,
+      fontSize: 11,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+    },
+    celebrationName: {
+      color: colors.text,
+      fontFamily: Fonts.accentItalic,
+      fontSize: 20,
+      marginTop: 2,
+    },
+
+    // --- Empty State ---
+    emptyHero: {
+      alignItems: 'center',
+      paddingTop: 60,
+      paddingBottom: 40,
+      paddingHorizontal: Spacing.xl,
+    },
+    emptyHeroIcon: {
+      fontSize: 64,
+      color: colors.textTertiary,
+      marginBottom: Spacing.lg,
+      opacity: 0.4,
+    },
+    emptyHeroTitle: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.accentItalic,
+      fontSize: 22,
+      textAlign: 'center',
+      marginBottom: Spacing.md,
+    },
+    emptyHeroSubtext: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 14,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    emptySection: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: Spacing.xl,
+      alignItems: 'center',
+    },
+    emptyTitle: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.headingMedium,
+      fontSize: 16,
+    },
+  });
+}
 
 // --- Collapse state persistence ---
 function useCollapseState(defaults: Record<string, boolean>) {
@@ -55,9 +484,45 @@ function useCollapseState(defaults: Record<string, boolean>) {
   return { collapsed: state, toggle };
 }
 
+// --- Letter Grade ---
+function getLetterGrade(pct: number, colors: ColorPalette): { grade: string; color: string } {
+  if (pct >= 95) return { grade: 'A+', color: colors.success };
+  if (pct >= 90) return { grade: 'A', color: colors.success };
+  if (pct >= 85) return { grade: 'A-', color: colors.success };
+  if (pct >= 80) return { grade: 'B+', color: colors.success + 'CC' };
+  if (pct >= 75) return { grade: 'B', color: colors.success + 'AA' };
+  if (pct >= 70) return { grade: 'B-', color: colors.success + '88' };
+  if (pct >= 65) return { grade: 'C+', color: colors.timer };
+  if (pct >= 60) return { grade: 'C', color: colors.timer };
+  if (pct >= 55) return { grade: 'C-', color: colors.timer };
+  if (pct >= 50) return { grade: 'D+', color: colors.error + '99' };
+  if (pct >= 45) return { grade: 'D', color: colors.error };
+  if (pct >= 40) return { grade: 'D-', color: colors.error };
+  return { grade: 'F', color: colors.error };
+}
+
+// --- Heatmap color scales ---
+const HEATMAP_DARK = ['#1A1A1A', '#333333', '#555555', '#888888', '#F5F5F5'];
+const HEATMAP_LIGHT = ['#EBEBEB', '#CCCCCC', '#999999', '#666666', '#333333'];
+
+function getHeatmapColor(rate: number, count: number, date: string, isDark: boolean): string {
+  if (!date) return 'transparent';
+  const scale = isDark ? HEATMAP_DARK : HEATMAP_LIGHT;
+  if (count === 0) return scale[0];
+  if (rate >= 0.9) return scale[4];
+  if (rate >= 0.7) return scale[3];
+  if (rate >= 0.5) return scale[2];
+  if (rate >= 0.2) return scale[1];
+  return scale[0];
+}
+
+// --- Animated Ring Component ---
+const AnimatedCircle = RNAnimated.createAnimatedComponent(Circle);
+
 // --- Collapsible Section Header ---
-function CollapsibleHeader({ title, collapsed, onToggle, count }: {
+function CollapsibleHeader({ title, collapsed, onToggle, count, styles }: {
   title: string; collapsed: boolean; onToggle: () => void; count?: string;
+  styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <TouchableOpacity
@@ -74,28 +539,10 @@ function CollapsibleHeader({ title, collapsed, onToggle, count }: {
   );
 }
 
-// --- Letter Grade ---
-function getLetterGrade(pct: number): { grade: string; color: string } {
-  if (pct >= 95) return { grade: 'A+', color: Colors.dark.success };
-  if (pct >= 90) return { grade: 'A', color: Colors.dark.success };
-  if (pct >= 85) return { grade: 'A-', color: Colors.dark.success };
-  if (pct >= 80) return { grade: 'B+', color: '#4ADE80CC' };
-  if (pct >= 75) return { grade: 'B', color: '#4ADE80AA' };
-  if (pct >= 70) return { grade: 'B-', color: '#4ADE8088' };
-  if (pct >= 65) return { grade: 'C+', color: Colors.dark.timer };
-  if (pct >= 60) return { grade: 'C', color: Colors.dark.timer };
-  if (pct >= 55) return { grade: 'C-', color: Colors.dark.timer };
-  if (pct >= 50) return { grade: 'D+', color: '#EF444499' };
-  if (pct >= 45) return { grade: 'D', color: Colors.dark.error };
-  if (pct >= 40) return { grade: 'D-', color: Colors.dark.error };
-  return { grade: 'F', color: Colors.dark.error };
-}
-
-// --- Animated Ring Component ---
-const AnimatedCircle = RNAnimated.createAnimatedComponent(Circle);
-
-// --- 1. Today's Snapshot (Hero) — Ring + Grade + Streak unified ---
+// --- 1. Today's Snapshot (Hero) ---
 function TodaySnapshot() {
+  const { colors, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const todos = useTodoStore(s => s.todos);
   const logicalDate = getLogicalDate();
   const ringAnim = useRef(new RNAnimated.Value(0)).current;
@@ -111,12 +558,11 @@ function TodaySnapshot() {
     }, 0);
     const progress = total > 0 ? completed / total : 0;
     const pct = Math.round(progress * 100);
-    const { grade, color: gradeColor } = total > 0 ? getLetterGrade(pct) : { grade: '-', color: Colors.dark.textTertiary };
+    const { grade, color: gradeColor } = total > 0 ? getLetterGrade(pct, colors) : { grade: '-', color: colors.textTertiary };
     const streak = calculateStreak(todos);
     return { completed, total, focusMins, progress, pct, grade, gradeColor, streak };
-  }, [todos, logicalDate]);
+  }, [todos, logicalDate, colors]);
 
-  // Animate ring from 0 to current value
   useEffect(() => {
     ringAnim.setValue(0);
     RNAnimated.timing(ringAnim, {
@@ -138,16 +584,16 @@ function TodaySnapshot() {
   });
 
   return (
-    <View style={styles.heroCard}>
+    <View style={[styles.heroCard, shadows.lg]}>
       <View style={styles.ringContainer}>
         <Svg width={size} height={size}>
           <Circle
             cx={size / 2} cy={size / 2} r={radius}
-            stroke={Colors.dark.border} strokeWidth={strokeWidth} fill="transparent"
+            stroke={colors.border} strokeWidth={strokeWidth} fill="transparent"
           />
           <AnimatedCircle
             cx={size / 2} cy={size / 2} r={radius}
-            stroke={progress === 1 ? Colors.dark.success : Colors.dark.accent}
+            stroke={progress === 1 ? colors.success : colors.accent}
             strokeWidth={strokeWidth} fill="transparent"
             strokeDasharray={`${circumference}`}
             strokeDashoffset={animatedStrokeDashoffset}
@@ -172,6 +618,8 @@ function TodaySnapshot() {
 
 // --- 2. Weekly Bar Chart ---
 function WeeklyBarChart() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const todos = useTodoStore(s => s.todos);
   const stats = useMemo(() => getWeekStats(), [todos]);
   const hasData = stats.totalTasks > 0;
@@ -230,18 +678,18 @@ function WeeklyBarChart() {
               ) : (
                 <Text style={styles.barPctLabel}> </Text>
               )}
-              <View style={[styles.barTrack, { backgroundColor: isToday ? Colors.dark.surface : '#333333' }]}>
+              <View style={[styles.barTrack, isToday && { backgroundColor: colors.surface }]}>
                 <RNAnimated.View
                   style={[
                     styles.barFill,
                     {
                       height: animatedHeight,
-                      backgroundColor: isToday ? Colors.dark.accent : '#888888',
+                      backgroundColor: isToday ? colors.accent : colors.textSecondary,
                     },
                   ]}
                 />
               </View>
-              <Text style={[styles.barLabel, isToday && { color: Colors.dark.accent }]}>
+              <Text style={[styles.barLabel, isToday && { color: colors.accent }]}>
                 {DAY_LABELS[i]}
               </Text>
             </View>
@@ -253,8 +701,12 @@ function WeeklyBarChart() {
   );
 }
 
-// --- 3. Contribution Graph (Monochrome) ---
+// --- 3. Contribution Graph ---
 function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const heatmapScale = isDark ? HEATMAP_DARK : HEATMAP_LIGHT;
+
   const graphData = useMemo(() => {
     if (heatmap.length === 0) return { weeks: [], monthLabels: [], totalCompleted: 0, activeDays: 0 };
     const firstDate = new Date(heatmap[0].date + 'T12:00:00');
@@ -288,17 +740,6 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
     const activeDays = heatmap.filter(d => d.count > 0).length;
     return { weeks, monthLabels, totalCompleted, activeDays };
   }, [heatmap]);
-
-  // Monochrome color scale
-  const getColor = (rate: number, count: number, date: string) => {
-    if (!date) return 'transparent';
-    if (count === 0) return '#1A1A1A';
-    if (rate >= 0.9) return '#F5F5F5';
-    if (rate >= 0.7) return '#888888';
-    if (rate >= 0.5) return '#555555';
-    if (rate >= 0.2) return '#333333';
-    return '#1A1A1A';
-  };
 
   if (graphData.weeks.length === 0) return null;
 
@@ -356,7 +797,7 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
                       style={{
                         width: cellSize,
                         height: cellSize,
-                        backgroundColor: getColor(day.rate, day.count, day.date),
+                        backgroundColor: getHeatmapColor(day.rate, day.count, day.date, isDark),
                         borderRadius: 3,
                       }}
                     />
@@ -369,7 +810,7 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
       </ScrollView>
       <View style={styles.heatmapLegend}>
         <Text style={styles.heatmapLegendText}>Less</Text>
-        {['#1A1A1A', '#333333', '#555555', '#888888', '#F5F5F5'].map((c, i) => (
+        {heatmapScale.map((c, i) => (
           <View key={i} style={[styles.heatmapLegendDot, { backgroundColor: c }]} />
         ))}
         <Text style={styles.heatmapLegendText}>More</Text>
@@ -383,6 +824,8 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
 
 // --- 5. Achievements Grid (3-column) ---
 function AchievementsGrid() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const achievements = useAchievementStore(s => s.achievements);
 
   return (
@@ -393,7 +836,7 @@ function AchievementsGrid() {
           style={[styles.achievementBadge, !a.unlockedAt && styles.achievementLocked]}
         >
           <Text style={[styles.achievementIcon, !a.unlockedAt && { opacity: 0.2 }]}>{a.icon}</Text>
-          <Text style={[styles.achievementTitle, !a.unlockedAt && { color: Colors.dark.textTertiary }]} numberOfLines={1}>
+          <Text style={[styles.achievementTitle, !a.unlockedAt && { color: colors.textTertiary }]} numberOfLines={1}>
             {a.title}
           </Text>
           <Text style={styles.achievementDesc} numberOfLines={2}>{a.description}</Text>
@@ -405,6 +848,9 @@ function AchievementsGrid() {
 
 // --- 6. Deep Statistics (2-column) ---
 function DeepStatistics({ analytics, todos }: { analytics: AnalyticsData; todos: any[] }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const stats = useMemo(() => {
     const allCompleted = todos.filter((t: any) => t.completed);
     const totalCompleted = allCompleted.length;
@@ -450,7 +896,7 @@ function DeepStatistics({ analytics, todos }: { analytics: AnalyticsData; todos:
     const prevRate = prev7Total > 0 ? prev7Completed / prev7Total : 0;
     const trend = recentRate > prevRate + 0.05 ? 'improving' : recentRate < prevRate - 0.05 ? 'declining' : 'steady';
     const trendIcon = trend === 'improving' ? '\u2191' : trend === 'declining' ? '\u2193' : '\u2192';
-    const trendColor = trend === 'improving' ? Colors.dark.success : trend === 'declining' ? Colors.dark.error : Colors.dark.textSecondary;
+    const trendColor = trend === 'improving' ? colors.success : trend === 'declining' ? colors.error : colors.textSecondary;
 
     return {
       totalCompleted, avgPerDay, completionRate,
@@ -460,7 +906,7 @@ function DeepStatistics({ analytics, todos }: { analytics: AnalyticsData; todos:
       focusLabel, totalFocusMins,
       trend, trendIcon, trendColor,
     };
-  }, [todos, analytics]);
+  }, [todos, analytics, colors]);
 
   return (
     <View style={styles.deepStatsGrid}>
@@ -473,7 +919,7 @@ function DeepStatistics({ analytics, todos }: { analytics: AnalyticsData; todos:
         <Text style={styles.deepStatLabel}>avg tasks/day</Text>
       </View>
       <View style={styles.deepStatCard}>
-        <Text style={[styles.deepStatValue, { color: Colors.dark.success }]}>{stats.longestStreak}</Text>
+        <Text style={[styles.deepStatValue, { color: colors.success }]}>{stats.longestStreak}</Text>
         <Text style={styles.deepStatLabel}>best streak</Text>
       </View>
       <View style={styles.deepStatCard}>
@@ -485,7 +931,7 @@ function DeepStatistics({ analytics, todos }: { analytics: AnalyticsData; todos:
         <Text style={styles.deepStatLabel}>{stats.timeOfDay.toLowerCase()}</Text>
       </View>
       <View style={styles.deepStatCard}>
-        <Text style={[styles.deepStatValue, { color: Colors.dark.timer }]}>{stats.focusLabel}</Text>
+        <Text style={[styles.deepStatValue, { color: colors.timer }]}>{stats.focusLabel}</Text>
         <Text style={styles.deepStatLabel}>total focus</Text>
       </View>
       <View style={styles.deepStatCard}>
@@ -502,6 +948,8 @@ function DeepStatistics({ analytics, todos }: { analytics: AnalyticsData; todos:
 
 // --- 7. Share Card ---
 function ShareSection({ analytics }: { analytics: AnalyticsData }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const viewShotRef = useRef<ViewShot>(null);
   const todos = useTodoStore(s => s.todos);
   const weekStats = useMemo(() => getWeekStats(), [todos]);
@@ -555,7 +1003,7 @@ function ShareSection({ analytics }: { analytics: AnalyticsData }) {
               <>
                 <View style={styles.shareDivider} />
                 <View style={styles.shareStatItem}>
-                  <Text style={[styles.shareStatValue, { color: Colors.dark.timer }]}>{weekPomoMins}m</Text>
+                  <Text style={[styles.shareStatValue, { color: colors.timer }]}>{weekPomoMins}m</Text>
                   <Text style={styles.shareStatLabel}>focus time</Text>
                 </View>
               </>
@@ -573,6 +1021,8 @@ function ShareSection({ analytics }: { analytics: AnalyticsData }) {
 
 // --- Achievement Celebration Toast ---
 function AchievementCelebration() {
+  const { colors, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const newlyUnlocked = useAchievementStore(s => s.newlyUnlocked);
   const achievements = useAchievementStore(s => s.achievements);
   const dismissAll = useAchievementStore(s => s.dismissAllCelebrations);
@@ -603,7 +1053,7 @@ function AchievementCelebration() {
   const a = toShow[0];
 
   return (
-    <RNAnimated.View style={[styles.celebrationToast, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+    <RNAnimated.View style={[styles.celebrationToast, shadows.lg, { shadowColor: colors.success, opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
       <Text style={styles.celebrationIcon}>{a.icon}</Text>
       <View style={{ flex: 1 }}>
         <Text style={styles.celebrationTitle}>Achievement Unlocked!</Text>
@@ -615,6 +1065,8 @@ function AchievementCelebration() {
 
 // --- Empty Hero ---
 function ProgressEmptyHero() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const fadeAnim = useRef(new RNAnimated.Value(0)).current;
   useEffect(() => {
     RNAnimated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
@@ -633,10 +1085,11 @@ function ProgressEmptyHero() {
 
 // --- Main Screen ---
 function ProgressScreenContent() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [refreshing, setRefreshing] = useState(false);
   const todos = useTodoStore(s => s.todos);
 
-  // Entrance fade animation
   const entranceFade = useRef(new RNAnimated.Value(0)).current;
   useEffect(() => {
     RNAnimated.timing(entranceFade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
@@ -649,9 +1102,9 @@ function ProgressScreenContent() {
   const completedCount = useMemo(() => todos.filter(t => t.completed).length, [todos]);
 
   const { collapsed, toggle } = useCollapseState({
-    weeklyReview: false,  // expanded by default
-    achievements: true,   // collapsed by default
-    deepStats: true,      // collapsed by default
+    weeklyReview: false,
+    achievements: true,
+    deepStats: true,
   });
 
   useEffect(() => {
@@ -674,9 +1127,9 @@ function ProgressScreenContent() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={Colors.dark.textSecondary}
+            tintColor={colors.textSecondary}
             title="Syncing..."
-            titleColor={Colors.dark.textTertiary}
+            titleColor={colors.textTertiary}
           />
         }
       >
@@ -685,47 +1138,41 @@ function ProgressScreenContent() {
           <ProgressEmptyHero />
         ) : (
           <>
-            {/* 1. Today's Snapshot — unified hero card */}
             <TodaySnapshot />
-
-            {/* 2. Weekly Bar Chart */}
             <WeeklyBarChart />
-
-            {/* 3. Activity Heatmap */}
             <ContributionGraph heatmap={analytics.heatmap} />
 
-            {/* 4. Weekly Review (collapsible) */}
             <View style={styles.section}>
               <CollapsibleHeader
                 title="Weekly Review"
                 collapsed={collapsed.weeklyReview}
                 onToggle={() => toggle('weeklyReview')}
+                styles={styles}
               />
               {!collapsed.weeklyReview && <WeeklyReviewComponent />}
             </View>
 
-            {/* 5. Achievements (collapsible) */}
             <View style={styles.section}>
               <CollapsibleHeader
                 title="Achievements"
                 collapsed={collapsed.achievements}
                 onToggle={() => toggle('achievements')}
                 count={`${unlockedCount}/${achievements.length}`}
+                styles={styles}
               />
               {!collapsed.achievements && <AchievementsGrid />}
             </View>
 
-            {/* 6. Deep Stats (collapsible) */}
             <View style={styles.section}>
               <CollapsibleHeader
                 title="Statistics"
                 collapsed={collapsed.deepStats}
                 onToggle={() => toggle('deepStats')}
+                styles={styles}
               />
               {!collapsed.deepStats && <DeepStatistics analytics={analytics} todos={todos} />}
             </View>
 
-            {/* 7. Share Card */}
             <ShareSection analytics={analytics} />
           </>
         )}
@@ -742,438 +1189,3 @@ export default function ProgressScreen() {
     </ErrorBoundary>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-    paddingHorizontal: Spacing.lg,
-  },
-  heading: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 36,
-    paddingTop: Spacing.lg,
-    marginBottom: Spacing.xl,
-    letterSpacing: -0.5,
-  },
-
-  // --- 1. Hero Card (Ring + Grade + Streak) ---
-  heroCard: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 20,
-    paddingVertical: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  ringContainer: {
-    position: 'relative',
-    width: 120,
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ringCenter: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ringGrade: {
-    fontFamily: Fonts.accent,
-    fontSize: 36,
-    lineHeight: 40,
-  },
-  ringTaskInfo: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    marginTop: Spacing.sm,
-  },
-  ringStreak: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    marginTop: Spacing.xs,
-  },
-  ringFocus: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    marginTop: Spacing.xs,
-  },
-
-  // --- Sections ---
-  section: {
-    marginBottom: Spacing.xl,
-  },
-  sectionTitle: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 13,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-
-  // --- Collapsible ---
-  collapsibleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  collapsibleHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  collapsibleCount: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.accent,
-    fontSize: 14,
-  },
-  collapsibleChevron: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 18,
-    lineHeight: 20,
-  },
-
-  // --- 2. Bar Chart ---
-  weekHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: Spacing.md,
-  },
-  weekPct: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 28,
-  },
-  barChart: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: BAR_MAX_HEIGHT + 44,
-    marginBottom: Spacing.md,
-    paddingHorizontal: Spacing.xs,
-    gap: 6,
-  },
-  barCol: {
-    flex: 1,
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  barPctLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    height: 14,
-  },
-  barTrack: {
-    width: '100%',
-    maxWidth: 28,
-    height: BAR_MAX_HEIGHT,
-    justifyContent: 'flex-end',
-    borderRadius: 6,
-    overflow: 'hidden',
-    backgroundColor: '#333333',
-  },
-  barFill: {
-    width: '100%',
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-  },
-  barLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-  },
-  weekSummary: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    textAlign: 'center',
-  },
-
-  // --- 3. Contribution Graph ---
-  heatmapHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: Spacing.md,
-  },
-  heatmapSummary: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-  },
-  monthLabelsRow: {
-    flexDirection: 'row',
-    marginBottom: 2,
-  },
-  monthLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-  },
-  heatmapContainer: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  heatmapDayLabels: {
-    width: 16,
-    justifyContent: 'flex-start',
-  },
-  heatmapDayLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    textAlign: 'right',
-  },
-  heatmapGrid: {
-    flexDirection: 'row',
-    flex: 1,
-  },
-  heatmapWeek: {
-    flexDirection: 'column',
-  },
-  heatmapLegend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 4,
-    marginTop: Spacing.sm,
-  },
-  heatmapLegendText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-  },
-  heatmapLegendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 3,
-  },
-
-  // --- 5. Achievements Grid (3-column) ---
-  achievementsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  achievementBadge: {
-    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 2) / 3,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.md,
-    alignItems: 'center',
-    minHeight: 100,
-  },
-  achievementLocked: {
-    opacity: 0.3,
-  },
-  achievementIcon: {
-    fontSize: 32,
-    color: Colors.dark.text,
-    marginBottom: 6,
-  },
-  achievementTitle: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 12,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  achievementDesc: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    textAlign: 'center',
-    lineHeight: 15,
-  },
-
-  // --- 6. Deep Statistics (2-column) ---
-  deepStatsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-  },
-  deepStatCard: {
-    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.md) / 2,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.md,
-    alignItems: 'center',
-  },
-  deepStatValue: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 28,
-    lineHeight: 32,
-  },
-  deepStatLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-
-  // --- 7. Share ---
-  shareCard: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.lg,
-    alignItems: 'center',
-  },
-  shareCardDate: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    marginBottom: Spacing.xs,
-  },
-  shareCardTitle: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 20,
-    marginBottom: Spacing.md,
-  },
-  shareStatsRow: {
-    flexDirection: 'row',
-    gap: Spacing.xl,
-    marginBottom: Spacing.md,
-  },
-  shareStatItem: {
-    alignItems: 'center',
-  },
-  shareStatValue: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 28,
-  },
-  shareStatLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  shareDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: Colors.dark.border,
-  },
-  shareWatermark: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 11,
-    opacity: 0.4,
-  },
-  shareBtn: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.md,
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-  },
-  shareBtnText: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
-  },
-
-  // --- Celebration Toast ---
-  celebrationToast: {
-    position: 'absolute',
-    top: 60,
-    left: Spacing.lg,
-    right: Spacing.lg,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.success,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    zIndex: 100,
-    shadowColor: Colors.dark.success,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 20,
-  },
-  celebrationIcon: {
-    fontSize: 32,
-    color: Colors.dark.success,
-  },
-  celebrationTitle: {
-    color: Colors.dark.success,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  celebrationName: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 20,
-    marginTop: 2,
-  },
-
-  // --- Empty State ---
-  emptyHero: {
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingBottom: 40,
-    paddingHorizontal: Spacing.xl,
-  },
-  emptyHeroIcon: {
-    fontSize: 64,
-    color: Colors.dark.textTertiary,
-    marginBottom: Spacing.lg,
-    opacity: 0.4,
-  },
-  emptyHeroTitle: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 22,
-    textAlign: 'center',
-    marginBottom: Spacing.md,
-  },
-  emptyHeroSubtext: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  emptySection: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.xl,
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 16,
-  },
-});
