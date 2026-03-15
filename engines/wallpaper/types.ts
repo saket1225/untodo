@@ -6,6 +6,8 @@ export type WallpaperStyle = 'minimal' | 'terminal' | 'gradient' | 'neon' | 'pap
 
 export type HeadingMode = 'day_first' | 'remaining_first';
 
+export type GridPosition = 'center' | 'top';
+
 export interface WallpaperConfig {
   enabled: boolean;
   dotSize: number;
@@ -28,6 +30,10 @@ export interface WallpaperConfig {
   headingMode: HeadingMode;
   wallpaperAutoUpdate: boolean;
   cachedWallpaperPath: string | null;
+  topPadding: number;
+  bottomPadding: number;
+  sidePadding: number;
+  gridPosition: GridPosition;
 }
 
 export interface DayData {

@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useWallpaperStore } from '../../engines/wallpaper/store';
 import { useTodoStore } from '../../engines/todo/store';
-import { DayData, WallpaperPreset, WallpaperStyle } from '../../engines/wallpaper/types';
+import { DayData, WallpaperPreset, WallpaperStyle, GridPosition } from '../../engines/wallpaper/types';
 import { getLogicalDate } from '../../lib/date-utils';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { registerWallpaperTask, unregisterWallpaperTask, cacheWallpaperForBackground } from '../../engines/wallpaper/background-task';
@@ -70,10 +70,11 @@ function getDailyQuote(customQuote: string): string {
   return QUOTE_POOL[dayOfYear % QUOTE_POOL.length];
 }
 
-// ─── Layout Constants ────────────────────────────────────────────────────────────
+// ─── Layout Constants (defaults, overridable via config) ─────────────────────────
 
-const STATUS_BAR_HEIGHT = 60;   // dp - safe zone for status bar + clock
-const DOCK_HEIGHT = 210;        // dp - safe zone for dock + search bar + nav gesture
+const DEFAULT_TOP_PADDING = 60;
+const DEFAULT_BOTTOM_PADDING = 210;
+const DEFAULT_SIDE_PADDING = 16;
 
 // ─── Wallpaper Styles ───────────────────────────────────────────────────────────
 
@@ -399,7 +400,8 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
   const sSpacing = spacing * scaleFactor;
   const dotDiameter = sDotSize * 2;
   const totalWidth = cols * dotDiameter + (cols - 1) * sSpacing;
-  const availableWidth = (SCREEN_W - Spacing.lg * 2) * scaleFactor;
+  const sidePad = config.sidePadding ?? DEFAULT_SIDE_PADDING;
+  const availableWidth = (SCREEN_W - sidePad * 2) * scaleFactor;
   const scale = Math.min(1, availableWidth / totalWidth);
   const finalDot = Math.round(dotDiameter * scale * 100) / 100;
   const finalSpacing = Math.round(sSpacing * scale * 100) / 100;
@@ -938,9 +940,9 @@ function WallpaperContent({
       <VibeOverlay style={config.wallpaperStyle || 'minimal'} />
       <View style={{
         flex: 1,
-        paddingTop: STATUS_BAR_HEIGHT * s,
-        paddingBottom: DOCK_HEIGHT * s,
-        paddingHorizontal: Spacing.lg * s,
+        paddingTop: (config.topPadding ?? DEFAULT_TOP_PADDING) * s,
+        paddingBottom: (config.bottomPadding ?? DEFAULT_BOTTOM_PADDING) * s,
+        paddingHorizontal: (config.sidePadding ?? DEFAULT_SIDE_PADDING) * s,
       }}>
         {/* ── Top: Heading ── */}
         <View style={{ alignItems: 'center', paddingTop: 16 * s }}>
@@ -979,7 +981,7 @@ function WallpaperContent({
         </View>
 
         {/* ── Middle: Dot Grid ── */}
-        <View style={{ flex: 1, justifyContent: 'center', paddingVertical: 12 * s }}>
+        <View style={{ flex: 1, justifyContent: (config.gridPosition ?? 'center') === 'center' ? 'center' : 'flex-start', paddingVertical: 12 * s }}>
           <DotGrid config={config} days={days} style={activeStyle} scaleFactor={s} />
         </View>
 
@@ -1435,6 +1437,50 @@ function WallpaperScreenContent() {
           </View>
         </CollapsibleSection>
 
+        {/* ── LAYOUT section ── */}
+        <CollapsibleSection title="Layout" defaultOpen={false}>
+          <View style={styles.controls}>
+            <NumericControl
+              label="Top Padding"
+              value={config.topPadding ?? DEFAULT_TOP_PADDING}
+              min={40} max={120} step={5}
+              onChange={v => updateConfig({ topPadding: v })}
+              format={v => `${v}dp`}
+            />
+            <NumericControl
+              label="Bottom Padding"
+              value={config.bottomPadding ?? DEFAULT_BOTTOM_PADDING}
+              min={100} max={300} step={10}
+              onChange={v => updateConfig({ bottomPadding: v })}
+              format={v => `${v}dp`}
+            />
+            <NumericControl
+              label="Side Padding"
+              value={config.sidePadding ?? DEFAULT_SIDE_PADDING}
+              min={8} max={40} step={2}
+              onChange={v => updateConfig({ sidePadding: v })}
+              format={v => `${v}dp`}
+            />
+            <View style={styles.controlRow}>
+              <Text style={styles.controlLabel}>Grid Position</Text>
+              <TouchableOpacity
+                style={styles.headingToggleBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  LayoutAnimation.configureNext(ANIM_CONFIG);
+                  updateConfig({
+                    gridPosition: (config.gridPosition ?? 'center') === 'center' ? 'top' : 'center',
+                  });
+                }}
+              >
+                <Text style={styles.headingToggleBtnText}>
+                  {(config.gridPosition ?? 'center') === 'center' ? 'Center' : 'Top'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </CollapsibleSection>
+
         {/* ── GRID section ── */}
         <CollapsibleSection title="Grid" defaultOpen={false}>
           <View style={styles.controls}>
@@ -1508,6 +1554,14 @@ function WallpaperScreenContent() {
               }}
             />
             <ToggleControl
+              label="Show Days Left"
+              value={config.showDaysLeft}
+              onChange={v => {
+                LayoutAnimation.configureNext(ANIM_CONFIG);
+                updateConfig({ showDaysLeft: v });
+              }}
+            />
+            <ToggleControl
               label="Auto-refresh Daily"
               value={config.wallpaperEnabled}
               onChange={v => updateConfig({ wallpaperEnabled: v })}
@@ -1572,6 +1626,8 @@ function WallpaperScreenContent() {
                     preset: 'full', colorTheme: 'classic', customQuote: '',
                     wallpaperStyle: 'minimal', startDate: '2026-03-10',
                     headingMode: 'remaining_first',
+                    topPadding: 60, bottomPadding: 210, sidePadding: 16,
+                    gridPosition: 'center',
                   });
                 },
               },
