@@ -151,13 +151,13 @@ function TodoInputInner({ onAdd, viewingDate }: Props) {
       borderRadius: 12,
     },
     inputFocused: {
-      borderColor: colors.textSecondary,
+      borderColor: colors.textTertiary,
       backgroundColor: colors.surfaceHover,
       shadowColor: colors.accent,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 4,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 3,
     },
     priorityBtn: {
       flexDirection: 'row',
@@ -173,13 +173,13 @@ function TodoInputInner({ onAdd, viewingDate }: Props) {
     input: {
       flex: 1,
       backgroundColor: colors.surface,
-      borderRadius: 12,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: 14,
+      borderRadius: 14,
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: 16,
       color: colors.text,
       fontFamily: Fonts.body,
       fontSize: 16,
-      borderWidth: 1,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
     },
     templateBtn: {
@@ -234,21 +234,27 @@ function TodoInputInner({ onAdd, viewingDate }: Props) {
       color: colors.textTertiary,
     },
     addButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 12,
+      width: 48,
+      height: 48,
+      borderRadius: 14,
       backgroundColor: colors.accent,
       justifyContent: 'center',
       alignItems: 'center',
     },
     addButtonDisabled: {
-      backgroundColor: colors.surfaceHover,
+      backgroundColor: colors.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
     },
     addButtonText: {
-      fontSize: 24,
+      fontSize: 22,
       color: colors.background,
-      fontFamily: Fonts.bodyBold,
-      marginTop: -2,
+      fontFamily: Fonts.body,
+      fontWeight: '300',
+      marginTop: -1,
+    },
+    addButtonTextDisabled: {
+      color: colors.textTertiary,
     },
     quickAddHint: {
       color: colors.textTertiary,
@@ -441,7 +447,7 @@ function TodoInputInner({ onAdd, viewingDate }: Props) {
         <TextInput
           ref={inputRef}
           style={[styles.input, isFocused && styles.inputFocused]}
-          placeholder={isFocused ? "What needs to get done?" : "Add a task..."}
+          placeholder={isFocused ? "What needs doing?" : "Add a task..."}
           placeholderTextColor={isFocused ? colors.textSecondary : colors.textTertiary}
           value={text}
           onChangeText={setText}
@@ -461,7 +467,7 @@ function TodoInputInner({ onAdd, viewingDate }: Props) {
           accessibilityRole="button"
           accessibilityState={{ disabled: !text.trim() }}
         >
-          <Text style={styles.addButtonText}>+</Text>
+          <Text style={[styles.addButtonText, !text.trim() && styles.addButtonTextDisabled]}>+</Text>
         </TouchableOpacity>
       </View>
 
@@ -661,7 +667,7 @@ const staticStyles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: 10,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,

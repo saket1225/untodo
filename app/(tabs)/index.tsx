@@ -602,6 +602,7 @@ function TodayScreenContent() {
             )}
           </View>
         </View>
+        <View style={styles.headerSeparator} />
       </RNAnimated.View>
 
       {/* Back to Today pill */}
@@ -801,11 +802,16 @@ function TodayScreenContent() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.completedSectionText}>
-                    Completed ({completedTodos.length})
-                  </Text>
+                  <View style={styles.completedSectionLeft}>
+                    <Text style={styles.completedSectionText}>
+                      Done
+                    </Text>
+                    <Text style={styles.completedSectionCount}>
+                      {completedTodos.length}
+                    </Text>
+                  </View>
                   <Text style={styles.completedSectionChevron}>
-                    {completedCollapsed ? '›' : '⌄'}
+                    {completedCollapsed ? '▸' : '▾'}
                   </Text>
                 </TouchableOpacity>
                 {!completedCollapsed && completedTodos.map(item => (
@@ -1058,19 +1064,25 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
+  headerSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginTop: Spacing.md,
+    marginHorizontal: 0,
+  },
   greetingText: {
-    color: colors.textSecondary,
+    color: colors.textTertiary,
     fontFamily: Fonts.headingMedium,
-    fontSize: 12,
-    letterSpacing: 1.5,
+    fontSize: 11,
+    letterSpacing: 2,
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   greetingSubText: {
     color: colors.textTertiary,
     fontFamily: Fonts.accentItalic,
-    fontSize: 14,
-    marginBottom: 6,
+    fontSize: 13,
+    marginBottom: 8,
   },
   dateRow: {
     flexDirection: 'row',
@@ -1081,6 +1093,7 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+    paddingBottom: 4,
   },
   progressText: {
     color: colors.textTertiary,
@@ -1093,9 +1106,9 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   },
   navArrowText: {
     color: colors.textTertiary,
-    fontSize: 28,
+    fontSize: 24,
     fontFamily: Fonts.body,
-    lineHeight: 32,
+    lineHeight: 28,
   },
   syncIcon: {
     fontSize: 14,
@@ -1111,28 +1124,47 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   dateText: {
     color: colors.text,
     fontFamily: Fonts.accentItalic,
-    fontSize: 30,
+    fontSize: 36,
     flexShrink: 1,
     letterSpacing: -0.5,
+    lineHeight: 42,
   },
   completedSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    marginTop: Spacing.sm,
+    paddingVertical: 14,
+    marginTop: Spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
+  completedSectionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   completedSectionText: {
     color: colors.textTertiary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 13,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  completedSectionCount: {
+    color: colors.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    overflow: 'hidden',
   },
   completedSectionChevron: {
     color: colors.textTertiary,
-    fontSize: 16,
+    fontSize: 12,
+    fontFamily: Fonts.body,
   },
 
   // Back to today
@@ -1241,7 +1273,7 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   },
   list: {
     paddingBottom: 120,
-    paddingTop: Spacing.sm,
+    paddingTop: Spacing.xs,
   },
   allDoneBanner: {
     flexDirection: 'row',
