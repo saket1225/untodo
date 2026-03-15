@@ -50,7 +50,6 @@ import {
   formatDayHeader,
   PomodoroHeaderIndicator,
 } from '../../components/today';
-import { getDailyScore } from '../../components/today/DailyScore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Items have variable heights (subtasks, habit dots, metadata) - no getItemLayout
@@ -531,54 +530,71 @@ function TodayScreenContent() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header - single clean row: Date+Grade left, Streak+Filter right */}
+      {/* Header */}
       <RNAnimated.View style={[styles.header, { opacity: entranceFade }]}>
-        <View style={styles.headerRow}>
+        <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setShowCalendar(true);
-              }}
-              activeOpacity={0.7}
-              style={styles.dateTouchable}
-              hitSlop={{ top: 8, bottom: 8, left: 0, right: 8 }}
-            >
-              <Text style={styles.dateText} accessibilityRole="header">
-                {formatDayHeader(viewingDate)}
-              </Text>
-              <Text style={styles.dateChevron}>▾</Text>
-            </TouchableOpacity>
-            {isSyncing && (
-              <RNAnimated.View style={[styles.syncDot, { opacity: syncPulse }]} accessibilityLabel="Syncing" />
+            {isToday && (
+              <View>
+                <Text style={styles.greetingText}>{getGreeting()}</Text>
+                {(() => {
+                  const sub = getGreetingSub(completed, total);
+                  return sub ? <Text style={styles.greetingSubText}>{sub}</Text> : null;
+                })()}
+              </View>
             )}
-            {isToday && total > 0 && (() => {
-              const { grade, color } = getDailyScore(completed, total, streak);
-              return (
-                <Text style={[styles.inlineGrade, { color }]}> · {grade}</Text>
-              );
-            })()}
+            <View style={styles.dateRow}>
+              <TouchableOpacity
+                onPress={goToPrevDay}
+                style={styles.navArrow}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel="Previous day"
+                accessibilityRole="button"
+              >
+                <Text style={styles.navArrowText}>‹</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowCalendar(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.dateText} accessibilityRole="header">{formatDayHeader(viewingDate)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={goToNextDay}
+                style={styles.navArrow}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel="Next day"
+                accessibilityRole="button"
+              >
+                <Text style={styles.navArrowText}>›</Text>
+              </TouchableOpacity>
+              {isSyncing && (
+                <RNAnimated.Text style={[styles.syncIcon, { opacity: syncPulse }]} accessibilityLabel="Syncing">☁</RNAnimated.Text>
+              )}
+            </View>
           </View>
           <View style={styles.headerRight}>
-            {isToday && streak > 0 && (
-              <Text style={[styles.streakCounter, streak >= 3 && styles.streakCounterActive]}>
-                🔥{streak}
-              </Text>
-            )}
             {activeCats.length > 0 && (
               <TouchableOpacity
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setShowFilters(prev => !prev);
                 }}
-                style={styles.filterIconBtn}
+                style={styles.searchIconBtn}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityLabel={showFilters ? 'Hide filters' : 'Show filters'}
                 accessibilityRole="button"
               >
-                <Text style={[styles.filterIconText, showFilters && { color: Colors.dark.text }]}>☰</Text>
-                {activeCategory !== 'all' && <View style={styles.filterActiveDot} />}
+                <Text style={[styles.searchIconText, showFilters && { color: Colors.dark.text }]}>☰</Text>
               </TouchableOpacity>
+            )}
+            {total > 0 && (
+              <Text style={styles.progressText} accessibilityLabel={`${completed} of ${total} tasks done`}>
+                {completed}/{total}{total > 0 && completed === total ? ' ✓' : ''}
+              </Text>
             )}
           </View>
         </View>
@@ -652,8 +668,13 @@ function TodayScreenContent() {
         </ScrollView>
       )}
 
-      {/* Streak at-risk banner (only when streak is at risk, not for normal display) */}
-      {isToday && atRisk && streak > 0 && (
+      {/* Daily score */}
+      {isToday && total > 0 && (
+        <DailyScore completed={completed} total={total} streak={streak} />
+      )}
+
+      {/* Streak banner */}
+      {isToday && (streak > 0 || atRisk) && (
         <StreakBanner streak={streak} atRisk={atRisk} />
       )}
 
@@ -1022,78 +1043,64 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.lg,
     paddingBottom: Spacing.sm,
-    height: 48,
-    justifyContent: 'center',
   },
-  headerRow: {
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
   },
   headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
     flex: 1,
   },
-  dateTouchable: {
+  greetingText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.headingMedium,
+    fontSize: 13,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  greetingSubText: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.accentItalic,
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  progressText: {
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 14,
+  },
+  navArrow: {
+    padding: 4,
+  },
+  navArrowText: {
+    color: Colors.dark.textTertiary,
+    fontSize: 30,
+    fontFamily: Fonts.body,
+    lineHeight: 34,
+  },
+  syncIcon: {
+    fontSize: 14,
+    color: Colors.dark.textTertiary,
   },
   dateText: {
     color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
     fontSize: 28,
+    flexShrink: 1,
     letterSpacing: -0.5,
-  },
-  dateChevron: {
-    color: Colors.dark.textTertiary,
-    fontSize: 14,
-    marginLeft: 4,
-    marginTop: 4,
-  },
-  syncDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.dark.success,
-    marginLeft: 6,
-  },
-  inlineGrade: {
-    fontFamily: Fonts.headingMedium,
-    fontSize: 18,
-    marginTop: 2,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  streakCounter: {
-    fontFamily: Fonts.headingMedium,
-    fontSize: 14,
-    color: Colors.dark.textSecondary,
-  },
-  streakCounterActive: {
-    color: Colors.dark.timer,
-  },
-  filterIconBtn: {
-    padding: 4,
-    position: 'relative' as const,
-  },
-  filterIconText: {
-    fontSize: 20,
-    color: Colors.dark.textTertiary,
-  },
-  filterActiveDot: {
-    position: 'absolute' as const,
-    top: 2,
-    right: 2,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.dark.accent,
   },
   completedSectionHeader: {
     flexDirection: 'row',
