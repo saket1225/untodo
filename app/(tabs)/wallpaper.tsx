@@ -14,6 +14,28 @@ import { getLogicalDate } from '../../lib/date-utils';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { registerWallpaperTask, unregisterWallpaperTask, cacheWallpaperForBackground } from '../../engines/wallpaper/background-task';
 
+const WALLPAPER_ALBUM_NAME = 'untodo';
+
+async function saveToUntodoAlbum(uri: string): Promise<void> {
+  // Create the asset first
+  const asset = await MediaLibrary.createAssetAsync(uri);
+
+  // Get or create the untodo album
+  let album = await MediaLibrary.getAlbumAsync(WALLPAPER_ALBUM_NAME);
+  if (album) {
+    // Delete all existing wallpapers in the album
+    const existingAssets = await MediaLibrary.getAssetsAsync({ album, first: 100 });
+    if (existingAssets.assets.length > 0) {
+      await MediaLibrary.deleteAssetsAsync(existingAssets.assets);
+    }
+    // Add new wallpaper to the album
+    await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+  } else {
+    // Create album with this asset
+    album = await MediaLibrary.createAlbumAsync(WALLPAPER_ALBUM_NAME, asset, false);
+  }
+}
+
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -1123,7 +1145,7 @@ function WallpaperScreenContent() {
 
       if (viewShotRef.current?.capture) {
         const uri = await viewShotRef.current.capture();
-        await MediaLibrary.saveToLibraryAsync(uri);
+        await saveToUntodoAlbum(uri);
         updateConfig({ lastWallpaperDate: getLogicalDate() });
 
         if (Platform.OS === 'android') {
@@ -1171,7 +1193,7 @@ function WallpaperScreenContent() {
 
       if (viewShotRef.current?.capture) {
         const uri = await viewShotRef.current.capture();
-        await MediaLibrary.createAssetAsync(uri);
+        await saveToUntodoAlbum(uri);
         updateConfig({ lastWallpaperDate: getLogicalDate() });
 
         if (Platform.OS === 'android') {

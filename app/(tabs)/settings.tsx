@@ -152,7 +152,8 @@ function SettingsScreenContent() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             await disconnectSilicon();
             setSilicon(null);
-            setPairingCode(null);
+            const newCode = generatePairingCode();
+            setPairingCode(newCode);
             setShowCode(false);
           },
         },

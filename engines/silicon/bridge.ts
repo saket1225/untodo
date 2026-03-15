@@ -84,6 +84,17 @@ async function processCommand(command: SiliconCommand, username: string): Promis
   const cmdRef = doc(db, 'users', username, 'silicon_commands', command.id);
 
   try {
+    // Check if Silicon is still connected
+    const connection = await getSiliconConnection();
+    if (!connection?.connected) {
+      status = 'error';
+      result = { message: 'Silicon is disconnected. Pair again to send commands.' };
+      const responseRef = doc(db, 'users', username, 'silicon_responses', command.id);
+      await setDoc(responseRef, { commandId: command.id, result, status, completedAt: Date.now() });
+      await updateDoc(cmdRef, { status: 'rejected' });
+      return;
+    }
+
     // Mark as processing
     await updateDoc(cmdRef, { status: 'processing' });
 
