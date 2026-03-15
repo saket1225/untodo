@@ -228,7 +228,7 @@ function SettingsScreenContent() {
 
   const handleCopyMessage = async () => {
     try {
-      await Clipboard.setStringAsync(`Connect to my untodo app. My username is @${username}. Read the docs at untodo.vercel.app/docs.html`);
+      await Clipboard.setStringAsync(`Connect to my untodo app. My username is @${username}. Read the docs at untodo-docs.vercel.app/docs.html`);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setMessageCopied(true);
       setTimeout(() => setMessageCopied(false), 2000);
@@ -440,11 +440,11 @@ function SettingsScreenContent() {
                 style={styles.docsLink}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  Linking.openURL('https://untodo.vercel.app/docs.html');
+                  Linking.openURL('https://untodo-docs.vercel.app/docs.html');
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.docsLinkUrl}>untodo.vercel.app</Text>
+                <Text style={styles.docsLinkUrl}>untodo-docs.vercel.app</Text>
                 <Text style={styles.docsLinkArrow}>↗</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -453,7 +453,7 @@ function SettingsScreenContent() {
                 activeOpacity={0.7}
               >
                 <Text style={styles.messageHintText}>
-                  {messageCopied ? 'Copied!' : `Tell Silicon: "Connect to my untodo app. My username is @${username}. Read the docs at untodo.vercel.app/docs.html"`}
+                  {messageCopied ? 'Copied!' : `Tell Silicon: "Connect to my untodo app. My username is @${username}. Read the docs at untodo-docs.vercel.app/docs.html"`}
                 </Text>
               </TouchableOpacity>
 
