@@ -1373,11 +1373,11 @@ function WallpaperScreenContent() {
           } catch (err: any) {
             console.error('setWallpaper failed:', err);
             setGenerating(false);
-            Alert.alert('Wallpaper Saved', 'Image saved to gallery but could not set wallpaper automatically. Set it manually from your gallery.');
+            Alert.alert('Wallpaper Saved', 'Image saved but could not set wallpaper automatically. Try again or set it manually.');
           }
         } else {
           setGenerating(false);
-          Alert.alert('Wallpaper Saved', 'Image saved to gallery. Set it as wallpaper from your Photos app.');
+          Alert.alert('Wallpaper Saved', 'Image saved. Set it as wallpaper from your device settings.');
         }
       } else {
         setGenerating(false);
@@ -1545,7 +1545,7 @@ function WallpaperScreenContent() {
                   handleSaveWallpaper(false);
                 }}
               >
-                <Text style={styles.secondaryBtnText}>Save to Gallery</Text>
+                <Text style={styles.secondaryBtnText}>Save Only</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.secondaryBtn}
