@@ -147,10 +147,23 @@ function SettingsScreenContent() {
   const { colors, isDark, mode, setTheme } = useTheme();
   const [resetHour, setResetHour] = useState(5);
 
-  // Entrance fade animation
-  const entranceFade = useRef(new RNAnimated.Value(0)).current;
+  // Staggered section entrance animations
+  const NUM_SECTIONS = 6;
+  const sectionAnims = useRef(
+    Array.from({ length: NUM_SECTIONS }, () => ({
+      opacity: new RNAnimated.Value(0),
+      translateY: new RNAnimated.Value(12),
+    }))
+  ).current;
   useEffect(() => {
-    RNAnimated.timing(entranceFade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
+    sectionAnims.forEach((anim, i) => {
+      setTimeout(() => {
+        RNAnimated.parallel([
+          RNAnimated.timing(anim.opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+          RNAnimated.timing(anim.translateY, { toValue: 0, duration: 300, useNativeDriver: true }),
+        ]).start();
+      }, i * 60);
+    });
   }, []);
   const [silicon, setSilicon] = useState<SiliconConnection | null>(null);
   const [siliconLoading, setSiliconLoading] = useState(true);
@@ -321,7 +334,8 @@ function SettingsScreenContent() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, paddingHorizontal: Spacing.lg }} edges={['top']}>
-      <RNAnimated.ScrollView showsVerticalScrollIndicator={false} style={{ opacity: entranceFade }}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <RNAnimated.View style={{ opacity: sectionAnims[0].opacity, transform: [{ translateY: sectionAnims[0].translateY }] }}>
         <Text style={{
           color: colors.text,
           fontFamily: Fonts.accentItalic,
@@ -347,7 +361,9 @@ function SettingsScreenContent() {
             <Text style={{ color: colors.accent, fontFamily: Fonts.accent, fontSize: 20 }} accessibilityLabel={`Username: ${username}`}>@{username}</Text>
           </View>
         </SectionCard>
+        </RNAnimated.View>
 
+        <RNAnimated.View style={{ opacity: sectionAnims[1].opacity, transform: [{ translateY: sectionAnims[1].translateY }] }}>
         {/* Preferences */}
         <Text style={{
           color: colors.textSecondary,
@@ -406,7 +422,9 @@ function SettingsScreenContent() {
             <ThemeSegmentedControl mode={mode} setTheme={setTheme} colors={colors} />
           </View>
         </SectionCard>
+        </RNAnimated.View>
 
+        <RNAnimated.View style={{ opacity: sectionAnims[2].opacity, transform: [{ translateY: sectionAnims[2].translateY }] }}>
         {/* Notifications */}
         <Text style={{
           color: colors.textSecondary,
@@ -446,7 +464,9 @@ function SettingsScreenContent() {
             </View>
           ))}
         </SectionCard>
+        </RNAnimated.View>
 
+        <RNAnimated.View style={{ opacity: sectionAnims[3].opacity, transform: [{ translateY: sectionAnims[3].translateY }] }}>
         {/* Silicon Connection */}
         <Text style={{
           color: colors.textSecondary,
@@ -620,7 +640,9 @@ function SettingsScreenContent() {
             </>
           )}
         </SectionCard>
+        </RNAnimated.View>
 
+        <RNAnimated.View style={{ opacity: sectionAnims[4].opacity, transform: [{ translateY: sectionAnims[4].translateY }] }}>
         {/* About */}
         <Text style={{
           color: colors.textSecondary,
@@ -647,7 +669,9 @@ function SettingsScreenContent() {
             <Text style={{ color: colors.textSecondary, fontFamily: Fonts.accentItalic, fontSize: 15 }}>Silicon</Text>
           </View>
         </SectionCard>
+        </RNAnimated.View>
 
+        <RNAnimated.View style={{ opacity: sectionAnims[5].opacity, transform: [{ translateY: sectionAnims[5].translateY }] }}>
         {/* Data */}
         <Text style={{
           color: colors.textSecondary,
@@ -708,7 +732,8 @@ function SettingsScreenContent() {
         </TouchableOpacity>
 
         <View style={{ height: 120 }} />
-      </RNAnimated.ScrollView>
+        </RNAnimated.View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

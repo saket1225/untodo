@@ -55,6 +55,29 @@ import {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Items have variable heights (subtasks, habit dots, metadata) - no getItemLayout
 
+// Staggered fade-in wrapper for list items
+function AnimatedListItem({ children, index }: { children: React.ReactNode; index: number }) {
+  const fadeAnim = useRef(new RNAnimated.Value(0)).current;
+  const slideAnim = useRef(new RNAnimated.Value(8)).current;
+
+  useEffect(() => {
+    const delay = Math.min(index * 50, 300);
+    const timer = setTimeout(() => {
+      RNAnimated.parallel([
+        RNAnimated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+        RNAnimated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <RNAnimated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      {children}
+    </RNAnimated.View>
+  );
+}
+
 function TodayScreenContent() {
   const { colors, fonts, spacing, isDark, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -508,21 +531,23 @@ function TodayScreenContent() {
   }, [deleteTodo, restoreTodo]);
 
   const renderItem = useCallback(({ item, index }: { item: Todo; index: number }) => (
-    <TodoItem
-      todo={item}
-      onToggle={() => handleToggle(item.id)}
-      onDelete={() => handleDelete(item)}
-      onPress={() => setDetailTodo(item)}
-      onLongPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setQuickActionTodo(item);
-      }}
-      onFocus={!item.completed ? () => setFocusTodo(item) : undefined}
-      selectionMode={selectionMode}
-      isSelected={selectedIds.has(item.id)}
-      onSelect={() => toggleSelection(item.id)}
-      habitHistory={habitHistories[item.id]}
-    />
+    <AnimatedListItem index={index}>
+      <TodoItem
+        todo={item}
+        onToggle={() => handleToggle(item.id)}
+        onDelete={() => handleDelete(item)}
+        onPress={() => setDetailTodo(item)}
+        onLongPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setQuickActionTodo(item);
+        }}
+        onFocus={!item.completed ? () => setFocusTodo(item) : undefined}
+        selectionMode={selectionMode}
+        isSelected={selectedIds.has(item.id)}
+        onSelect={() => toggleSelection(item.id)}
+        habitHistory={habitHistories[item.id]}
+      />
+    </AnimatedListItem>
   ), [handleToggle, handleDelete, selectionMode, selectedIds, enterSelectionMode, toggleSelection, habitHistories]);
 
 

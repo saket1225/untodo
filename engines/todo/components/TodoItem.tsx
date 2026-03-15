@@ -152,19 +152,19 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
 
   const handleToggle = () => {
     if (!todo.completed) {
-      // Completing — satisfying scale pulse + confetti + haptic
+      // Completing — satisfying scale punch + confetti + haptic
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowConfetti(true);
       if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
       confettiTimerRef.current = setTimeout(() => setShowConfetti(false), 500);
       Animated.sequence([
-        Animated.timing(scaleAnim, { toValue: 1.02, duration: 120, useNativeDriver: true }),
+        Animated.timing(scaleAnim, { toValue: 0.95, duration: 100, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4, tension: 300 }),
       ]).start();
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       Animated.sequence([
-        Animated.timing(scaleAnim, { toValue: 0.97, duration: 80, useNativeDriver: true }),
+        Animated.timing(scaleAnim, { toValue: 0.95, duration: 100, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4 }),
       ]).start();
     }
