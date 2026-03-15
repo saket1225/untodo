@@ -1,3 +1,5 @@
+// ─── Color Palettes ───────────────────────────────────────────────
+
 export const Colors = {
   dark: {
     background: '#0A0A0A',
@@ -20,15 +22,23 @@ export const Colors = {
     surface: '#F5F5F5',
     surfaceHover: '#EBEBEB',
     border: '#E0E0E0',
-    text: '#0F0F0F',
+    text: '#0A0A0A',
     textSecondary: '#666666',
     textTertiary: '#999999',
-    accent: '#000000',
+    accent: '#0A0A0A',
     success: '#22C55E',
-    error: '#DC2626',
-    timer: '#D97706',
-  }
-};
+    error: '#EF4444',
+    timer: '#F59E0B',
+    priorityHigh: '#EF4444',
+    priorityMedium: '#FBBF24',
+    priorityLow: '#60A5FA',
+  },
+} as const;
+
+export type ColorPalette = typeof Colors.dark | typeof Colors.light;
+export type ThemeMode = 'light' | 'dark' | 'system';
+
+// ─── Typography ───────────────────────────────────────────────────
 
 export const Fonts = {
   heading: 'ApfelGrotezk-Bold',
@@ -38,11 +48,7 @@ export const Fonts = {
   bodyBold: 'Inter-Bold',
   accent: 'InstrumentSerif-Regular',
   accentItalic: 'InstrumentSerif-Italic',
-};
-
-export const Spacing = {
-  xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48,
-};
+} as const;
 
 export const Typography = {
   heading: { fontFamily: Fonts.accentItalic, fontSize: 32 },
@@ -52,7 +58,18 @@ export const Typography = {
   bodyMedium: { fontFamily: Fonts.bodyMedium, fontSize: 15 },
   caption: { fontFamily: Fonts.body, fontSize: 12 },
   tiny: { fontFamily: Fonts.body, fontSize: 10 },
-};
+} as const;
+
+// ─── Spacing & Layout ────────────────────────────────────────────
+
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+} as const;
 
 export const BorderRadius = {
   sm: 8,
@@ -60,4 +77,21 @@ export const BorderRadius = {
   lg: 16,
   xl: 20,
   pill: 100,
-};
+} as const;
+
+// ─── Shadows (per-theme) ─────────────────────────────────────────
+
+export const Shadows = {
+  dark: {
+    sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 2, elevation: 2 },
+    md: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 4, elevation: 4 },
+    lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 8, elevation: 8 },
+  },
+  light: {
+    sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2, elevation: 2 },
+    md: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 4 },
+    lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 8 },
+  },
+} as const;
+
+export type ShadowSet = typeof Shadows.dark | typeof Shadows.light;
