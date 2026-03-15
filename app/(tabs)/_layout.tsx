@@ -13,8 +13,8 @@ function TabIcon({ label, focused, badge }: { label: string; focused: boolean; b
   const icons: Record<string, string> = {
     'Today': '◉',
     'Stats': '◧',
-    'Wallpaper': '◫',
-    'Settings': '⚙',
+    'Wall': '◫',
+    'Config': '⚙',
   };
   return (
     <View style={styles.tabIcon}>
@@ -41,7 +41,6 @@ function TabIcon({ label, focused, badge }: { label: string; focused: boolean; b
       >
         {label}
       </Text>
-      {focused && <View style={styles.activeIndicator} />}
     </View>
   );
 }
@@ -92,14 +91,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="wallpaper"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon label="Wallpaper" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon label="Wall" focused={focused} />,
         }}
         listeners={{ tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon label="Settings" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon label="Config" focused={focused} />,
         }}
         listeners={{ tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) }}
       />
@@ -112,9 +111,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.background,
     borderTopColor: Colors.dark.border,
     borderTopWidth: StyleSheet.hairlineWidth,
-    height: 80,
-    paddingBottom: 20,
-    paddingTop: 10,
+    height: 88,
+    paddingBottom: 24,
+    paddingTop: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.4,
@@ -124,7 +123,7 @@ const styles = StyleSheet.create({
   tabIcon: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 5,
     paddingTop: 2,
   },
   iconContainer: {
@@ -136,7 +135,7 @@ const styles = StyleSheet.create({
   },
   iconFocused: {
     opacity: 1,
-    fontSize: 23,
+    fontSize: 22,
   },
   badge: {
     position: 'absolute',
@@ -153,17 +152,10 @@ const styles = StyleSheet.create({
   badgeText: {
     color: Colors.dark.background,
     fontFamily: Fonts.bodyMedium,
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 9,
+    lineHeight: 12,
   },
   label: {
-    fontSize: 11,
-  },
-  activeIndicator: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.dark.accent,
-    marginTop: 2,
+    fontSize: 9,
   },
 });
