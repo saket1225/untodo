@@ -3,38 +3,45 @@ import { View, Text, TouchableOpacity, ScrollView, Switch, TextInput, StyleSheet
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { setWallpaper, FLAG_BOTH } from '../../modules/wallpaper-setter';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 import { useWallpaperStore } from '../../engines/wallpaper/store';
 import { useTodoStore } from '../../engines/todo/store';
 import { DayData, WallpaperPreset, WallpaperStyle, GridPosition } from '../../engines/wallpaper/types';
 import { getLogicalDate } from '../../lib/date-utils';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { registerWallpaperTask, unregisterWallpaperTask, cacheWallpaperForBackground } from '../../engines/wallpaper/background-task';
+import type { ColorPalette } from '../../lib/theme';
 
 const WALLPAPER_DIR = FileSystem.documentDirectory + 'wallpapers/';
 
 async function saveWallpaperHidden(uri: string): Promise<string> {
-  // Save to app's internal storage - hidden from gallery
-  const dirInfo = await FileSystem.getInfoAsync(WALLPAPER_DIR);
-  if (!dirInfo.exists) {
-    await FileSystem.makeDirectoryAsync(WALLPAPER_DIR, { intermediates: true });
+  try {
+    // Save to app's internal storage - hidden from gallery
+    const dirInfo = await FileSystem.getInfoAsync(WALLPAPER_DIR);
+    if (!dirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(WALLPAPER_DIR, { intermediates: true });
+    }
+
+    // Delete any existing wallpapers
+    const files = await FileSystem.readDirectoryAsync(WALLPAPER_DIR);
+    for (const file of files) {
+      await FileSystem.deleteAsync(WALLPAPER_DIR + file, { idempotent: true });
+    }
+
+    // Read as base64 and write to hidden dir (more reliable than copyAsync with mixed URI schemes)
+    const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+    const destPath = WALLPAPER_DIR + `wallpaper_${Date.now()}.png`;
+    await FileSystem.writeAsStringAsync(destPath, base64, { encoding: FileSystem.EncodingType.Base64 });
+
+    return destPath;
+  } catch (err) {
+    console.error('saveWallpaperHidden failed:', err);
+    throw err;
   }
-
-  // Delete any existing wallpapers
-  const files = await FileSystem.readDirectoryAsync(WALLPAPER_DIR);
-  for (const file of files) {
-    await FileSystem.deleteAsync(WALLPAPER_DIR + file, { idempotent: true });
-  }
-
-  // Copy new wallpaper
-  const destPath = WALLPAPER_DIR + `wallpaper_${Date.now()}.png`;
-  const normalizedUri = uri.startsWith('file://') ? uri : `file://${uri}`;
-  await FileSystem.copyAsync({ from: normalizedUri, to: destPath });
-
-  return destPath;
 }
 
 // Enable LayoutAnimation on Android
@@ -534,6 +541,8 @@ function NumericControl({ label, value, min, max, step = 1, onChange, format }: 
   label: string; value: number; min: number; max: number; step?: number;
   onChange: (v: number) => void; format?: (v: number) => string;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.controlRow}>
       <Text style={styles.controlLabel}>{label}</Text>
@@ -567,6 +576,8 @@ function NumericControl({ label, value, min, max, step = 1, onChange, format }: 
 function ToggleControl({ label, value, onChange }: {
   label: string; value: boolean; onChange: (v: boolean) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.controlRow}>
       <Text style={styles.controlLabel}>{label}</Text>
@@ -576,8 +587,8 @@ function ToggleControl({ label, value, onChange }: {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onChange(v);
         }}
-        trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
-        thumbColor={value ? Colors.dark.accent : Colors.dark.textTertiary}
+        trackColor={{ false: colors.surface, true: colors.textSecondary }}
+        thumbColor={value ? colors.accent : colors.textTertiary}
       />
     </View>
   );
@@ -592,6 +603,7 @@ const ANIM_CONFIG = LayoutAnimation.create(
 function CollapsibleSection({ title, children, defaultOpen = true }: {
   title: string; children: React.ReactNode; defaultOpen?: boolean;
 }) {
+  const styles = useStyles();
   const [open, setOpen] = useState(defaultOpen);
   return (
     <View style={styles.section}>
@@ -614,6 +626,8 @@ function CollapsibleSection({ title, children, defaultOpen = true }: {
 // ─── Date Input ─────────────────────────────────────────────────────────────────
 
 function DateInput({ value, onChange, error, label }: { value: string; onChange: (v: string) => void; error: string | null; label?: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [year, setYear] = useState(() => value.split('-')[0] || '2028');
   const [month, setMonth] = useState(() => value.split('-')[1] || '01');
   const [day, setDay] = useState(() => value.split('-')[2] || '12');
@@ -640,37 +654,37 @@ function DateInput({ value, onChange, error, label }: { value: string; onChange:
         <View style={styles.dateField}>
           <Text style={styles.dateFieldLabel}>Year</Text>
           <TextInput
-            style={[styles.dateFieldInput, error ? { borderColor: Colors.dark.error } : null]}
+            style={[styles.dateFieldInput, error ? { borderColor: colors.error } : null]}
             value={year}
             onChangeText={(v) => { setYear(v.replace(/\D/g, '').slice(0, 4)); }}
             onBlur={() => commit(year, month, day)}
             keyboardType="number-pad"
             maxLength={4}
-            placeholderTextColor={Colors.dark.textTertiary}
+            placeholderTextColor={colors.textTertiary}
           />
         </View>
         <View style={styles.dateField}>
           <Text style={styles.dateFieldLabel}>Month</Text>
           <TextInput
-            style={[styles.dateFieldInput, error ? { borderColor: Colors.dark.error } : null]}
+            style={[styles.dateFieldInput, error ? { borderColor: colors.error } : null]}
             value={month}
             onChangeText={(v) => { setMonth(v.replace(/\D/g, '').slice(0, 2)); }}
             onBlur={() => commit(year, month, day)}
             keyboardType="number-pad"
             maxLength={2}
-            placeholderTextColor={Colors.dark.textTertiary}
+            placeholderTextColor={colors.textTertiary}
           />
         </View>
         <View style={styles.dateField}>
           <Text style={styles.dateFieldLabel}>Day</Text>
           <TextInput
-            style={[styles.dateFieldInput, error ? { borderColor: Colors.dark.error } : null]}
+            style={[styles.dateFieldInput, error ? { borderColor: colors.error } : null]}
             value={day}
             onChangeText={(v) => { setDay(v.replace(/\D/g, '').slice(0, 2)); }}
             onBlur={() => commit(year, month, day)}
             keyboardType="number-pad"
             maxLength={2}
-            placeholderTextColor={Colors.dark.textTertiary}
+            placeholderTextColor={colors.textTertiary}
           />
         </View>
       </View>
@@ -1033,6 +1047,8 @@ function WallpaperContent({
 // ─── Main Screen ────────────────────────────────────────────────────────────────
 
 function WallpaperScreenContent() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { config, updateConfig } = useWallpaperStore();
   const todos = useTodoStore(s => s.todos);
   const viewShotRef = useRef<ViewShot>(null);
@@ -1310,7 +1326,7 @@ function WallpaperScreenContent() {
         {/* Loading overlay */}
         {generating && (
           <View style={styles.generatingOverlay}>
-            <ActivityIndicator size="small" color={Colors.dark.accent} />
+            <ActivityIndicator size="small" color={colors.accent} />
             <Text style={styles.generatingText}>Setting wallpaper...</Text>
           </View>
         )}
@@ -1343,7 +1359,7 @@ function WallpaperScreenContent() {
                   handleDisableAutoUpdate();
                 }}
               >
-                <Text style={[styles.secondaryBtnText, { color: Colors.dark.error }]}>Disable</Text>
+                <Text style={[styles.secondaryBtnText, { color: colors.error }]}>Disable</Text>
               </TouchableOpacity>
             </View>
           </>
@@ -1590,7 +1606,7 @@ function WallpaperScreenContent() {
               value={config.customQuote}
               onChangeText={v => updateConfig({ customQuote: v })}
               placeholder="Leave empty for daily rotation"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               multiline
             />
           </View>
@@ -1614,7 +1630,7 @@ function WallpaperScreenContent() {
               value={config.goalTitle}
               onChangeText={v => updateConfig({ goalTitle: v })}
               placeholder="e.g. 20"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
             />
           </View>
           <DateInput
@@ -1664,531 +1680,538 @@ export default function WallpaperScreen() {
   );
 }
 
-// ─── Styles ─────────────────────────────────────────────────────────────────────
+// ─── Dynamic Styles ─────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-    paddingHorizontal: Spacing.lg,
-  },
-  heading: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 36,
-    paddingTop: Spacing.lg,
-    marginBottom: Spacing.lg,
-    letterSpacing: -0.5,
-  },
+function createStyles(colors: ColorPalette) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+      paddingHorizontal: Spacing.lg,
+    },
+    heading: {
+      color: colors.text,
+      fontFamily: Fonts.accentItalic,
+      fontSize: 36,
+      paddingTop: Spacing.lg,
+      marginBottom: Spacing.lg,
+      letterSpacing: -0.5,
+    },
 
-  // Phone frame — premium preview
-  phoneFrame: {
-    borderRadius: 32,
-    overflow: 'hidden',
-    borderWidth: PHONE_BORDER,
-    borderColor: '#3A3A3A',
-    marginBottom: Spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.8,
-    shadowRadius: 32,
-    elevation: 24,
-    backgroundColor: '#111111',
-  },
-  phoneNotch: {
-    width: 100,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#1A1A1A',
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 4,
-    zIndex: 10,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-  },
-  preview: {
-    width: PREVIEW_WIDTH,
-    height: PREVIEW_HEIGHT,
-    backgroundColor: '#080808',
-  },
-  previewContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-  },
+    // Phone frame — premium preview
+    phoneFrame: {
+      borderRadius: 32,
+      overflow: 'hidden',
+      borderWidth: PHONE_BORDER,
+      borderColor: colors.border,
+      marginBottom: Spacing.lg,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 20 },
+      shadowOpacity: 0.8,
+      shadowRadius: 32,
+      elevation: 24,
+      backgroundColor: colors.surface,
+    },
+    phoneNotch: {
+      width: 100,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+      alignSelf: 'center',
+      marginTop: 10,
+      marginBottom: 4,
+      zIndex: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    preview: {
+      width: PREVIEW_WIDTH,
+      height: PREVIEW_HEIGHT,
+      backgroundColor: '#080808',
+    },
+    previewContent: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.md,
+    },
 
-  // Preview typography
-  previewDayCount: {
-    fontFamily: Fonts.accent,
-    fontSize: 100,
-    marginBottom: -6,
-    letterSpacing: -1,
-  },
-  previewDayLabel: {
-    fontFamily: Fonts.headingMedium,
-    fontSize: 12,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.lg,
-  },
-  previewSubLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    letterSpacing: 0.5,
-    marginBottom: Spacing.sm,
-    opacity: 0.8,
-  },
-  previewQuote: {
-    fontFamily: Fonts.accentItalic,
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
-    lineHeight: 18,
-    opacity: 0.9,
-  },
-  previewStreak: {
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    marginTop: Spacing.sm,
-    letterSpacing: 0.5,
-  },
+    // Preview typography
+    previewDayCount: {
+      fontFamily: Fonts.accent,
+      fontSize: 100,
+      marginBottom: -6,
+      letterSpacing: -1,
+    },
+    previewDayLabel: {
+      fontFamily: Fonts.headingMedium,
+      fontSize: 12,
+      letterSpacing: 2,
+      textTransform: 'uppercase',
+      marginBottom: Spacing.lg,
+    },
+    previewSubLabel: {
+      fontFamily: Fonts.body,
+      fontSize: 10,
+      letterSpacing: 0.5,
+      marginBottom: Spacing.sm,
+      opacity: 0.8,
+    },
+    previewQuote: {
+      fontFamily: Fonts.accentItalic,
+      fontSize: 12,
+      textAlign: 'center',
+      marginTop: Spacing.lg,
+      paddingHorizontal: Spacing.xl,
+      lineHeight: 18,
+      opacity: 0.9,
+    },
+    previewStreak: {
+      fontFamily: Fonts.body,
+      fontSize: 10,
+      marginTop: Spacing.sm,
+      letterSpacing: 0.5,
+    },
 
-  // Stats row
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-    gap: Spacing.sm,
-  },
-  statItem: {
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 11,
-    letterSpacing: 0.5,
-  },
-  statDivider: {
-    fontSize: 11,
-  },
+    // Stats row
+    statsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: Spacing.md,
+      gap: Spacing.sm,
+    },
+    statItem: {
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 11,
+      letterSpacing: 0.5,
+    },
+    statDivider: {
+      fontSize: 11,
+    },
 
-  // Toast
-  toast: {
-    backgroundColor: Colors.dark.success,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    alignItems: 'center',
-  },
-  toastText: {
-    color: '#000000',
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 14,
-  },
+    // Toast
+    toast: {
+      backgroundColor: colors.success,
+      borderRadius: 14,
+      paddingVertical: 14,
+      paddingHorizontal: Spacing.lg,
+      marginBottom: Spacing.md,
+      alignItems: 'center',
+    },
+    toastText: {
+      color: '#000000',
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 14,
+    },
 
-  // Action buttons
-  setWallpaperBtn: {
-    backgroundColor: Colors.dark.accent,
-    borderRadius: 18,
-    paddingVertical: 20,
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.xs,
-    shadowColor: '#fff',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 10,
-  },
-  setWallpaperBtnText: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyBold,
-    fontSize: 18,
-    letterSpacing: 0.3,
-  },
-  setWallpaperSubtext: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    opacity: 0.5,
-    marginTop: 4,
-  },
+    // Action buttons
+    setWallpaperBtn: {
+      backgroundColor: colors.accent,
+      borderRadius: 18,
+      paddingVertical: 20,
+      alignItems: 'center',
+      marginBottom: Spacing.sm,
+      marginTop: Spacing.xs,
+      shadowColor: colors.accent,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.15,
+      shadowRadius: 24,
+      elevation: 10,
+    },
+    setWallpaperBtnText: {
+      color: colors.background,
+      fontFamily: Fonts.bodyBold,
+      fontSize: 18,
+      letterSpacing: 0.3,
+    },
+    setWallpaperSubtext: {
+      color: colors.background,
+      fontFamily: Fonts.body,
+      fontSize: 12,
+      opacity: 0.5,
+      marginTop: 4,
+    },
 
-  // Active wallpaper card
-  activeWallpaperCard: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(74, 222, 128, 0.3)',
-    paddingVertical: 20,
-    paddingHorizontal: Spacing.lg,
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  activeIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: 4,
-  },
-  activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.dark.success,
-  },
-  activeLabel: {
-    color: Colors.dark.success,
-    fontFamily: Fonts.bodyBold,
-    fontSize: 16,
-  },
-  activeSubtext: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    marginTop: 2,
-  },
+    // Active wallpaper card
+    activeWallpaperCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: 'rgba(74, 222, 128, 0.3)',
+      paddingVertical: 20,
+      paddingHorizontal: Spacing.lg,
+      alignItems: 'center',
+      marginBottom: Spacing.sm,
+    },
+    activeIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+      marginBottom: 4,
+    },
+    activeDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.success,
+    },
+    activeLabel: {
+      color: colors.success,
+      fontFamily: Fonts.bodyBold,
+      fontSize: 16,
+    },
+    activeSubtext: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 12,
+      marginTop: 2,
+    },
 
-  secondaryActionRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.xl,
-  },
-  secondaryBtn: {
-    flex: 1,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-  },
-  secondaryBtnText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 14,
-  },
+    secondaryActionRow: {
+      flexDirection: 'row',
+      gap: Spacing.sm,
+      marginBottom: Spacing.xl,
+    },
+    secondaryBtn: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: Spacing.md,
+      alignItems: 'center',
+    },
+    secondaryBtnText: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 14,
+    },
 
-  // Sections
-  section: {
-    marginBottom: Spacing.md,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    overflow: 'hidden',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-  },
-  sectionTitle: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
-  },
-  sectionChevron: {
-    color: Colors.dark.textTertiary,
-    fontSize: 14,
-  },
-  sectionContent: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
-  },
+    // Sections
+    section: {
+      marginBottom: Spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: Spacing.md,
+      paddingHorizontal: Spacing.md,
+    },
+    sectionTitle: {
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 15,
+    },
+    sectionChevron: {
+      color: colors.textTertiary,
+      fontSize: 14,
+    },
+    sectionContent: {
+      paddingHorizontal: Spacing.md,
+      paddingBottom: Spacing.md,
+    },
 
-  // Vibe/Style chips
-  vibeChip: {
-    width: 92,
-    alignItems: 'center',
-    paddingVertical: Spacing.sm + 2,
-    paddingHorizontal: Spacing.xs,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: Colors.dark.border,
-    backgroundColor: Colors.dark.surface,
-  },
-  vibeChipActive: {
-    borderColor: Colors.dark.accent,
-    backgroundColor: '#1A1A1A',
-  },
-  vibePreview: {
-    width: 60,
-    height: 40,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    marginBottom: 8,
-  },
-  vibeDotLg: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  vibeDotMd: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  vibeDotSm: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  vibeLabel: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 12,
-  },
-  vibeLabelActive: {
-    color: Colors.dark.accent,
-  },
-  vibeDesc: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 9,
-    marginTop: 2,
-  },
-  vibeDescActive: {
-    color: Colors.dark.textSecondary,
-  },
+    // Vibe/Style chips
+    vibeChip: {
+      width: 92,
+      alignItems: 'center',
+      paddingVertical: Spacing.sm + 2,
+      paddingHorizontal: Spacing.xs,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    vibeChipActive: {
+      borderColor: colors.accent,
+      backgroundColor: colors.surfaceHover,
+    },
+    vibePreview: {
+      width: 60,
+      height: 40,
+      borderRadius: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      marginBottom: 8,
+    },
+    vibeDotLg: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+    vibeDotMd: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    vibeDotSm: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    },
+    vibeLabel: {
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 12,
+    },
+    vibeLabelActive: {
+      color: colors.accent,
+    },
+    vibeDesc: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 9,
+      marginTop: 2,
+    },
+    vibeDescActive: {
+      color: colors.textSecondary,
+    },
 
-  // Presets
-  presetRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  presetChip: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-  },
-  presetChipActive: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
-  },
-  presetLabel: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 13,
-  },
-  presetLabelActive: {
-    color: Colors.dark.background,
-  },
-  presetDesc: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  presetDescActive: {
-    color: Colors.dark.background,
-    opacity: 0.7,
-  },
+    // Presets
+    presetRow: {
+      flexDirection: 'row',
+      gap: Spacing.sm,
+    },
+    presetChip: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: Spacing.md,
+      alignItems: 'center',
+    },
+    presetChipActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    presetLabel: {
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 13,
+    },
+    presetLabelActive: {
+      color: colors.background,
+    },
+    presetDesc: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 10,
+      marginTop: 2,
+    },
+    presetDescActive: {
+      color: colors.background,
+      opacity: 0.7,
+    },
 
-  // Controls
-  controls: {
-    gap: Spacing.xs,
-  },
-  controlRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm + 2,
-  },
-  controlLabel: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
-  },
-  controlButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  controlBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: Colors.dark.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  controlBtnText: {
-    color: Colors.dark.text,
-    fontSize: 18,
-    fontFamily: Fonts.body,
-  },
-  controlValue: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 20,
-    minWidth: 40,
-    textAlign: 'center',
-  },
-  headingToggleBtn: {
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  headingToggleBtnText: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 13,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.dark.border,
-    marginVertical: Spacing.sm,
-  },
+    // Controls
+    controls: {
+      gap: Spacing.xs,
+    },
+    controlRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: Spacing.sm + 2,
+    },
+    controlLabel: {
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 15,
+    },
+    controlButtons: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
+    },
+    controlBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    controlBtnText: {
+      color: colors.text,
+      fontSize: 18,
+      fontFamily: Fonts.body,
+    },
+    controlValue: {
+      color: colors.text,
+      fontFamily: Fonts.accent,
+      fontSize: 20,
+      minWidth: 40,
+      textAlign: 'center',
+    },
+    headingToggleBtn: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    headingToggleBtnText: {
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 13,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: Spacing.sm,
+    },
 
-  // Inputs
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-    gap: Spacing.md,
-  },
-  inputLabel: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    marginBottom: Spacing.xs,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-  },
-  quoteInput: {
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    color: Colors.dark.text,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 14,
-    minHeight: 48,
-    textAlignVertical: 'top',
-  },
+    // Inputs
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: Spacing.md,
+      gap: Spacing.md,
+    },
+    inputLabel: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.body,
+      fontSize: 13,
+      marginBottom: Spacing.xs,
+    },
+    input: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 12,
+      color: colors.text,
+      fontFamily: Fonts.body,
+      fontSize: 14,
+    },
+    quoteInput: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 12,
+      color: colors.text,
+      fontFamily: Fonts.accentItalic,
+      fontSize: 14,
+      minHeight: 48,
+      textAlignVertical: 'top',
+    },
 
-  // Date input
-  dateInputRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  dateField: {
-    flex: 1,
-  },
-  dateFieldLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    marginBottom: Spacing.xs,
-  },
-  dateFieldInput: {
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 18,
-    textAlign: 'center',
-  },
-  dateError: {
-    color: Colors.dark.error,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    marginTop: Spacing.sm,
-  },
+    // Date input
+    dateInputRow: {
+      flexDirection: 'row',
+      gap: Spacing.sm,
+    },
+    dateField: {
+      flex: 1,
+    },
+    dateFieldLabel: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+      marginBottom: Spacing.xs,
+    },
+    dateFieldInput: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 12,
+      color: colors.text,
+      fontFamily: Fonts.accent,
+      fontSize: 18,
+      textAlign: 'center',
+    },
+    dateError: {
+      color: colors.error,
+      fontFamily: Fonts.body,
+      fontSize: 12,
+      marginTop: Spacing.sm,
+    },
 
-  // Dot count
-  dotCountText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: Spacing.sm,
-  },
+    // Dot count
+    dotCountText: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 12,
+      textAlign: 'center',
+      marginTop: Spacing.sm,
+    },
 
-  // No goal / goal passed
-  noGoalPrompt: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  noGoalTitle: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 18,
-    textAlign: 'center',
-    marginBottom: Spacing.sm,
-  },
-  noGoalSubtext: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+    // No goal / goal passed
+    noGoalPrompt: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: Spacing.lg,
+      alignItems: 'center',
+      marginBottom: Spacing.lg,
+    },
+    noGoalTitle: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.accentItalic,
+      fontSize: 18,
+      textAlign: 'center',
+      marginBottom: Spacing.sm,
+    },
+    noGoalSubtext: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 13,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
 
-  // Generating overlay
-  generatingOverlay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    marginBottom: Spacing.xs,
-  },
-  generatingText: {
-    color: Colors.dark.accent,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 13,
-  },
+    // Generating overlay
+    generatingOverlay: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: Spacing.sm,
+      paddingVertical: Spacing.sm,
+      marginBottom: Spacing.xs,
+    },
+    generatingText: {
+      color: colors.accent,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 13,
+    },
 
-  // Reset
-  resetBtn: {
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  resetBtnText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 14,
-  },
-});
+    // Reset
+    resetBtn: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginBottom: Spacing.md,
+    },
+    resetBtnText: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 14,
+    },
+  });
+}
+
+function useStyles() {
+  const { colors } = useTheme();
+  return useMemo(() => createStyles(colors), [colors]);
+}
