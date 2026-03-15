@@ -264,6 +264,19 @@ export default function FocusMode({ todo, visible, onClose, onComplete }: Props)
 
           {/* Subtle label */}
           <Text style={styles.focusLabel}>focused</Text>
+
+          {/* Previously spent time */}
+          {(() => {
+            const prevSeconds = (todo.timeTracking?.totalSeconds || 0) + (todo.pomodoroMinutesLogged || 0) * 60;
+            if (prevSeconds > 0) {
+              return (
+                <Text style={styles.prevTime}>
+                  {formatTime(prevSeconds + elapsed)} total on this task
+                </Text>
+              );
+            }
+            return null;
+          })()}
         </View>
 
         {/* Done button at bottom */}
@@ -354,6 +367,13 @@ const styles = StyleSheet.create({
     letterSpacing: 4,
     textTransform: 'uppercase',
     opacity: 0.4,
+  },
+  prevTime: {
+    color: Colors.dark.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    marginTop: Spacing.lg,
+    opacity: 0.6,
   },
   doneBtn: {
     width: SCREEN_WIDTH * 0.85,
