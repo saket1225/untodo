@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { Fonts, Spacing, type ColorPalette, type ThemeMode } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 import {
   generatePairingCode,
   getSiliconConnection,
@@ -23,16 +24,23 @@ import { setupDefaultNotifications } from '../../engines/notifications/service';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import Constants from 'expo-constants';
 
-function SectionCard({ children, style }: { children: React.ReactNode; style?: any }) {
+function SectionCard({ children, style, colors }: { children: React.ReactNode; style?: any; colors: ColorPalette }) {
   return (
-    <View style={[styles.sectionCard, style]}>
+    <View style={[{
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: Spacing.md,
+      overflow: 'hidden' as const,
+    }, style]}>
       {children}
     </View>
   );
 }
 
 // Pulsing dot animation for "listening" state
-function PulsingDot({ size = 8 }: { size?: number }) {
+function PulsingDot({ size = 8, colors }: { size?: number; colors: ColorPalette }) {
   const pulse = useRef(new RNAnimated.Value(0.4)).current;
 
   useEffect(() => {
@@ -47,12 +55,12 @@ function PulsingDot({ size = 8 }: { size?: number }) {
   }, []);
 
   return (
-    <RNAnimated.View style={[styles.pulsingDot, { opacity: pulse, width: size, height: size, borderRadius: size / 2 }]} />
+    <RNAnimated.View style={[{ backgroundColor: colors.success }, { opacity: pulse, width: size, height: size, borderRadius: size / 2 }]} />
   );
 }
 
 // Pulsing ring animation for listening state
-function PulsingRing() {
+function PulsingRing({ colors }: { colors: ColorPalette }) {
   const scale = useRef(new RNAnimated.Value(1)).current;
   const opacity = useRef(new RNAnimated.Value(0.6)).current;
 
@@ -75,7 +83,7 @@ function PulsingRing() {
         height: 48,
         borderRadius: 24,
         borderWidth: 2,
-        borderColor: Colors.dark.success,
+        borderColor: colors.success,
         transform: [{ scale }],
         opacity,
       }}
@@ -83,8 +91,60 @@ function PulsingRing() {
   );
 }
 
+const THEME_OPTIONS: { label: string; value: ThemeMode }[] = [
+  { label: 'System', value: 'system' },
+  { label: 'Light', value: 'light' },
+  { label: 'Dark', value: 'dark' },
+];
+
+function ThemeSegmentedControl({ mode, setTheme, colors }: { mode: ThemeMode; setTheme: (m: ThemeMode) => void; colors: ColorPalette }) {
+  return (
+    <View style={{
+      flexDirection: 'row',
+      backgroundColor: colors.background,
+      borderRadius: 10,
+      padding: 3,
+    }}>
+      {THEME_OPTIONS.map((opt) => {
+        const isActive = mode === opt.value;
+        return (
+          <TouchableOpacity
+            key={opt.value}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setTheme(opt.value);
+            }}
+            style={{
+              flex: 1,
+              paddingVertical: 7,
+              borderRadius: 8,
+              alignItems: 'center' as const,
+              backgroundColor: isActive ? colors.surface : 'transparent',
+              ...(isActive ? {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.12,
+                shadowRadius: 3,
+                elevation: 2,
+              } : {}),
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{
+              fontFamily: isActive ? Fonts.bodyMedium : Fonts.body,
+              fontSize: 13,
+              color: isActive ? colors.text : colors.textSecondary,
+            }}>{opt.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 function SettingsScreenContent() {
   const router = useRouter();
+  const { colors, isDark, mode, setTheme } = useTheme();
   const [resetHour, setResetHour] = useState(5);
 
   // Entrance fade animation
@@ -257,28 +317,57 @@ function SettingsScreenContent() {
 
   const isConnected = silicon?.connected;
 
+  const switchTrackColor = { false: colors.background, true: colors.textSecondary };
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, paddingHorizontal: Spacing.lg }} edges={['top']}>
       <RNAnimated.ScrollView showsVerticalScrollIndicator={false} style={{ opacity: entranceFade }}>
-        <Text style={styles.heading} accessibilityRole="header">Settings</Text>
+        <Text style={{
+          color: colors.text,
+          fontFamily: Fonts.accentItalic,
+          fontSize: 36,
+          paddingTop: Spacing.lg,
+          marginBottom: Spacing.lg,
+          letterSpacing: -0.5,
+        }} accessibilityRole="header">Settings</Text>
 
         {/* Account */}
-        <Text style={styles.sectionHeaderText}>ACCOUNT</Text>
-        <SectionCard>
-          <View style={styles.cardRow}>
-            <Text style={styles.cardRowLabel}>Username</Text>
-            <Text style={styles.usernameValue} accessibilityLabel={`Username: ${username}`}>@{username}</Text>
+        <Text style={{
+          color: colors.textSecondary,
+          fontFamily: Fonts.headingMedium,
+          fontSize: 13,
+          letterSpacing: 1,
+          marginBottom: Spacing.sm,
+          marginTop: Spacing.md,
+          paddingHorizontal: Spacing.xs,
+        }}>ACCOUNT</Text>
+        <SectionCard colors={colors}>
+          <View style={s.cardRow}>
+            <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>Username</Text>
+            <Text style={{ color: colors.accent, fontFamily: Fonts.accent, fontSize: 20 }} accessibilityLabel={`Username: ${username}`}>@{username}</Text>
           </View>
         </SectionCard>
 
         {/* Preferences */}
-        <Text style={styles.sectionHeaderText}>PREFERENCES</Text>
-        <SectionCard>
-          <View style={styles.cardRow}>
-            <Text style={styles.cardRowLabel}>Day resets at</Text>
-            <View style={styles.resetTimeRow}>
+        <Text style={{
+          color: colors.textSecondary,
+          fontFamily: Fonts.headingMedium,
+          fontSize: 13,
+          letterSpacing: 1,
+          marginBottom: Spacing.sm,
+          marginTop: Spacing.md,
+          paddingHorizontal: Spacing.xs,
+        }}>PREFERENCES</Text>
+        <SectionCard colors={colors}>
+          <View style={s.cardRow}>
+            <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>Day resets at</Text>
+            <View style={s.resetTimeRow}>
               <TouchableOpacity
-                style={styles.ctrlBtn}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  backgroundColor: colors.background,
+                  justifyContent: 'center' as const, alignItems: 'center' as const,
+                }}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setResetHour(h => Math.max(0, h - 1));
@@ -287,11 +376,18 @@ function SettingsScreenContent() {
                 accessibilityRole="button"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.ctrlBtnText}>-</Text>
+                <Text style={{ color: colors.text, fontSize: 18, fontFamily: Fonts.body }}>-</Text>
               </TouchableOpacity>
-              <Text style={styles.timeValue} accessibilityLabel={`Reset time: ${String(resetHour).padStart(2, '0')}:00`}>{String(resetHour).padStart(2, '0')}:00</Text>
+              <Text style={{
+                color: colors.text, fontFamily: Fonts.accent, fontSize: 20,
+                minWidth: 56, textAlign: 'center' as const,
+              }} accessibilityLabel={`Reset time: ${String(resetHour).padStart(2, '0')}:00`}>{String(resetHour).padStart(2, '0')}:00</Text>
               <TouchableOpacity
-                style={styles.ctrlBtn}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  backgroundColor: colors.background,
+                  justifyContent: 'center' as const, alignItems: 'center' as const,
+                }}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setResetHour(h => Math.min(12, h + 1));
@@ -300,120 +396,95 @@ function SettingsScreenContent() {
                 accessibilityRole="button"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.ctrlBtnText}>+</Text>
+                <Text style={{ color: colors.text, fontSize: 18, fontFamily: Fonts.body }}>+</Text>
               </TouchableOpacity>
             </View>
           </View>
-          <View style={styles.cardDivider} />
-          <View style={styles.cardRow}>
-            <Text style={styles.cardRowLabel}>Theme</Text>
-            <Text style={styles.cardRowValue}>Dark</Text>
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: Spacing.md }} />
+          <View style={s.cardRow}>
+            <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>Theme</Text>
+            <ThemeSegmentedControl mode={mode} setTheme={setTheme} colors={colors} />
           </View>
         </SectionCard>
 
         {/* Notifications */}
-        <Text style={styles.sectionHeaderText}>NOTIFICATIONS</Text>
-        <SectionCard>
-          <View style={styles.notifRow}>
-            <View style={styles.notifInfo}>
-              <Text style={styles.notifLabel}>Morning motivation</Text>
-              <Text style={styles.notifTime}>10:00 AM</Text>
+        <Text style={{
+          color: colors.textSecondary,
+          fontFamily: Fonts.headingMedium,
+          fontSize: 13,
+          letterSpacing: 1,
+          marginBottom: Spacing.sm,
+          marginTop: Spacing.md,
+          paddingHorizontal: Spacing.xs,
+        }}>NOTIFICATIONS</Text>
+        <SectionCard colors={colors}>
+          {([
+            { key: 'morningReminder' as const, label: 'Morning motivation', time: '10:00 AM' },
+            { key: 'afternoonCheck' as const, label: 'Afternoon check', time: '3:00 PM' },
+            { key: 'eveningReminder' as const, label: 'Evening reminder', time: '9:00 PM' },
+            { key: 'progressNotification' as const, label: 'Progress summary', time: 'Persistent · updates live' },
+            { key: 'weeklySummary' as const, label: 'Weekly summary', time: 'Sunday · 7:00 PM' },
+          ] as const).map((item, i, arr) => (
+            <View key={item.key}>
+              <View style={s.notifRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>{item.label}</Text>
+                  <Text style={{ color: colors.textTertiary, fontFamily: Fonts.body, fontSize: 12, marginTop: 2 }}>{item.time}</Text>
+                </View>
+                <Switch
+                  value={notifPrefs[item.key]}
+                  onValueChange={v => handleNotifToggle(item.key, v)}
+                  trackColor={switchTrackColor}
+                  thumbColor={notifPrefs[item.key] ? colors.accent : colors.textTertiary}
+                  accessibilityLabel={`${item.label} notification`}
+                  accessibilityRole="switch"
+                />
+              </View>
+              {i < arr.length - 1 && (
+                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: Spacing.md }} />
+              )}
             </View>
-            <Switch
-              value={notifPrefs.morningReminder}
-              onValueChange={v => handleNotifToggle('morningReminder', v)}
-              trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
-              thumbColor={notifPrefs.morningReminder ? Colors.dark.accent : Colors.dark.textTertiary}
-              accessibilityLabel="Morning motivation notification"
-              accessibilityRole="switch"
-            />
-          </View>
-          <View style={styles.cardDivider} />
-          <View style={styles.notifRow}>
-            <View style={styles.notifInfo}>
-              <Text style={styles.notifLabel}>Afternoon check</Text>
-              <Text style={styles.notifTime}>3:00 PM</Text>
-            </View>
-            <Switch
-              value={notifPrefs.afternoonCheck}
-              onValueChange={v => handleNotifToggle('afternoonCheck', v)}
-              trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
-              thumbColor={notifPrefs.afternoonCheck ? Colors.dark.accent : Colors.dark.textTertiary}
-              accessibilityLabel="Afternoon check notification"
-              accessibilityRole="switch"
-            />
-          </View>
-          <View style={styles.cardDivider} />
-          <View style={styles.notifRow}>
-            <View style={styles.notifInfo}>
-              <Text style={styles.notifLabel}>Evening reminder</Text>
-              <Text style={styles.notifTime}>9:00 PM</Text>
-            </View>
-            <Switch
-              value={notifPrefs.eveningReminder}
-              onValueChange={v => handleNotifToggle('eveningReminder', v)}
-              trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
-              thumbColor={notifPrefs.eveningReminder ? Colors.dark.accent : Colors.dark.textTertiary}
-              accessibilityLabel="Evening reminder notification"
-              accessibilityRole="switch"
-            />
-          </View>
-          <View style={styles.cardDivider} />
-          <View style={styles.notifRow}>
-            <View style={styles.notifInfo}>
-              <Text style={styles.notifLabel}>Progress summary</Text>
-              <Text style={styles.notifTime}>Persistent · updates live</Text>
-            </View>
-            <Switch
-              value={notifPrefs.progressNotification}
-              onValueChange={v => handleNotifToggle('progressNotification', v)}
-              trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
-              thumbColor={notifPrefs.progressNotification ? Colors.dark.accent : Colors.dark.textTertiary}
-              accessibilityLabel="Progress summary notification"
-              accessibilityRole="switch"
-            />
-          </View>
-          <View style={styles.cardDivider} />
-          <View style={styles.notifRow}>
-            <View style={styles.notifInfo}>
-              <Text style={styles.notifLabel}>Weekly summary</Text>
-              <Text style={styles.notifTime}>Sunday · 7:00 PM</Text>
-            </View>
-            <Switch
-              value={notifPrefs.weeklySummary}
-              onValueChange={v => handleNotifToggle('weeklySummary', v)}
-              trackColor={{ false: Colors.dark.surface, true: Colors.dark.textSecondary }}
-              thumbColor={notifPrefs.weeklySummary ? Colors.dark.accent : Colors.dark.textTertiary}
-              accessibilityLabel="Weekly summary notification"
-              accessibilityRole="switch"
-            />
-          </View>
+          ))}
         </SectionCard>
 
-        {/* Silicon Connection - New Flow */}
-        <Text style={styles.sectionHeaderText}>SILICON</Text>
-        <SectionCard style={styles.siliconCard}>
+        {/* Silicon Connection */}
+        <Text style={{
+          color: colors.textSecondary,
+          fontFamily: Fonts.headingMedium,
+          fontSize: 13,
+          letterSpacing: 1,
+          marginBottom: Spacing.sm,
+          marginTop: Spacing.md,
+          paddingHorizontal: Spacing.xs,
+        }}>SILICON</Text>
+        <SectionCard colors={colors} style={{
+          borderColor: colors.textTertiary + '44',
+          padding: Spacing.lg,
+          overflow: 'visible' as const,
+        }}>
           {siliconLoading ? (
             <View style={{ alignItems: 'center', paddingVertical: Spacing.lg }}>
               <RNAnimated.View style={{ opacity: 0.5 }}>
-                <Text style={{ color: Colors.dark.textTertiary, fontFamily: Fonts.body, fontSize: 14 }}>Checking connection...</Text>
+                <Text style={{ color: colors.textTertiary, fontFamily: Fonts.body, fontSize: 14 }}>Checking connection...</Text>
               </RNAnimated.View>
             </View>
           ) : isConnected ? (
             <>
-              {/* Connected state — clean minimal */}
-              <View style={styles.connectedHeader}>
-                <View style={styles.connectedIconContainer}>
-                  <View style={styles.connectedIcon}>
-                    <Text style={styles.connectedCheckmark}>✓</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.md }}>
+                <View style={{ width: 40, height: 40, justifyContent: 'center', alignItems: 'center' }}>
+                  <View style={{
+                    width: 40, height: 40, borderRadius: 20,
+                    backgroundColor: colors.success,
+                    justifyContent: 'center' as const, alignItems: 'center' as const,
+                  }}>
+                    <Text style={{ color: colors.background, fontSize: 20, fontWeight: '700' }}>✓</Text>
                   </View>
                 </View>
-                <View style={styles.connectedInfo}>
-                  <Text style={styles.connectedTitle}>Silicon Connected</Text>
-                  <Text style={styles.connectedDesc}>Syncing in real-time</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontFamily: Fonts.bodyMedium, fontSize: 17 }}>Silicon Connected</Text>
+                  <Text style={{ color: colors.success, fontFamily: Fonts.body, fontSize: 13, marginTop: 2 }}>Syncing in real-time</Text>
                 </View>
               </View>
-
               <TouchableOpacity
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -422,56 +493,73 @@ function SettingsScreenContent() {
                 accessibilityLabel="Disconnect Silicon"
                 accessibilityRole="button"
               >
-                <Text style={styles.disconnectText}>Disconnect</Text>
+                <Text style={{ color: colors.error, fontFamily: Fonts.body, fontSize: 14, opacity: 0.8, marginTop: Spacing.xs }}>Disconnect</Text>
               </TouchableOpacity>
             </>
           ) : (
             <>
-              {/* Step 1: Read the docs */}
-              <View style={styles.flowStep}>
-                <View style={styles.stepBadge}>
-                  <Text style={styles.stepBadgeText}>1</Text>
+              {/* Step 1 */}
+              <View style={s.flowStep}>
+                <View style={{
+                  width: 28, height: 28, borderRadius: 14,
+                  backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border,
+                  justifyContent: 'center' as const, alignItems: 'center' as const,
+                }}>
+                  <Text style={{ color: colors.text, fontFamily: Fonts.bodyMedium, fontSize: 12 }}>1</Text>
                 </View>
-                <View style={styles.stepContent}>
-                  <Text style={styles.stepTitle}>Read the docs</Text>
-                  <Text style={styles.stepDesc}>Send Silicon to the untodo docs</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontFamily: Fonts.bodyMedium, fontSize: 15 }}>Read the docs</Text>
+                  <Text style={{ color: colors.textTertiary, fontFamily: Fonts.body, fontSize: 12, marginTop: 2 }}>Send Silicon to the untodo docs</Text>
                 </View>
               </View>
               <TouchableOpacity
-                style={styles.docsLink}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                  backgroundColor: colors.background, borderRadius: 12,
+                  paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
+                  borderWidth: 1, borderColor: colors.border, marginBottom: Spacing.sm,
+                }}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   Linking.openURL('https://untodo-docs.vercel.app/docs.html');
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.docsLinkUrl}>untodo-docs.vercel.app</Text>
-                <Text style={styles.docsLinkArrow}>↗</Text>
+                <Text style={{ color: colors.accent, fontFamily: Fonts.bodyMedium, fontSize: 15 }}>untodo-docs.vercel.app</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: 16 }}>↗</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.messageHint}
+                style={{ backgroundColor: colors.background, borderRadius: 12, padding: Spacing.md, marginBottom: Spacing.xs }}
                 onPress={handleCopyMessage}
                 activeOpacity={0.7}
               >
-                <Text style={styles.messageHintText}>
+                <Text style={{ color: colors.textSecondary, fontFamily: Fonts.accentItalic, fontSize: 13, lineHeight: 20 }}>
                   {messageCopied ? 'Copied!' : `Tell Silicon: "Connect to my untodo app. My username is @${username}. Read the docs at untodo-docs.vercel.app/docs.html"`}
                 </Text>
               </TouchableOpacity>
 
-              {/* Step 2: Share the code when asked */}
-              <View style={[styles.flowStep, { marginTop: Spacing.lg }]}>
-                <View style={styles.stepBadge}>
-                  <Text style={styles.stepBadgeText}>2</Text>
+              {/* Step 2 */}
+              <View style={[s.flowStep, { marginTop: Spacing.lg }]}>
+                <View style={{
+                  width: 28, height: 28, borderRadius: 14,
+                  backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border,
+                  justifyContent: 'center' as const, alignItems: 'center' as const,
+                }}>
+                  <Text style={{ color: colors.text, fontFamily: Fonts.bodyMedium, fontSize: 12 }}>2</Text>
                 </View>
-                <View style={styles.stepContent}>
-                  <Text style={styles.stepTitle}>Share your code</Text>
-                  <Text style={styles.stepDesc}>Silicon will ask for it after reading the docs</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontFamily: Fonts.bodyMedium, fontSize: 15 }}>Share your code</Text>
+                  <Text style={{ color: colors.textTertiary, fontFamily: Fonts.body, fontSize: 12, marginTop: 2 }}>Silicon will ask for it after reading the docs</Text>
                 </View>
               </View>
 
-              {/* Tucked away code - not shown by default */}
               <TouchableOpacity
-                style={styles.revealCodeBtn}
+                style={{
+                  alignSelf: 'flex-start' as const,
+                  paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md,
+                  backgroundColor: colors.background, borderRadius: 8,
+                  borderWidth: 1, borderColor: colors.border,
+                }}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setShowCode(!showCode);
@@ -480,38 +568,52 @@ function SettingsScreenContent() {
                 accessibilityLabel={showCode ? 'Hide pairing code' : 'Reveal pairing code'}
                 accessibilityRole="button"
               >
-                <Text style={styles.revealCodeBtnText}>
+                <Text style={{ color: colors.textTertiary, fontFamily: Fonts.body, fontSize: 13 }}>
                   {showCode ? 'Hide code' : 'Tap to reveal code'}
                 </Text>
               </TouchableOpacity>
 
               {showCode && pairingCode && (
-                <View style={styles.codeRevealContainer}>
-                  <Text style={styles.codeRevealLabel}>Your pairing code</Text>
+                <View style={{
+                  alignItems: 'center' as const,
+                  backgroundColor: colors.background, borderRadius: 16,
+                  paddingVertical: Spacing.lg, paddingHorizontal: Spacing.md, marginTop: Spacing.md,
+                }}>
+                  <Text style={{
+                    color: colors.textTertiary, fontFamily: Fonts.body, fontSize: 11,
+                    textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: Spacing.sm,
+                  }}>Your pairing code</Text>
                   <TouchableOpacity onPress={handleCopyCode} activeOpacity={0.7}>
-                    <Text style={styles.codeRevealValue}>{pairingCode}</Text>
+                    <Text style={{ color: colors.accent, fontFamily: Fonts.accent, fontSize: 44, letterSpacing: 8, marginBottom: Spacing.md }}>{pairingCode}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.codeCopyBtn} onPress={handleCopyCode}>
-                    <Text style={styles.codeCopyBtnText}>{copied ? 'Copied!' : 'Copy code'}</Text>
+                  <TouchableOpacity style={{
+                    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+                    borderRadius: 8, paddingHorizontal: Spacing.lg, paddingVertical: 8, marginBottom: Spacing.sm,
+                  }} onPress={handleCopyCode}>
+                    <Text style={{ color: colors.text, fontFamily: Fonts.bodyMedium, fontSize: 13 }}>{copied ? 'Copied!' : 'Copy code'}</Text>
                   </TouchableOpacity>
-                  <Text style={styles.codeRevealHint}>
+                  <Text style={{ color: colors.textTertiary, fontFamily: Fonts.body, fontSize: 12, marginTop: Spacing.xs }}>
                     Username: @{username}
                   </Text>
                 </View>
               )}
 
-              {/* Step 3: Listening */}
-              <View style={[styles.flowStep, { marginTop: Spacing.lg }]}>
-                <View style={styles.stepBadge}>
-                  <Text style={styles.stepBadgeText}>3</Text>
+              {/* Step 3 */}
+              <View style={[s.flowStep, { marginTop: Spacing.lg }]}>
+                <View style={{
+                  width: 28, height: 28, borderRadius: 14,
+                  backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border,
+                  justifyContent: 'center' as const, alignItems: 'center' as const,
+                }}>
+                  <Text style={{ color: colors.text, fontFamily: Fonts.bodyMedium, fontSize: 12 }}>3</Text>
                 </View>
-                <View style={styles.stepContent}>
-                  <View style={styles.listeningRow}>
-                    <View style={styles.listeningDotContainer}>
-                      <PulsingRing />
-                      <PulsingDot size={12} />
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+                    <View style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
+                      <PulsingRing colors={colors} />
+                      <PulsingDot size={12} colors={colors} />
                     </View>
-                    <Text style={styles.listeningText}>Listening for Silicon...</Text>
+                    <Text style={{ color: colors.textSecondary, fontFamily: Fonts.body, fontSize: 14 }}>Listening for Silicon...</Text>
                   </View>
                 </View>
               </View>
@@ -520,49 +622,68 @@ function SettingsScreenContent() {
         </SectionCard>
 
         {/* About */}
-        <Text style={styles.sectionHeaderText}>ABOUT</Text>
-        <SectionCard>
-          <View style={styles.cardRow}>
-            <Text style={styles.cardRowLabel}>Version</Text>
-            <Text style={styles.cardRowValue}>{appVersion}</Text>
+        <Text style={{
+          color: colors.textSecondary,
+          fontFamily: Fonts.headingMedium,
+          fontSize: 13,
+          letterSpacing: 1,
+          marginBottom: Spacing.sm,
+          marginTop: Spacing.md,
+          paddingHorizontal: Spacing.xs,
+        }}>ABOUT</Text>
+        <SectionCard colors={colors}>
+          <View style={s.cardRow}>
+            <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>Version</Text>
+            <Text style={{ color: colors.textSecondary, fontFamily: Fonts.body, fontSize: 15 }}>{appVersion}</Text>
           </View>
-          <View style={styles.cardDivider} />
-          <View style={styles.cardRow}>
-            <Text style={styles.cardRowLabel}>Tasks completed</Text>
-            <Text style={styles.cardRowValue}>{totalCompleted} / {totalTasks}</Text>
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: Spacing.md }} />
+          <View style={s.cardRow}>
+            <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>Tasks completed</Text>
+            <Text style={{ color: colors.textSecondary, fontFamily: Fonts.body, fontSize: 15 }}>{totalCompleted} / {totalTasks}</Text>
           </View>
-          <View style={styles.cardDivider} />
-          <View style={styles.cardRow}>
-            <Text style={styles.cardRowLabel}>Made with</Text>
-            <Text style={[styles.cardRowValue, { fontFamily: Fonts.accentItalic }]}>Silicon</Text>
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: Spacing.md }} />
+          <View style={s.cardRow}>
+            <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>Made with</Text>
+            <Text style={{ color: colors.textSecondary, fontFamily: Fonts.accentItalic, fontSize: 15 }}>Silicon</Text>
           </View>
         </SectionCard>
 
         {/* Data */}
-        <Text style={styles.sectionHeaderText}>DATA</Text>
-        <SectionCard>
+        <Text style={{
+          color: colors.textSecondary,
+          fontFamily: Fonts.headingMedium,
+          fontSize: 13,
+          letterSpacing: 1,
+          marginBottom: Spacing.sm,
+          marginTop: Spacing.md,
+          paddingHorizontal: Spacing.xs,
+        }}>DATA</Text>
+        <SectionCard colors={colors}>
           <TouchableOpacity
-            style={styles.cardRow}
+            style={s.cardRow}
             onPress={() => handleExportData('json')}
             accessibilityLabel="Export as JSON"
             accessibilityRole="button"
           >
-            <Text style={styles.cardRowLabel}>Export as JSON</Text>
-            <Text style={styles.cardRowArrow}>↗</Text>
+            <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>Export as JSON</Text>
+            <Text style={{ color: colors.textTertiary, fontSize: 16 }}>↗</Text>
           </TouchableOpacity>
-          <View style={styles.cardDivider} />
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: Spacing.md }} />
           <TouchableOpacity
-            style={styles.cardRow}
+            style={s.cardRow}
             onPress={() => handleExportData('csv')}
             accessibilityLabel="Export as CSV"
             accessibilityRole="button"
           >
-            <Text style={styles.cardRowLabel}>Export as CSV</Text>
-            <Text style={styles.cardRowArrow}>↗</Text>
+            <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>Export as CSV</Text>
+            <Text style={{ color: colors.textTertiary, fontSize: 16 }}>↗</Text>
           </TouchableOpacity>
-          <View style={styles.cardDivider} />
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: Spacing.md }} />
           <TouchableOpacity
-            style={styles.dangerRow}
+            style={{
+              flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+              paddingHorizontal: Spacing.md, paddingVertical: 14,
+            }}
             onPress={() => {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
               handleResetAllData();
@@ -571,19 +692,19 @@ function SettingsScreenContent() {
             accessibilityRole="button"
             accessibilityHint="Permanently deletes all tasks, progress, and settings"
           >
-            <Text style={styles.dangerRowText}>Reset All Data</Text>
-            <Text style={styles.dangerRowArrow}>→</Text>
+            <Text style={{ color: colors.error, fontFamily: Fonts.bodyMedium, fontSize: 15 }}>Reset All Data</Text>
+            <Text style={{ color: colors.error, fontSize: 16, opacity: 0.5 }}>→</Text>
           </TouchableOpacity>
         </SectionCard>
 
         {/* Log Out */}
         <TouchableOpacity
-          style={styles.logoutBtn}
+          style={{ alignItems: 'center' as const, paddingVertical: Spacing.md, marginTop: Spacing.lg }}
           onPress={handleLogout}
           accessibilityLabel="Log out"
           accessibilityRole="button"
         >
-          <Text style={styles.logoutBtnText}>Log Out</Text>
+          <Text style={{ color: colors.error, fontFamily: Fonts.body, fontSize: 15 }}>Log Out</Text>
         </TouchableOpacity>
 
         <View style={{ height: 120 }} />
@@ -600,42 +721,8 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-    paddingHorizontal: Spacing.lg,
-  },
-  heading: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 36,
-    paddingTop: Spacing.lg,
-    marginBottom: Spacing.lg,
-    letterSpacing: -0.5,
-  },
-  sectionHeaderText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 13,
-    letterSpacing: 1,
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.md,
-    paddingHorizontal: Spacing.xs,
-  },
-  sectionCard: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    marginBottom: Spacing.md,
-    overflow: 'hidden',
-  },
-  siliconCard: {
-    borderColor: Colors.dark.textTertiary + '44',
-    padding: Spacing.lg,
-    overflow: 'visible',
-  },
+// Static layout-only styles (no colors)
+const s = StyleSheet.create({
   cardRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -643,59 +730,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
   },
-  cardRowLabel: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-  },
-  cardRowValue: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-  },
-  cardDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.dark.border,
-    marginLeft: Spacing.md,
-  },
   resetTimeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
   },
-  ctrlBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: Colors.dark.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ctrlBtnText: {
-    color: Colors.dark.text,
-    fontSize: 18,
-    fontFamily: Fonts.body,
-  },
-  timeValue: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 20,
-    minWidth: 56,
-    textAlign: 'center',
-  },
-  usernameValue: {
-    color: Colors.dark.accent,
-    fontFamily: Fonts.accent,
-    fontSize: 20,
-  },
-  hint: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  // Notifications
   notifRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -703,285 +742,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
   },
-  notifInfo: {
-    flex: 1,
-  },
-  notifLabel: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-  },
-  notifTime: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    marginTop: 2,
-  },
-
-  // Silicon - Connected state
-  connectedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  connectedIconContainer: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  connectedIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.dark.success,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  connectedCheckmark: {
-    color: Colors.dark.background,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  connectedInfo: {
-    flex: 1,
-  },
-  connectedTitle: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 17,
-  },
-  connectedDesc: {
-    color: Colors.dark.success,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  showCodeBtn: {
-    paddingVertical: Spacing.sm,
-  },
-  showCodeBtnText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-  },
-  codeInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.dark.background,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    marginBottom: Spacing.md,
-  },
-  codeInlineValue: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.accent,
-    fontSize: 22,
-    letterSpacing: 4,
-  },
-  codeInlineCopy: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 12,
-  },
-
-  // Silicon - Disconnected flow
   flowStep: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
     marginBottom: Spacing.md,
-  },
-  stepBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepBadgeText: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 12,
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepTitle: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
-  },
-  stepDesc: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  docsLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.dark.background,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    marginBottom: Spacing.sm,
-  },
-  docsLinkUrl: {
-    color: Colors.dark.accent,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
-  },
-  docsLinkArrow: {
-    color: Colors.dark.textTertiary,
-    fontSize: 16,
-  },
-  messageHint: {
-    backgroundColor: Colors.dark.background,
-    borderRadius: 12,
-    padding: Spacing.md,
-    marginBottom: Spacing.xs,
-  },
-  messageHintText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  revealCodeBtn: {
-    alignSelf: 'flex-start',
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.dark.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  revealCodeBtnText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-  },
-  codeRevealContainer: {
-    alignItems: 'center',
-    backgroundColor: Colors.dark.background,
-    borderRadius: 16,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-  },
-  codeRevealLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: Spacing.sm,
-  },
-  codeRevealValue: {
-    color: Colors.dark.accent,
-    fontFamily: Fonts.accent,
-    fontSize: 44,
-    letterSpacing: 8,
-    marginBottom: Spacing.md,
-  },
-  codeCopyBtn: {
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 8,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 8,
-    marginBottom: Spacing.sm,
-  },
-  codeCopyBtnText: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 13,
-  },
-  codeRevealHint: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    marginTop: Spacing.xs,
-  },
-
-  // Listening state
-  listeningRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  listeningDotContainer: {
-    width: 48,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listeningText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-  },
-  pulsingDot: {
-    backgroundColor: Colors.dark.success,
-  },
-
-  // Disconnect text button
-  disconnectText: {
-    color: Colors.dark.error,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    opacity: 0.8,
-    marginTop: Spacing.xs,
-  },
-  cardRowArrow: {
-    color: Colors.dark.textTertiary,
-    fontSize: 16,
-  },
-  dangerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 14,
-  },
-  dangerRowText: {
-    color: Colors.dark.error,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
-  },
-  dangerRowArrow: {
-    color: Colors.dark.error,
-    fontSize: 16,
-    opacity: 0.5,
-  },
-  logoutBtn: {
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    marginTop: Spacing.lg,
-  },
-  logoutBtnText: {
-    color: Colors.dark.error,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-  },
-  footer: {
-    marginTop: Spacing.xl,
-    alignItems: 'center',
-  },
-  footerText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
   },
 });
