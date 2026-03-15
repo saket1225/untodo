@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, StyleSheet, Modal, TouchableOpacity, ScrollView,
   Animated as RNAnimated, RefreshControl, TextInput, Dimensions, PanResponder,
-  LayoutAnimation, UIManager, Platform,
+  LayoutAnimation, UIManager, Platform, StatusBar,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -12,7 +12,8 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { Fonts, Spacing, type ColorPalette } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 import { getLogicalDate, shiftDate } from '../../lib/date-utils';
 import { useTodoStore } from '../../engines/todo/store';
 import TodoInput from '../../engines/todo/components/TodoInput';
@@ -55,6 +56,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Items have variable heights (subtasks, habit dots, metadata) - no getItemLayout
 
 function TodayScreenContent() {
+  const { colors, fonts, spacing, isDark, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const logicalDate = getLogicalDate();
   const allTodos = useTodoStore(s => s.todos);
   const addTodo = useTodoStore(s => s.addTodo);
@@ -530,6 +533,7 @@ function TodayScreenContent() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       {/* Header */}
       <RNAnimated.View style={[styles.header, { opacity: entranceFade }]}>
         <View style={styles.headerTop}>
@@ -588,7 +592,7 @@ function TodayScreenContent() {
                 accessibilityLabel={showFilters ? 'Hide filters' : 'Show filters'}
                 accessibilityRole="button"
               >
-                <Text style={[styles.searchIconText, showFilters && { color: Colors.dark.text }]}>☰</Text>
+                <Text style={[styles.searchIconText, showFilters && { color: colors.text }]}>☰</Text>
               </TouchableOpacity>
             )}
             {total > 0 && (
@@ -659,7 +663,7 @@ function TodayScreenContent() {
             >
               <Text style={[
                 styles.filterChipText,
-                activeCategory === c.key && { color: Colors.dark.background },
+                activeCategory === c.key && { color: colors.background },
               ]}>
                 {c.label}
               </Text>
@@ -706,13 +710,13 @@ function TodayScreenContent() {
               <Text style={styles.selectionActionText}>All</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={batchComplete} style={styles.selectionActionBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-              <Text style={[styles.selectionActionText, { color: Colors.dark.success }]}>✓</Text>
+              <Text style={[styles.selectionActionText, { color: colors.success }]}>✓</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => batchSetPriority('high')} style={styles.selectionActionBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-              <Text style={[styles.selectionActionText, { color: Colors.dark.priorityHigh }]}>!</Text>
+              <Text style={[styles.selectionActionText, { color: colors.priorityHigh }]}>!</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={batchDelete} style={styles.selectionActionBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-              <Text style={[styles.selectionActionText, { color: Colors.dark.error }]}>✕</Text>
+              <Text style={[styles.selectionActionText, { color: colors.error }]}>✕</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -774,9 +778,9 @@ function TodayScreenContent() {
               await syncFromFirestore().catch(() => {});
               setRefreshing(false);
             }}
-            tintColor={Colors.dark.textTertiary}
+            tintColor={colors.textTertiary}
             title="Pull to sync"
-            titleColor={Colors.dark.textTertiary}
+            titleColor={colors.textTertiary}
           />
         }
         ListEmptyComponent={
@@ -1036,15 +1040,15 @@ export default function TodayScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.sm,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.md,
   },
   headerTop: {
     flexDirection: 'row',
@@ -1055,17 +1059,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   greetingText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontFamily: Fonts.headingMedium,
-    fontSize: 13,
-    letterSpacing: 0.5,
-    marginBottom: 2,
+    fontSize: 12,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
   greetingSubText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontFamily: Fonts.accentItalic,
-    fontSize: 13,
-    marginBottom: 4,
+    fontSize: 14,
+    marginBottom: 6,
   },
   dateRow: {
     flexDirection: 'row',
@@ -1078,27 +1083,35 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   progressText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 14,
+    color: colors.textTertiary,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    letterSpacing: 0.5,
   },
   navArrow: {
-    padding: 4,
+    padding: 6,
   },
   navArrowText: {
-    color: Colors.dark.textTertiary,
-    fontSize: 30,
+    color: colors.textTertiary,
+    fontSize: 28,
     fontFamily: Fonts.body,
-    lineHeight: 34,
+    lineHeight: 32,
   },
   syncIcon: {
     fontSize: 14,
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
+  },
+  searchIconBtn: {
+    padding: 4,
+  },
+  searchIconText: {
+    color: colors.textTertiary,
+    fontSize: 18,
   },
   dateText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontFamily: Fonts.accentItalic,
-    fontSize: 28,
+    fontSize: 30,
     flexShrink: 1,
     letterSpacing: -0.5,
   },
@@ -1110,46 +1123,47 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     marginTop: Spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: colors.border,
   },
   completedSectionText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontFamily: Fonts.bodyMedium,
     fontSize: 13,
   },
   completedSectionChevron: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 16,
   },
 
   // Back to today
   backToTodayPill: {
     alignSelf: 'center',
-    backgroundColor: Colors.dark.accent,
-    borderRadius: 20,
-    paddingHorizontal: 18,
+    backgroundColor: colors.accent,
+    borderRadius: 100,
+    paddingHorizontal: 20,
     paddingVertical: 8,
-    marginTop: Spacing.xs,
+    marginTop: Spacing.sm,
     marginBottom: Spacing.xs,
   },
   backToTodayText: {
-    color: Colors.dark.background,
+    color: colors.background,
     fontFamily: Fonts.bodyMedium,
-    fontSize: 13,
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
 
   progressBar: {
-    height: 3,
-    backgroundColor: Colors.dark.border,
+    height: 2,
+    backgroundColor: colors.border,
     marginHorizontal: Spacing.lg,
-    marginTop: Spacing.xs,
-    borderRadius: 2,
+    marginTop: Spacing.sm,
+    borderRadius: 1,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: Colors.dark.success,
-    borderRadius: 2,
+    backgroundColor: colors.success,
+    borderRadius: 1,
   },
   filterScroll: {
     maxHeight: 40,
@@ -1162,22 +1176,22 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: Colors.dark.surface,
+    borderRadius: 100,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   filterChipActive: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   filterChipText: {
     fontFamily: Fonts.body,
     fontSize: 12,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
   },
   filterChipTextActive: {
-    color: Colors.dark.background,
+    color: colors.background,
   },
   // Selection mode
   selectionBar: {
@@ -1186,9 +1200,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   selectionBarLeft: {
     flexDirection: 'row',
@@ -1201,109 +1215,105 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   selectionCancel: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 14,
   },
   selectionCount: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontFamily: Fonts.bodyMedium,
     fontSize: 14,
   },
   selectionActionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.background,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   selectionActionText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontFamily: Fonts.bodyMedium,
     fontSize: 14,
   },
   list: {
     paddingBottom: 120,
-    paddingTop: Spacing.xs,
+    paddingTop: Spacing.sm,
   },
   allDoneBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.md,
     paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     marginHorizontal: Spacing.lg,
-    backgroundColor: Colors.dark.success + '12',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.success + '20',
-    marginTop: Spacing.sm,
+    backgroundColor: colors.success + '10',
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.success + '30',
+    marginTop: Spacing.md,
   },
   allDoneCheck: {
-    color: Colors.dark.success,
-    fontSize: 18,
-    fontWeight: '700',
+    color: colors.success,
+    fontSize: 20,
+    fontWeight: '600',
   },
   allDoneText: {
-    color: Colors.dark.success,
+    color: colors.success,
     fontFamily: Fonts.accentItalic,
-    fontSize: 16,
+    fontSize: 15,
   },
 
   // Carry-over modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
   },
   modalContent: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     padding: Spacing.xl,
     width: '100%',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 32,
     elevation: 24,
   },
   modalTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontFamily: Fonts.headingMedium,
     fontSize: 20,
     marginBottom: Spacing.sm,
   },
   modalText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 15,
     textAlign: 'center',
     marginBottom: Spacing.xl,
   },
   modalPrimaryBtn: {
-    backgroundColor: Colors.dark.accent,
-    borderRadius: 12,
+    backgroundColor: colors.accent,
+    borderRadius: 14,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
     width: '100%',
     alignItems: 'center',
     marginBottom: Spacing.sm,
-    shadowColor: '#fff',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
   },
   modalPrimaryBtnText: {
-    color: Colors.dark.background,
+    color: colors.background,
     fontFamily: Fonts.bodyMedium,
     fontSize: 15,
   },
@@ -1315,22 +1325,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalSecondaryBtnText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 14,
   },
   modalOutlineBtn: {
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
     width: '100%',
     alignItems: 'center',
     marginBottom: Spacing.xs,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   modalOutlineBtnText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontFamily: Fonts.bodyMedium,
     fontSize: 15,
   },
@@ -1344,7 +1354,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
     gap: Spacing.md,
   },
   reviewCheck: {
@@ -1352,21 +1362,21 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: Colors.dark.textTertiary,
+    borderColor: colors.textTertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   reviewCheckSelected: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   reviewCheckMark: {
-    color: Colors.dark.background,
+    color: colors.background,
     fontSize: 14,
     fontWeight: '700',
   },
   reviewItemText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontFamily: Fonts.body,
     fontSize: 14,
     flex: 1,
@@ -1379,14 +1389,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: Spacing.lg,
     marginHorizontal: Spacing.lg,
-    backgroundColor: Colors.dark.timer + '12',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.timer + '20',
+    backgroundColor: colors.timer + '10',
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.timer + '25',
     marginTop: Spacing.sm,
   },
   encourageText: {
-    color: Colors.dark.timer,
+    color: colors.timer,
     fontFamily: Fonts.accentItalic,
     fontSize: 13,
     textAlign: 'center',
@@ -1395,7 +1405,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   allDoneStreak: {
-    color: Colors.dark.timer,
+    color: colors.timer,
     fontFamily: Fonts.bodyMedium,
     fontSize: 12,
     marginTop: 2,
