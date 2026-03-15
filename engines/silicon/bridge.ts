@@ -84,6 +84,18 @@ async function processCommand(command: SiliconCommand, username: string): Promis
   const cmdRef = doc(db, 'users', username, 'silicon_commands', command.id);
 
   try {
+    // Allow 'pair' command even when disconnected
+    if (command.type === 'pair') {
+      await updateDoc(cmdRef, { status: 'processing' });
+      const code = command.payload.code;
+      await saveSiliconConnection(code || '');
+      result = { message: 'Paired successfully', connected: true };
+      const responseRef = doc(db, 'users', username, 'silicon_responses', command.id);
+      await setDoc(responseRef, { commandId: command.id, result, status: 'success', completedAt: Date.now() });
+      await updateDoc(cmdRef, { status: 'done' });
+      return;
+    }
+
     // Check if Silicon is still connected
     const connection = await getSiliconConnection();
     if (!connection?.connected) {

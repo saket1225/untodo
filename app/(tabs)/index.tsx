@@ -112,14 +112,10 @@ function TodayScreenContent() {
   const activeTodos = useMemo(() => dateTodos.filter(t => !t.completed), [dateTodos]);
   const completedTodos = useMemo(() => dateTodos.filter(t => t.completed), [dateTodos]);
 
-  // Filtered by category
+  // Filtered by category — only active tasks in main list, completed shown in footer
   const todos = useMemo(() => {
-    const active = activeCategory === 'all' ? activeTodos : activeTodos.filter(t => t.category === activeCategory);
-    const done = activeCategory === 'all' ? completedTodos : completedTodos.filter(t => t.category === activeCategory);
-    // If completed section is collapsed, only show active tasks
-    if (completedCollapsed) return active;
-    return [...active, ...done];
-  }, [activeTodos, completedTodos, activeCategory, completedCollapsed]);
+    return activeCategory === 'all' ? activeTodos : activeTodos.filter(t => t.category === activeCategory);
+  }, [activeTodos, activeCategory]);
 
   // Search results across all tasks
   const searchResults = useMemo(() => {
