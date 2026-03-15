@@ -32,7 +32,6 @@ import { useKeyboardShortcuts } from '../../lib/useKeyboardShortcuts';
 
 import {
   ConfettiCelebration,
-  SearchResults,
   SkeletonLoader,
   EmptyState,
   StreakBanner,
@@ -78,11 +77,6 @@ function TodayScreenContent() {
   const isToday = viewingDate === logicalDate;
   const [showCalendar, setShowCalendar] = useState(false);
 
-  // Search
-  const [searchExpanded, setSearchExpanded] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchInputRef = useRef<TextInput>(null);
-
   // Category filter
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
@@ -117,16 +111,6 @@ function TodayScreenContent() {
     return activeCategory === 'all' ? activeTodos : activeTodos.filter(t => t.category === activeCategory);
   }, [activeTodos, activeCategory]);
 
-  // Search results across all tasks
-  const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return [];
-    return allTodos
-      .filter(t => t.title.toLowerCase().includes(q))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, 15);
-  }, [allTodos, searchQuery]);
-
   const [pomodoroTodo, setPomodoroTodo] = useState<Todo | null>(null);
   const [quickActionTodo, setQuickActionTodo] = useState<Todo | null>(null);
   const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
@@ -157,7 +141,7 @@ function TodayScreenContent() {
   const swipePanResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) =>
-        Math.abs(gs.dx) > 30 && Math.abs(gs.dy) < 30 && !searchExpanded,
+        Math.abs(gs.dx) > 30 && Math.abs(gs.dy) < 30,
       onPanResponderMove: (_, gs) => {
         swipeAnim.setValue(gs.dx * 0.3);
       },
@@ -425,23 +409,6 @@ function TodayScreenContent() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [logicalDate]);
 
-  // Search handlers
-  const toggleSearch = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSearchExpanded(prev => {
-      if (prev) {
-        setSearchQuery('');
-      }
-      return !prev;
-    });
-  }, []);
-
-  const handleSearchSelect = useCallback((todo: Todo) => {
-    setViewingDate(todo.logicalDate);
-    setSearchExpanded(false);
-    setSearchQuery('');
-  }, []);
-
   // Drag to reorder handlers
   const handleDragStart = useCallback((id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -624,15 +591,6 @@ function TodayScreenContent() {
                 <Text style={[styles.searchIconText, showFilters && { color: Colors.dark.text }]}>☰</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              onPress={toggleSearch}
-              style={styles.searchIconBtn}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityLabel={searchExpanded ? 'Close search' : 'Search tasks'}
-              accessibilityRole="button"
-            >
-              <Text style={styles.searchIconText}>{searchExpanded ? '✕' : '⌕'}</Text>
-            </TouchableOpacity>
             {total > 0 && (
               <Text style={styles.progressText} accessibilityLabel={`${completed} of ${total} tasks done`}>
                 {completed}/{total}{total > 0 && completed === total ? ' ✓' : ''}
@@ -641,28 +599,6 @@ function TodayScreenContent() {
           </View>
         </View>
       </RNAnimated.View>
-
-      {/* Search bar (collapsible) */}
-      {searchExpanded && (
-        <View style={styles.searchContainer}>
-          <TextInput
-            ref={searchInputRef}
-            style={styles.searchInput}
-            placeholder="Search all tasks..."
-            placeholderTextColor={Colors.dark.textTertiary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            returnKeyType="search"
-            autoCorrect={false}
-          />
-          <SearchResults
-            query={searchQuery}
-            results={searchResults}
-            onSelect={handleSearchSelect}
-            onClose={() => { setSearchExpanded(false); setSearchQuery(''); }}
-          />
-        </View>
-      )}
 
       {/* Back to Today pill */}
       {!isToday && (
@@ -1184,31 +1120,6 @@ const styles = StyleSheet.create({
   completedSectionChevron: {
     color: Colors.dark.textTertiary,
     fontSize: 16,
-  },
-  // Search
-  searchIconBtn: {
-    padding: 4,
-  },
-  searchIconText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 18,
-    fontFamily: Fonts.body,
-  },
-  searchContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    zIndex: 10,
-  },
-  searchInput: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
   },
 
   // Back to today

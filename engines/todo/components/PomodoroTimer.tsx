@@ -224,9 +224,29 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
     if (n > 0 && n <= 20) setTotalSessions(n);
   };
 
+  // Editable timer state
+  const [editingTime, setEditingTime] = useState(false);
+  const [editMins, setEditMins] = useState('');
+  const [editSecs, setEditSecs] = useState('');
+
   const displayTime = preset.isFlowtime && phase === 'work' ? flowElapsed : seconds;
   const mins = Math.floor(displayTime / 60);
   const secs = displayTime % 60;
+
+  const handleTimerTap = () => {
+    if (isRunning || preset.isFlowtime) return;
+    setEditMins(String(mins));
+    setEditSecs(String(secs).padStart(2, '0'));
+    setEditingTime(true);
+  };
+
+  const applyEditedTime = () => {
+    const m = parseInt(editMins) || 0;
+    const s = parseInt(editSecs) || 0;
+    const total = Math.max(0, m * 60 + s);
+    setSeconds(total);
+    setEditingTime(false);
+  };
 
   // Sync timer state to global store for header indicator
   useEffect(() => {
@@ -417,10 +437,39 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
         {/* Phase label */}
         <Text style={[styles.phase, { color: phaseColor }]}>{phaseLabel}</Text>
 
-        {/* Timer display */}
-        <Text style={styles.timer}>
-          {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-        </Text>
+        {/* Timer display - tap to edit */}
+        {editingTime ? (
+          <View style={styles.timerEditRow}>
+            <TextInput
+              style={styles.timerEditInput}
+              value={editMins}
+              onChangeText={setEditMins}
+              keyboardType="number-pad"
+              maxLength={3}
+              autoFocus
+              selectTextOnFocus
+            />
+            <Text style={styles.timerEditColon}>:</Text>
+            <TextInput
+              style={styles.timerEditInput}
+              value={editSecs}
+              onChangeText={setEditSecs}
+              keyboardType="number-pad"
+              maxLength={2}
+              selectTextOnFocus
+              onSubmitEditing={applyEditedTime}
+            />
+            <TouchableOpacity style={styles.timerEditDone} onPress={applyEditedTime}>
+              <Text style={styles.timerEditDoneText}>Set</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity onPress={handleTimerTap} activeOpacity={0.7}>
+            <Text style={styles.timer}>
+              {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Session counter */}
         {!preset.isFlowtime && (
@@ -604,6 +653,43 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.heading,
     fontSize: 72,
     marginBottom: Spacing.md,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  timerEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: Spacing.md,
+  },
+  timerEditInput: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.heading,
+    fontSize: 60,
+    textAlign: 'center',
+    width: 100,
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.dark.accent,
+    paddingVertical: 4,
+    includeFontPadding: false,
+  },
+  timerEditColon: {
+    color: Colors.dark.text,
+    fontFamily: Fonts.heading,
+    fontSize: 60,
+    includeFontPadding: false,
+  },
+  timerEditDone: {
+    marginLeft: 12,
+    backgroundColor: Colors.dark.accent,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  timerEditDoneText: {
+    color: Colors.dark.background,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 15,
   },
   sessionCount: {
     color: Colors.dark.textTertiary,
@@ -704,6 +790,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.heading,
     fontSize: 96,
     marginBottom: Spacing.md,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   immersiveTask: {
     color: Colors.dark.textTertiary,

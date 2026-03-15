@@ -287,16 +287,18 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
                 </View>
               </View>
             )}
-            {pomodoroMins > 0 && (
-              <Text style={styles.pomodoroText}>{pomodoroMins}m</Text>
-            )}
-            {(isTracking || totalSeconds > 0) && (
-              isTracking && todo.timeTracking?.startedAt ? (
-                <LiveTimer startedAt={todo.timeTracking.startedAt} baseSeconds={totalSeconds} />
-              ) : (
-                <Text style={styles.trackingTimeIdle}>{formatTrackingTime(totalSeconds)}</Text>
-              )
-            )}
+            {/* Combined time: pomodoro + time tracking */}
+            {(() => {
+              const pomodoroSeconds = pomodoroMins * 60;
+              const combinedBase = totalSeconds + pomodoroSeconds;
+              if (isTracking && todo.timeTracking?.startedAt) {
+                return <LiveTimer startedAt={todo.timeTracking.startedAt} baseSeconds={combinedBase} />;
+              }
+              if (combinedBase > 0) {
+                return <Text style={styles.trackingTimeIdle}>{formatTrackingTime(combinedBase)}</Text>;
+              }
+              return null;
+            })()}
             {todo.estimatedMinutes != null && todo.estimatedMinutes > 0 && (
               <Text style={styles.estimate}>~{todo.estimatedMinutes}m</Text>
             )}
