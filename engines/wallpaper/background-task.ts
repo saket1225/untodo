@@ -1,6 +1,6 @@
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundFetch from 'expo-background-fetch';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { setWallpaper, FLAG_BOTH } from '../../modules/wallpaper-setter';
 import { useWallpaperStore } from './store';
 import { Platform } from 'react-native';
