@@ -3,21 +3,22 @@ import { Stack, Redirect, useRouter } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Colors } from '../lib/theme';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { useUserStore } from '../engines/user/store';
 import { setupDefaultNotifications } from '../engines/notifications/service';
 import { useNotificationStore } from '../engines/notifications/store';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { ThemeProvider, useTheme } from '../lib/ThemeContext';
 
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayoutInner() {
   const router = useRouter();
   const username = useUserStore(s => s.username);
   const hydrated = useUserStore(s => s._hydrated);
   const notifInitialized = useNotificationStore(s => s.initialized);
+  const { colors, isDark } = useTheme();
 
   const [fontsLoaded] = useFonts({
     'ApfelGrotezk-Bold': require('../assets/fonts/ApfelGrotezk-Bold.ttf'),
@@ -61,15 +62,23 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: Colors.dark.background }} onLayout={onLayoutRootView}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }} onLayout={onLayoutRootView}>
       <ErrorBoundary>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.dark.background } }}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="(tabs)" />
         </Stack>
         {!username && <Redirect href="/onboarding" />}
       </ErrorBoundary>
     </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutInner />
+    </ThemeProvider>
   );
 }

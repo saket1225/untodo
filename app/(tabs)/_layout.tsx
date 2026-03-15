@@ -3,13 +3,15 @@ import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
-import { Colors, Fonts } from '../../lib/theme';
+import { Fonts } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 import { useUserStore } from '../../engines/user/store';
 import { useTodoStore } from '../../engines/todo/store';
 import { getLogicalDate } from '../../lib/date-utils';
 import { startSiliconListener } from '../../engines/silicon/bridge';
 
 function TabIcon({ label, focused, badge }: { label: string; focused: boolean; badge?: number }) {
+  const { colors } = useTheme();
   const icons: Record<string, string> = {
     'Today': '◉',
     'Stats': '◧',
@@ -21,27 +23,27 @@ function TabIcon({ label, focused, badge }: { label: string; focused: boolean; b
       <View style={styles.iconContainer}>
         <Text style={[
           styles.icon,
-          { color: focused ? Colors.dark.accent : Colors.dark.textTertiary },
+          { color: focused ? colors.accent : colors.textTertiary },
           focused && styles.iconFocused,
         ]}>
           {icons[label] || '●'}
         </Text>
         {badge != null && badge > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge > 99 ? '99' : badge}</Text>
+          <View style={[styles.badge, { backgroundColor: colors.accent }]}>
+            <Text style={[styles.badgeText, { color: colors.background }]}>{badge > 99 ? '99' : badge}</Text>
           </View>
         )}
       </View>
       <Text
         numberOfLines={1}
         style={[styles.label, {
-          color: focused ? Colors.dark.accent : Colors.dark.textTertiary,
+          color: focused ? colors.accent : colors.textTertiary,
           fontFamily: focused ? Fonts.bodyMedium : Fonts.body,
         }]}
       >
         {label}
       </Text>
-      {focused && <View style={styles.activeIndicator} />}
+      {focused && <View style={[styles.activeIndicator, { backgroundColor: colors.accent }]} />}
     </View>
   );
 }
@@ -57,6 +59,7 @@ function TodayTabIcon({ focused }: { focused: boolean }) {
 
 export default function TabLayout() {
   const username = useUserStore(s => s.username);
+  const { colors } = useTheme();
 
   useEffect(() => {
     if (!username) return;
@@ -68,11 +71,23 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: {
+          backgroundColor: colors.background,
+          borderTopColor: colors.border,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          height: 80,
+          paddingBottom: 20,
+          paddingTop: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.4,
+          shadowRadius: 12,
+          elevation: 16,
+        },
         tabBarShowLabel: false,
         animation: 'fade',
         lazy: false,
-        sceneStyle: { backgroundColor: Colors.dark.background },
+        sceneStyle: { backgroundColor: colors.background },
       }}
     >
       <Tabs.Screen
@@ -108,19 +123,6 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: Colors.dark.background,
-    borderTopColor: Colors.dark.border,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    height: 80,
-    paddingBottom: 20,
-    paddingTop: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 16,
-  },
   tabIcon: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -142,7 +144,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -10,
-    backgroundColor: Colors.dark.accent,
     borderRadius: 8,
     minWidth: 16,
     height: 16,
@@ -151,7 +152,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: {
-    color: Colors.dark.background,
     fontFamily: Fonts.bodyMedium,
     fontSize: 10,
     lineHeight: 14,
@@ -163,7 +163,6 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.dark.accent,
     marginTop: 2,
   },
 });
