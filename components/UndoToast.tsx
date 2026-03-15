@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Colors, Fonts, Spacing } from '../lib/theme';
+import { useTheme } from '../lib/ThemeContext';
+import { Fonts, Spacing } from '../lib/theme';
 
 interface UndoAction {
   id: string;
@@ -16,6 +17,7 @@ export function showUndoToast(action: UndoAction) {
 }
 
 export default function UndoToast() {
+  const { colors } = useTheme();
   const [action, setAction] = useState<UndoAction | null>(null);
   const translateY = useRef(new Animated.Value(100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -55,52 +57,46 @@ export default function UndoToast() {
   if (!action) return null;
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ translateY }], opacity }]}>
-      <Text style={styles.message}>{action.message}</Text>
+    <Animated.View style={[{
+      position: 'absolute',
+      bottom: 100,
+      left: Spacing.lg,
+      right: Spacing.lg,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.5,
+      shadowRadius: 12,
+      elevation: 16,
+      zIndex: 999,
+    }, { transform: [{ translateY }], opacity }]}>
+      <Text style={{
+        color: colors.text,
+        fontFamily: Fonts.body,
+        fontSize: 14,
+        flex: 1,
+      }}>{action.message}</Text>
       <TouchableOpacity
         onPress={handleUndo}
         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         accessibilityLabel="Undo action"
         accessibilityRole="button"
       >
-        <Text style={styles.undoButton}>Undo</Text>
+        <Text style={{
+          color: colors.accent,
+          fontFamily: Fonts.bodyBold,
+          fontSize: 14,
+          paddingLeft: Spacing.md,
+        }}>Undo</Text>
       </TouchableOpacity>
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    bottom: 100,
-    left: Spacing.lg,
-    right: Spacing.lg,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 16,
-    zIndex: 999,
-  },
-  message: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    flex: 1,
-  },
-  undoButton: {
-    color: Colors.dark.accent,
-    fontFamily: Fonts.bodyBold,
-    fontSize: 14,
-    paddingLeft: Spacing.md,
-  },
-});

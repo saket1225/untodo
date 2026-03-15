@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Colors, Fonts, Spacing } from '../lib/theme';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useTheme } from '../lib/ThemeContext';
+import { Fonts, Spacing } from '../lib/theme';
 
 interface Props {
   children: React.ReactNode;
@@ -10,6 +11,58 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+}
+
+function ErrorFallback({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { colors } = useTheme();
+
+  return (
+    <View style={{
+      flex: 1,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.xl,
+    }}>
+      <Text style={{
+        fontSize: 48,
+        color: colors.textTertiary,
+        marginBottom: Spacing.md,
+      }}>!</Text>
+      <Text style={{
+        color: colors.text,
+        fontFamily: Fonts.headingMedium,
+        fontSize: 20,
+        marginBottom: Spacing.sm,
+      }}>Something went wrong</Text>
+      <Text style={{
+        color: colors.textSecondary,
+        fontFamily: Fonts.body,
+        fontSize: 14,
+        textAlign: 'center',
+        marginBottom: Spacing.xl,
+      }}>{message}</Text>
+      <TouchableOpacity
+        style={{
+          backgroundColor: colors.surface,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 12,
+          paddingHorizontal: Spacing.xl,
+          paddingVertical: 14,
+        }}
+        onPress={onRetry}
+        accessibilityLabel="Try again"
+        accessibilityRole="button"
+      >
+        <Text style={{
+          color: colors.text,
+          fontFamily: Fonts.bodyMedium,
+          fontSize: 15,
+        }}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 export default class ErrorBoundary extends React.Component<Props, State> {
@@ -30,64 +83,12 @@ export default class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <View style={styles.container}>
-          <Text style={styles.icon}>!</Text>
-          <Text style={styles.title}>Something went wrong</Text>
-          <Text style={styles.message}>
-            {this.props.fallbackMessage || 'An unexpected error occurred.'}
-          </Text>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={this.handleRetry}
-            accessibilityLabel="Try again"
-            accessibilityRole="button"
-          >
-            <Text style={styles.buttonText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorFallback
+          message={this.props.fallbackMessage || 'An unexpected error occurred.'}
+          onRetry={this.handleRetry}
+        />
       );
     }
     return this.props.children;
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-  },
-  icon: {
-    fontSize: 48,
-    color: Colors.dark.textTertiary,
-    marginBottom: Spacing.md,
-  },
-  title: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 20,
-    marginBottom: Spacing.sm,
-  },
-  message: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: Spacing.xl,
-  },
-  button: {
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: 14,
-  },
-  buttonText: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
-  },
-});

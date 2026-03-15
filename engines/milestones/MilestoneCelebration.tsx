@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated as RNAnimated } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Colors, Fonts, Spacing } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
+import { Fonts, Spacing } from '../../lib/theme';
 import { useMilestoneStore, TaskMilestone } from './store';
 
 export default function MilestoneCelebration() {
+  const { colors } = useTheme();
   const pendingMilestone = useMilestoneStore(s => s.pendingMilestone);
   const dismissMilestone = useMilestoneStore(s => s.dismissMilestone);
   const opacity = useRef(new RNAnimated.Value(0)).current;
@@ -46,6 +48,8 @@ export default function MilestoneCelebration() {
     outputRange: [Math.max(0, pendingMilestone.threshold - 10), pendingMilestone.threshold],
   });
 
+  const styles = getStyles(colors);
+
   return (
     <RNAnimated.View style={[styles.overlay, { opacity }]}>
       <TouchableOpacity activeOpacity={1} onPress={dismiss} style={styles.touchArea}>
@@ -63,7 +67,7 @@ export default function MilestoneCelebration() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.85)',
@@ -78,10 +82,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     padding: Spacing.xl,
     marginHorizontal: Spacing.xl,
     alignItems: 'center',
@@ -94,23 +98,23 @@ const styles = StyleSheet.create({
   emoji: {
     fontSize: 48,
     marginBottom: Spacing.md,
-    color: Colors.dark.text,
+    color: colors.text,
   },
   title: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontFamily: Fonts.accentItalic,
     fontSize: 26,
     textAlign: 'center',
     marginBottom: Spacing.sm,
   },
   counter: {
-    color: Colors.dark.accent,
+    color: colors.accent,
     fontFamily: Fonts.heading,
     fontSize: 56,
     lineHeight: 64,
   },
   counterLabel: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 13,
     textTransform: 'uppercase',
@@ -118,7 +122,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   message: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 15,
     textAlign: 'center',

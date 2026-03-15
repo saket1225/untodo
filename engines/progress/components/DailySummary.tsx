@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { useTheme } from '../../../lib/ThemeContext';
+import { Fonts, Spacing } from '../../../lib/theme';
 import { useTodoStore } from '../../todo/store';
 import { getLogicalDate } from '../../../lib/date-utils';
 
 export default function DailySummary() {
+  const { colors } = useTheme();
   const todos = useTodoStore(s => s.todos);
   const logicalDate = getLogicalDate();
 
@@ -25,10 +27,12 @@ export default function DailySummary() {
   const pct = Math.round((stats.completed / stats.total) * 100);
   const allDone = stats.completed === stats.total;
 
+  const styles = getStyles(colors);
+
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <Text style={[styles.pct, allDone && { color: Colors.dark.success }]}>{pct}%</Text>
+        <Text style={[styles.pct, allDone && { color: colors.success }]}>{pct}%</Text>
         <View style={styles.details}>
           <Text style={styles.label}>
             {stats.completed}/{stats.total} tasks {allDone ? 'done' : 'completed'}
@@ -42,13 +46,13 @@ export default function DailySummary() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: Spacing.md,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   row: {
     flexDirection: 'row',
@@ -56,7 +60,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   pct: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontFamily: Fonts.accent,
     fontSize: 28,
   },
@@ -64,12 +68,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   label: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 14,
   },
   focus: {
-    color: Colors.dark.timer,
+    color: colors.timer,
     fontFamily: Fonts.body,
     fontSize: 12,
     marginTop: 2,

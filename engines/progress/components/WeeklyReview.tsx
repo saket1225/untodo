@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { useTheme } from '../../../lib/ThemeContext';
+import { Fonts, Spacing } from '../../../lib/theme';
 import { useTodoStore } from '../../todo/store';
 import { useProgressStore } from '../store';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, subWeeks } from 'date-fns';
@@ -9,6 +10,7 @@ import { format, startOfWeek, endOfWeek, eachDayOfInterval, subWeeks } from 'dat
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 function MiniRing({ progress, size = 36 }: { progress: number; size?: number }) {
+  const { colors } = useTheme();
   const strokeWidth = 3;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -18,11 +20,11 @@ function MiniRing({ progress, size = 36 }: { progress: number; size?: number }) 
     <Svg width={size} height={size}>
       <Circle
         cx={size / 2} cy={size / 2} r={radius}
-        stroke={Colors.dark.border} strokeWidth={strokeWidth} fill="transparent"
+        stroke={colors.border} strokeWidth={strokeWidth} fill="transparent"
       />
       <Circle
         cx={size / 2} cy={size / 2} r={radius}
-        stroke={progress >= 1 ? Colors.dark.success : progress > 0 ? Colors.dark.accent : 'transparent'}
+        stroke={progress >= 1 ? colors.success : progress > 0 ? colors.accent : 'transparent'}
         strokeWidth={strokeWidth} fill="transparent"
         strokeDasharray={`${circumference}`}
         strokeDashoffset={strokeDashoffset}
@@ -34,6 +36,7 @@ function MiniRing({ progress, size = 36 }: { progress: number; size?: number }) 
 }
 
 export default function WeeklyReview() {
+  const { colors } = useTheme();
   const todos = useTodoStore(s => s.todos);
   const reviews = useProgressStore(s => s.weeklyReviews);
 
@@ -106,6 +109,8 @@ export default function WeeklyReview() {
     };
   }, [todos, reviews]);
 
+  const styles = getStyles(colors);
+
   if (weekData.totalTasks === 0) {
     return (
       <View style={styles.container}>
@@ -164,13 +169,13 @@ export default function WeeklyReview() {
         </View>
         {weekData.totalFocus > 0 && (
           <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: Colors.dark.timer }]}>{weekData.totalFocus}m</Text>
+            <Text style={[styles.statValue, { color: colors.timer }]}>{weekData.totalFocus}m</Text>
             <Text style={styles.statLabel}>focus time</Text>
           </View>
         )}
         {weekData.perfectDays > 0 && (
           <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: Colors.dark.success }]}>{weekData.perfectDays}</Text>
+            <Text style={[styles.statValue, { color: colors.success }]}>{weekData.perfectDays}</Text>
             <Text style={styles.statLabel}>perfect day{weekData.perfectDays !== 1 ? 's' : ''}</Text>
           </View>
         )}
@@ -181,7 +186,7 @@ export default function WeeklyReview() {
         <View style={styles.changeRow}>
           <Text style={[
             styles.changeText,
-            { color: weekData.rateChange > 0 ? Colors.dark.success : Colors.dark.error },
+            { color: weekData.rateChange > 0 ? colors.success : colors.error },
           ]}>
             {changeText}
           </Text>
@@ -199,12 +204,12 @@ export default function WeeklyReview() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     marginBottom: Spacing.xl,
   },
   title: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontFamily: Fonts.headingMedium,
     fontSize: 13,
     letterSpacing: 1,
@@ -224,12 +229,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dayLabel: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 11,
   },
   dayLabelToday: {
-    color: Colors.dark.accent,
+    color: colors.accent,
     fontFamily: Fonts.bodyMedium,
   },
   dayRingWrap: {
@@ -241,19 +246,19 @@ const styles = StyleSheet.create({
   },
   dayNum: {
     position: 'absolute',
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontFamily: Fonts.body,
     fontSize: 12,
   },
   dayNumToday: {
-    color: Colors.dark.accent,
+    color: colors.accent,
     fontFamily: Fonts.bodyMedium,
   },
   dayNumPerfect: {
-    color: Colors.dark.success,
+    color: colors.success,
   },
   dayMeta: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 9,
   },
@@ -265,23 +270,23 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   statCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     padding: Spacing.md,
     alignItems: 'center',
     flex: 1,
     minWidth: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 3) / 4,
   },
   statValue: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontFamily: Fonts.accent,
     fontSize: 22,
     lineHeight: 26,
   },
   statLabel: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 10,
     marginTop: 2,
@@ -297,42 +302,42 @@ const styles = StyleSheet.create({
   },
   // Empty
   emptyCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     padding: Spacing.xl,
     alignItems: 'center',
   },
   emptyText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontFamily: Fonts.headingMedium,
     fontSize: 16,
     marginBottom: Spacing.xs,
   },
   emptySubtext: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 13,
     textAlign: 'center',
   },
   // Silicon review
   reviewCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     padding: Spacing.md,
   },
   reviewLabel: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontFamily: Fonts.bodyMedium,
     fontSize: 10,
     letterSpacing: 1,
     marginBottom: Spacing.sm,
   },
   reviewText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontFamily: Fonts.accentItalic,
     fontSize: 15,
     lineHeight: 22,
