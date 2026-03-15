@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useRef, memo, useEffect } from 'react';
-import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity, Share, Dimensions, Animated as RNAnimated, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity, Share, Dimensions, Animated as RNAnimated, LayoutAnimation, Platform, UIManager, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import ViewShot from 'react-native-view-shot';
@@ -91,12 +91,16 @@ function getLetterGrade(pct: number): { grade: string; color: string } {
   return { grade: 'F', color: Colors.dark.error };
 }
 
-// --- 1. Today's Progress Ring ---
-function TodayProgressRing() {
+// --- Animated Ring Component ---
+const AnimatedCircle = RNAnimated.createAnimatedComponent(Circle);
+
+// --- 1. Today's Snapshot (Hero) — Ring + Grade + Streak unified ---
+function TodaySnapshot() {
   const todos = useTodoStore(s => s.todos);
   const logicalDate = getLogicalDate();
+  const ringAnim = useRef(new RNAnimated.Value(0)).current;
 
-  const { completed, total, focusMins } = useMemo(() => {
+  const { completed, total, focusMins, progress, pct, grade, gradeColor, streak } = useMemo(() => {
     const todayTodos = todos.filter(t => t.logicalDate === logicalDate);
     const completed = todayTodos.filter(t => t.completed).length;
     const total = todayTodos.length;
@@ -105,41 +109,60 @@ function TodayProgressRing() {
       if (t.timeTracking?.totalSeconds) mins += Math.floor(t.timeTracking.totalSeconds / 60);
       return s + mins;
     }, 0);
-    return { completed, total, focusMins };
+    const progress = total > 0 ? completed / total : 0;
+    const pct = Math.round(progress * 100);
+    const { grade, color: gradeColor } = total > 0 ? getLetterGrade(pct) : { grade: '-', color: Colors.dark.textTertiary };
+    const streak = calculateStreak(todos);
+    return { completed, total, focusMins, progress, pct, grade, gradeColor, streak };
   }, [todos, logicalDate]);
 
-  const progress = total > 0 ? completed / total : 0;
-  const pct = Math.round(progress * 100);
+  // Animate ring from 0 to current value
+  useEffect(() => {
+    ringAnim.setValue(0);
+    RNAnimated.timing(ringAnim, {
+      toValue: progress,
+      duration: 800,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [progress]);
 
-  const size = 160;
-  const strokeWidth = 12;
+  const size = 120;
+  const strokeWidth = 10;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference * (1 - progress);
+
+  const animatedStrokeDashoffset = ringAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [circumference, 0],
+  });
 
   return (
-    <View style={styles.ringSection}>
+    <View style={styles.heroCard}>
       <View style={styles.ringContainer}>
         <Svg width={size} height={size}>
           <Circle
             cx={size / 2} cy={size / 2} r={radius}
             stroke={Colors.dark.border} strokeWidth={strokeWidth} fill="transparent"
           />
-          <Circle
+          <AnimatedCircle
             cx={size / 2} cy={size / 2} r={radius}
             stroke={progress === 1 ? Colors.dark.success : Colors.dark.accent}
             strokeWidth={strokeWidth} fill="transparent"
             strokeDasharray={`${circumference}`}
-            strokeDashoffset={strokeDashoffset}
+            strokeDashoffset={animatedStrokeDashoffset}
             strokeLinecap="round"
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
           />
         </Svg>
         <View style={styles.ringCenter}>
-          <Text style={styles.ringPct}>{pct}%</Text>
-          <Text style={styles.ringLabel}>{completed}/{total}</Text>
+          <Text style={[styles.ringGrade, { color: gradeColor }]}>{grade}</Text>
         </View>
       </View>
+      <Text style={styles.ringTaskInfo}>{completed}/{total} tasks · {pct}%</Text>
+      {streak > 0 && (
+        <Text style={styles.ringStreak}>{'\uD83D\uDD25'} {streak} day streak</Text>
+      )}
       {focusMins > 0 && (
         <Text style={styles.ringFocus}>{focusMins}m focused today</Text>
       )}
@@ -147,50 +170,27 @@ function TodayProgressRing() {
   );
 }
 
-// --- 2. Daily Score Letter Grade ---
-function DailyScoreGrade() {
-  const todos = useTodoStore(s => s.todos);
-  const logicalDate = getLogicalDate();
-
-  const { grade, color, pct } = useMemo(() => {
-    const todayTodos = todos.filter(t => t.logicalDate === logicalDate);
-    const total = todayTodos.length;
-    const completed = todayTodos.filter(t => t.completed).length;
-    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-    const { grade, color } = total > 0 ? getLetterGrade(pct) : { grade: '-', color: Colors.dark.textTertiary };
-    return { grade, color, pct };
-  }, [todos, logicalDate]);
-
-  return (
-    <View style={styles.gradeCard}>
-      <Text style={[styles.gradeValue, { color }]}>{grade}</Text>
-      <View>
-        <Text style={styles.gradeLabel}>Daily Score</Text>
-        <Text style={styles.gradeSub}>{pct}% completion</Text>
-      </View>
-    </View>
-  );
-}
-
-// --- 3. Streak Counter ---
-function StreakCounter() {
-  const todos = useTodoStore(s => s.todos);
-  const streak = useMemo(() => calculateStreak(todos), [todos]);
-
-  return (
-    <View style={styles.streakCard}>
-      <Text style={styles.streakEmoji}>{streak > 0 ? '\uD83D\uDD25' : '\uD83D\uDCA4'}</Text>
-      <Text style={styles.streakNum}>{streak}</Text>
-      <Text style={styles.streakLabel}>day streak</Text>
-    </View>
-  );
-}
-
-// --- 4. Weekly Bar Chart ---
+// --- 2. Weekly Bar Chart ---
 function WeeklyBarChart() {
   const todos = useTodoStore(s => s.todos);
   const stats = useMemo(() => getWeekStats(), [todos]);
   const hasData = stats.totalTasks > 0;
+  const barAnims = useRef(stats.weekDays.map(() => new RNAnimated.Value(0))).current;
+
+  useEffect(() => {
+    if (hasData) {
+      barAnims.forEach((anim, i) => {
+        anim.setValue(0);
+        RNAnimated.timing(anim, {
+          toValue: 1,
+          duration: 400,
+          delay: i * 80,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }).start();
+      });
+    }
+  }, [hasData]);
 
   if (!hasData) {
     return (
@@ -214,9 +214,15 @@ function WeeklyBarChart() {
       <View style={styles.barChart}>
         {stats.weekDays.map((day, i) => {
           const rate = day.totalTasks > 0 ? day.completionRate : 0;
-          const height = day.totalTasks > 0 ? Math.max(4, rate * BAR_MAX_HEIGHT) : 4;
+          const targetHeight = day.totalTasks > 0 ? Math.max(4, rate * BAR_MAX_HEIGHT) : 4;
           const isToday = day.date === new Date().toISOString().split('T')[0];
           const pctLabel = day.totalTasks > 0 ? `${Math.round(rate * 100)}%` : '';
+
+          const animatedHeight = barAnims[i].interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, targetHeight],
+          });
+
           return (
             <View key={day.date} style={styles.barCol}>
               {pctLabel ? (
@@ -224,15 +230,13 @@ function WeeklyBarChart() {
               ) : (
                 <Text style={styles.barPctLabel}> </Text>
               )}
-              <View style={styles.barTrack}>
-                <View
+              <View style={[styles.barTrack, { backgroundColor: isToday ? Colors.dark.surface : '#333333' }]}>
+                <RNAnimated.View
                   style={[
                     styles.barFill,
                     {
-                      height,
-                      backgroundColor: isToday
-                        ? Colors.dark.accent
-                        : day.totalTasks > 0 ? Colors.dark.textSecondary : Colors.dark.border,
+                      height: animatedHeight,
+                      backgroundColor: isToday ? Colors.dark.accent : '#888888',
                     },
                   ]}
                 />
@@ -244,16 +248,12 @@ function WeeklyBarChart() {
           );
         })}
       </View>
-      <View style={styles.weekStatsRow}>
-        <Text style={styles.weekStatText}>{stats.totalCompleted} completed</Text>
-        <View style={styles.weekStatDot} />
-        <Text style={styles.weekStatText}>{stats.totalTasks} total</Text>
-      </View>
+      <Text style={styles.weekSummary}>{stats.totalCompleted} of {stats.totalTasks} completed</Text>
     </View>
   );
 }
 
-// --- 5. Contribution Graph ---
+// --- 3. Contribution Graph (Monochrome) ---
 function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
   const graphData = useMemo(() => {
     if (heatmap.length === 0) return { weeks: [], monthLabels: [], totalCompleted: 0, activeDays: 0 };
@@ -289,21 +289,22 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
     return { weeks, monthLabels, totalCompleted, activeDays };
   }, [heatmap]);
 
+  // Monochrome color scale
   const getColor = (rate: number, count: number, date: string) => {
     if (!date) return 'transparent';
-    if (count === 0) return Colors.dark.border;
-    if (rate >= 0.9) return Colors.dark.success;
-    if (rate >= 0.7) return '#4ADE80AA';
-    if (rate >= 0.5) return '#4ADE8066';
-    if (rate >= 0.2) return '#4ADE8033';
-    return Colors.dark.surfaceHover;
+    if (count === 0) return '#1A1A1A';
+    if (rate >= 0.9) return '#F5F5F5';
+    if (rate >= 0.7) return '#888888';
+    if (rate >= 0.5) return '#555555';
+    if (rate >= 0.2) return '#333333';
+    return '#1A1A1A';
   };
 
   if (graphData.weeks.length === 0) return null;
 
   const numWeeks = graphData.weeks.length;
-  const cellSize = 14;
-  const gap = 2;
+  const cellSize = 16;
+  const gap = 3;
   const gridWidth = numWeeks * (cellSize + gap);
   const availableWidth = SCREEN_WIDTH - Spacing.lg * 2 - 20;
   const needsScroll = gridWidth > availableWidth;
@@ -356,7 +357,7 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
                         width: cellSize,
                         height: cellSize,
                         backgroundColor: getColor(day.rate, day.count, day.date),
-                        borderRadius: 2,
+                        borderRadius: 3,
                       }}
                     />
                   ))}
@@ -368,7 +369,7 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
       </ScrollView>
       <View style={styles.heatmapLegend}>
         <Text style={styles.heatmapLegendText}>Less</Text>
-        {[Colors.dark.border, '#4ADE8033', '#4ADE8066', '#4ADE80AA', Colors.dark.success].map((c, i) => (
+        {['#1A1A1A', '#333333', '#555555', '#888888', '#F5F5F5'].map((c, i) => (
           <View key={i} style={[styles.heatmapLegendDot, { backgroundColor: c }]} />
         ))}
         <Text style={styles.heatmapLegendText}>More</Text>
@@ -377,13 +378,12 @@ function ContributionGraph({ heatmap }: { heatmap: AnalyticsData['heatmap'] }) {
   );
 }
 
-// --- 6. Weekly Review (Collapsible) ---
+// --- 4. Weekly Review (Collapsible) ---
 // Uses the existing WeeklyReviewComponent
 
-// --- 7. Achievements Grid (Collapsible) ---
+// --- 5. Achievements Grid (3-column) ---
 function AchievementsGrid() {
   const achievements = useAchievementStore(s => s.achievements);
-  const unlocked = achievements.filter(a => a.unlockedAt);
 
   return (
     <View style={styles.achievementsGrid}>
@@ -403,7 +403,7 @@ function AchievementsGrid() {
   );
 }
 
-// --- 8. Deep Statistics (Collapsible) ---
+// --- 6. Deep Statistics (2-column) ---
 function DeepStatistics({ analytics, todos }: { analytics: AnalyticsData; todos: any[] }) {
   const stats = useMemo(() => {
     const allCompleted = todos.filter((t: any) => t.completed);
@@ -500,7 +500,7 @@ function DeepStatistics({ analytics, todos }: { analytics: AnalyticsData; todos:
   );
 }
 
-// --- 9. Share Card ---
+// --- 7. Share Card ---
 function ShareSection({ analytics }: { analytics: AnalyticsData }) {
   const viewShotRef = useRef<ViewShot>(null);
   const todos = useTodoStore(s => s.todos);
@@ -685,22 +685,16 @@ function ProgressScreenContent() {
           <ProgressEmptyHero />
         ) : (
           <>
-            {/* 1. Today's Progress Ring */}
-            <TodayProgressRing />
+            {/* 1. Today's Snapshot — unified hero card */}
+            <TodaySnapshot />
 
-            {/* 2. Daily Score + 3. Streak - side by side */}
-            <View style={styles.gradeStreakRow}>
-              <DailyScoreGrade />
-              <StreakCounter />
-            </View>
-
-            {/* 4. Weekly Bar Chart */}
+            {/* 2. Weekly Bar Chart */}
             <WeeklyBarChart />
 
-            {/* 5. Contribution Graph */}
+            {/* 3. Activity Heatmap */}
             <ContributionGraph heatmap={analytics.heatmap} />
 
-            {/* 6. Weekly Review (collapsible) */}
+            {/* 4. Weekly Review (collapsible) */}
             <View style={styles.section}>
               <CollapsibleHeader
                 title="Weekly Review"
@@ -710,7 +704,7 @@ function ProgressScreenContent() {
               {!collapsed.weeklyReview && <WeeklyReviewComponent />}
             </View>
 
-            {/* 7. Achievements (collapsible) */}
+            {/* 5. Achievements (collapsible) */}
             <View style={styles.section}>
               <CollapsibleHeader
                 title="Achievements"
@@ -721,7 +715,7 @@ function ProgressScreenContent() {
               {!collapsed.achievements && <AchievementsGrid />}
             </View>
 
-            {/* 8. Deep Stats (collapsible) */}
+            {/* 6. Deep Stats (collapsible) */}
             <View style={styles.section}>
               <CollapsibleHeader
                 title="Statistics"
@@ -731,7 +725,7 @@ function ProgressScreenContent() {
               {!collapsed.deepStats && <DeepStatistics analytics={analytics} todos={todos} />}
             </View>
 
-            {/* 9. Share Card */}
+            {/* 7. Share Card */}
             <ShareSection analytics={analytics} />
           </>
         )}
@@ -764,26 +758,24 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
 
-  // --- 1. Ring ---
-  ringSection: {
+  // --- 1. Hero Card (Ring + Grade + Streak) ---
+  heroCard: {
     alignItems: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
     backgroundColor: Colors.dark.surface,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
     elevation: 12,
   },
   ringContainer: {
     position: 'relative',
-    width: 160,
-    height: 160,
+    width: 120,
+    height: 120,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -792,83 +784,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  ringPct: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 42,
-    lineHeight: 46,
-  },
-  ringLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  ringFocus: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    marginTop: Spacing.md,
-  },
-
-  // --- 2+3. Grade + Streak Row ---
-  gradeStreakRow: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    marginBottom: Spacing.xl,
-  },
-  gradeCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.md,
-  },
-  gradeValue: {
+  ringGrade: {
     fontFamily: Fonts.accent,
     fontSize: 36,
     lineHeight: 40,
   },
-  gradeLabel: {
+  ringTaskInfo: {
     color: Colors.dark.textSecondary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 12,
-    letterSpacing: 0.5,
-  },
-  gradeSub: {
-    color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 11,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: Spacing.sm,
   },
-  streakCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-  },
-  streakEmoji: {
-    fontSize: 22,
-  },
-  streakNum: {
+  ringStreak: {
     color: Colors.dark.text,
-    fontFamily: Fonts.accent,
-    fontSize: 32,
-    lineHeight: 36,
-  },
-  streakLabel: {
-    color: Colors.dark.textSecondary,
     fontFamily: Fonts.body,
-    fontSize: 12,
+    fontSize: 14,
+    marginTop: Spacing.xs,
+  },
+  ringFocus: {
+    color: Colors.dark.timer,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    marginTop: Spacing.xs,
   },
 
   // --- Sections ---
@@ -908,7 +845,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // --- 4. Bar Chart ---
+  // --- 2. Bar Chart ---
   weekHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -937,46 +874,36 @@ const styles = StyleSheet.create({
   barPctLabel: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 9,
+    fontSize: 11,
     height: 14,
   },
   barTrack: {
     width: '100%',
-    maxWidth: 36,
+    maxWidth: 28,
     height: BAR_MAX_HEIGHT,
     justifyContent: 'flex-end',
-    borderRadius: 8,
+    borderRadius: 6,
     overflow: 'hidden',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: '#333333',
   },
   barFill: {
     width: '100%',
-    borderRadius: 8,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
   },
   barLabel: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 11,
   },
-  weekStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  weekStatText: {
+  weekSummary: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 12,
-  },
-  weekStatDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: Colors.dark.textTertiary,
+    fontSize: 13,
+    textAlign: 'center',
   },
 
-  // --- 5. Contribution Graph ---
+  // --- 3. Contribution Graph ---
   heatmapHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -995,7 +922,7 @@ const styles = StyleSheet.create({
   monthLabel: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 9,
+    fontSize: 11,
   },
   heatmapContainer: {
     flexDirection: 'row',
@@ -1008,7 +935,7 @@ const styles = StyleSheet.create({
   heatmapDayLabel: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 9,
+    fontSize: 11,
     textAlign: 'right',
   },
   heatmapGrid: {
@@ -1028,83 +955,83 @@ const styles = StyleSheet.create({
   heatmapLegendText: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 10,
+    fontSize: 11,
   },
   heatmapLegendDot: {
     width: 12,
     height: 12,
-    borderRadius: 2,
+    borderRadius: 3,
   },
 
-  // --- 7. Achievements Grid ---
+  // --- 5. Achievements Grid (3-column) ---
   achievementsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
   },
   achievementBadge: {
-    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 4) / 5,
+    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 2) / 3,
     backgroundColor: Colors.dark.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.dark.border,
-    padding: Spacing.sm,
+    padding: Spacing.md,
     alignItems: 'center',
-    minHeight: 80,
+    minHeight: 100,
   },
   achievementLocked: {
-    opacity: 0.5,
+    opacity: 0.3,
   },
   achievementIcon: {
-    fontSize: 22,
+    fontSize: 32,
     color: Colors.dark.text,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   achievementTitle: {
     color: Colors.dark.text,
     fontFamily: Fonts.bodyMedium,
-    fontSize: 9,
+    fontSize: 12,
     textAlign: 'center',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   achievementDesc: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 7,
+    fontSize: 11,
     textAlign: 'center',
-    lineHeight: 10,
+    lineHeight: 15,
   },
 
-  // --- 8. Deep Statistics ---
+  // --- 6. Deep Statistics (2-column) ---
   deepStatsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   deepStatCard: {
-    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.sm * 3) / 4,
+    width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.md) / 2,
     backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.dark.border,
-    padding: Spacing.sm,
+    padding: Spacing.md,
     alignItems: 'center',
   },
   deepStatValue: {
     color: Colors.dark.text,
     fontFamily: Fonts.accent,
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 28,
+    lineHeight: 32,
   },
   deepStatLabel: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.body,
-    fontSize: 9,
+    fontSize: 11,
     textAlign: 'center',
-    marginTop: 2,
+    marginTop: 4,
   },
 
-  // --- 9. Share ---
+  // --- 7. Share ---
   shareCard: {
     backgroundColor: Colors.dark.surface,
     borderRadius: 16,
