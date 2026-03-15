@@ -25,18 +25,10 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('screen');
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const WALLPAPER_W = SCREEN_W;
 const WALLPAPER_H = SCREEN_H;
-const PHONE_BORDER = 2;
+const PHONE_BORDER = 3;
 const PREVIEW_WIDTH = SCREEN_WIDTH * 0.7;
 const PREVIEW_SCALE = PREVIEW_WIDTH / SCREEN_W;
 const PREVIEW_HEIGHT = SCREEN_H * PREVIEW_SCALE;
-// Dual preview (lock + home side by side)
-const DUAL_PREVIEW_WIDTH = SCREEN_WIDTH * 0.42;
-const DUAL_PREVIEW_SCALE = DUAL_PREVIEW_WIDTH / SCREEN_W;
-const DUAL_PREVIEW_HEIGHT = SCREEN_H * DUAL_PREVIEW_SCALE;
-// Sticky mini preview
-const MINI_PREVIEW_WIDTH = 40;
-const MINI_PREVIEW_HEIGHT = 80;
-const MINI_PREVIEW_SCALE = MINI_PREVIEW_WIDTH / SCREEN_W;
 const MAX_DOTS = 1000;
 
 // Content renders at device logical resolution (SCREEN_W x SCREEN_H).
@@ -1240,56 +1232,9 @@ function WallpaperScreenContent() {
   const isTerminal = config.wallpaperStyle === 'terminal';
   const fontFamily = isTerminal ? 'monospace' : undefined;
 
-  // Sticky mini preview state
-  const [showStickyPreview, setShowStickyPreview] = useState(false);
-  const stickyAnim = useRef(new RNAnimated.Value(0)).current;
-  const previewLayoutY = useRef(0);
-  const previewLayoutH = useRef(0);
-
-  useEffect(() => {
-    RNAnimated.timing(stickyAnim, {
-      toValue: showStickyPreview ? 1 : 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [showStickyPreview]);
-
-  const handleScroll = useCallback((e: any) => {
-    const scrollY = e.nativeEvent.contentOffset.y;
-    const previewBottom = previewLayoutY.current + previewLayoutH.current;
-    setShowStickyPreview(scrollY > previewBottom);
-  }, []);
-
-  const onPreviewLayout = useCallback((e: any) => {
-    previewLayoutY.current = e.nativeEvent.layout.y;
-    previewLayoutH.current = e.nativeEvent.layout.height;
-  }, []);
-
-  const wallpaperContentProps = {
-    config,
-    activeStyle,
-    fontFamily,
-    isTerminal,
-    isStats,
-    displayNumber,
-    displayLabel,
-    displaySubLabel,
-    weekRate,
-    streak,
-    days,
-    quote,
-    dayNumber,
-  };
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <RNAnimated.ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        style={{ opacity: entranceFade }}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-      >
+      <RNAnimated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }} style={{ opacity: entranceFade }}>
         <Text style={styles.heading}>Wallpaper</Text>
 
         {/* ── Hidden full-res ViewShot for capture ── */}
@@ -1305,73 +1250,44 @@ function WallpaperScreenContent() {
             <WallpaperContent
               containerWidth={WALLPAPER_W}
               containerHeight={WALLPAPER_H}
-              {...wallpaperContentProps}
+              config={config}
+              activeStyle={activeStyle}
+              fontFamily={fontFamily}
+              isTerminal={isTerminal}
+              isStats={isStats}
+              displayNumber={displayNumber}
+              displayLabel={displayLabel}
+              displaySubLabel={displaySubLabel}
+              weekRate={weekRate}
+              streak={streak}
+              days={days}
+              quote={quote}
+              dayNumber={dayNumber}
             />
           </ViewShot>
         </View>
 
-        {/* ── Dual Preview — Lock Screen + Home Screen ── */}
-        <View style={styles.dualPreviewRow} onLayout={onPreviewLayout}>
-          {/* Lock Screen Preview */}
-          <View style={styles.dualPreviewColumn}>
-            <Text style={styles.dualPreviewLabel}>Lock Screen</Text>
-            <View style={[styles.dualPhoneFrame, { width: DUAL_PREVIEW_WIDTH + PHONE_BORDER * 2 }]}>
-              <View style={{ width: DUAL_PREVIEW_WIDTH, height: DUAL_PREVIEW_HEIGHT, overflow: 'hidden' }}>
-                <WallpaperContent
-                  containerWidth={DUAL_PREVIEW_WIDTH}
-                  containerHeight={DUAL_PREVIEW_HEIGHT}
-                  {...wallpaperContentProps}
-                />
-                {/* Lock screen overlay */}
-                <View style={styles.lockScreenOverlay} pointerEvents="none">
-                  <View style={styles.lockScreenTop}>
-                    <Text style={[styles.lockScreenTime, { fontSize: 42 * DUAL_PREVIEW_SCALE }]}>
-                      {new Date().getHours().toString().padStart(2, '0')}:{new Date().getMinutes().toString().padStart(2, '0')}
-                    </Text>
-                    <Text style={[styles.lockScreenDate, { fontSize: 11 * DUAL_PREVIEW_SCALE }]}>
-                      {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                    </Text>
-                  </View>
-                  <View style={styles.lockScreenBottom}>
-                    <View style={[styles.lockIcon, { width: 20 * DUAL_PREVIEW_SCALE, height: 20 * DUAL_PREVIEW_SCALE, borderRadius: 10 * DUAL_PREVIEW_SCALE }]}>
-                      <Text style={{ fontSize: 10 * DUAL_PREVIEW_SCALE, color: '#fff' }}>🔒</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Home Screen Preview */}
-          <View style={styles.dualPreviewColumn}>
-            <Text style={styles.dualPreviewLabel}>Home Screen</Text>
-            <View style={[styles.dualPhoneFrame, { width: DUAL_PREVIEW_WIDTH + PHONE_BORDER * 2 }]}>
-              <View style={{ width: DUAL_PREVIEW_WIDTH, height: DUAL_PREVIEW_HEIGHT, overflow: 'hidden' }}>
-                <WallpaperContent
-                  containerWidth={DUAL_PREVIEW_WIDTH}
-                  containerHeight={DUAL_PREVIEW_HEIGHT}
-                  {...wallpaperContentProps}
-                />
-                {/* Home screen overlay */}
-                <View style={styles.homeScreenOverlay} pointerEvents="none">
-                  <View style={[styles.homeStatusBar, { height: 16 * DUAL_PREVIEW_SCALE }]}>
-                    <Text style={[styles.homeStatusTime, { fontSize: 9 * DUAL_PREVIEW_SCALE }]}>
-                      {new Date().getHours().toString().padStart(2, '0')}:{new Date().getMinutes().toString().padStart(2, '0')}
-                    </Text>
-                  </View>
-                  <View style={styles.homeBottomArea}>
-                    <View style={[styles.homeSearchBar, { height: 28 * DUAL_PREVIEW_SCALE, borderRadius: 14 * DUAL_PREVIEW_SCALE, marginBottom: 8 * DUAL_PREVIEW_SCALE }]}>
-                      <Text style={[styles.homeSearchText, { fontSize: 9 * DUAL_PREVIEW_SCALE }]}>Search</Text>
-                    </View>
-                    <View style={styles.homeDock}>
-                      {[0, 1, 2, 3].map(i => (
-                        <View key={i} style={[styles.homeDockIcon, { width: 30 * DUAL_PREVIEW_SCALE, height: 30 * DUAL_PREVIEW_SCALE, borderRadius: 8 * DUAL_PREVIEW_SCALE }]} />
-                      ))}
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
+        {/* ── Live Preview — phone frame ── */}
+        <View style={[styles.phoneFrame, { width: PREVIEW_WIDTH + PHONE_BORDER * 2, alignSelf: 'center' }]}>
+          <View style={styles.phoneNotch} />
+          <View style={{ width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT, overflow: 'hidden' }}>
+            <WallpaperContent
+              containerWidth={PREVIEW_WIDTH}
+              containerHeight={PREVIEW_HEIGHT}
+              config={config}
+              activeStyle={activeStyle}
+              fontFamily={fontFamily}
+              isTerminal={isTerminal}
+              isStats={isStats}
+              displayNumber={displayNumber}
+              displayLabel={displayLabel}
+              displaySubLabel={displaySubLabel}
+              weekRate={weekRate}
+              streak={streak}
+              days={days}
+              quote={quote}
+              dayNumber={dayNumber}
+            />
           </View>
         </View>
 
@@ -1727,31 +1643,6 @@ function WallpaperScreenContent() {
           <Text style={styles.resetBtnText}>Reset to Defaults</Text>
         </TouchableOpacity>
       </RNAnimated.ScrollView>
-
-      {/* ── Sticky Mini Preview ── */}
-      <RNAnimated.View
-        pointerEvents="none"
-        style={[
-          styles.stickyPreview,
-          {
-            opacity: stickyAnim,
-            transform: [{
-              translateY: stickyAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-20, 0],
-              }),
-            }],
-          },
-        ]}
-      >
-        <View style={styles.stickyPreviewInner}>
-          <WallpaperContent
-            containerWidth={MINI_PREVIEW_WIDTH}
-            containerHeight={MINI_PREVIEW_HEIGHT}
-            {...wallpaperContentProps}
-          />
-        </View>
-      </RNAnimated.View>
     </SafeAreaView>
   );
 }
@@ -1781,7 +1672,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
 
-  // Phone frame — premium preview (legacy single)
+  // Phone frame — premium preview
   phoneFrame: {
     borderRadius: 32,
     overflow: 'hidden',
@@ -1806,134 +1697,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
     borderWidth: 1,
     borderColor: '#2A2A2A',
-  },
-
-  // Dual preview row
-  dualPreviewRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  dualPreviewColumn: {
-    alignItems: 'center',
-  },
-  dualPreviewLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    letterSpacing: 0.5,
-    marginBottom: Spacing.xs,
-    textTransform: 'uppercase',
-  },
-  dualPhoneFrame: {
-    borderRadius: 22,
-    overflow: 'hidden',
-    borderWidth: PHONE_BORDER,
-    borderColor: '#3A3A3A',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.7,
-    shadowRadius: 20,
-    elevation: 16,
-    backgroundColor: '#111111',
-  },
-
-  // Lock screen overlay
-  lockScreenOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  lockScreenTop: {
-    alignItems: 'center',
-    paddingTop: 28 * DUAL_PREVIEW_SCALE,
-  },
-  lockScreenTime: {
-    color: '#ffffff',
-    fontFamily: Fonts.accent,
-    fontWeight: '200',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  lockScreenDate: {
-    color: 'rgba(255,255,255,0.8)',
-    fontFamily: Fonts.body,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  lockScreenBottom: {
-    paddingBottom: 24 * DUAL_PREVIEW_SCALE,
-  },
-  lockIcon: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Home screen overlay
-  homeScreenOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
-  },
-  homeStatusBar: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 12 * DUAL_PREVIEW_SCALE,
-  },
-  homeStatusTime: {
-    color: '#ffffff',
-    fontFamily: Fonts.bodyMedium,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  homeBottomArea: {
-    alignItems: 'center',
-    paddingBottom: 10 * DUAL_PREVIEW_SCALE,
-    paddingHorizontal: 12 * DUAL_PREVIEW_SCALE,
-  },
-  homeSearchBar: {
-    width: '90%',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    justifyContent: 'center',
-    paddingHorizontal: 12 * DUAL_PREVIEW_SCALE,
-  },
-  homeSearchText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontFamily: Fonts.body,
-  },
-  homeDock: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10 * DUAL_PREVIEW_SCALE,
-  },
-  homeDockIcon: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-
-  // Sticky mini preview
-  stickyPreview: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    zIndex: 100,
-  },
-  stickyPreviewInner: {
-    width: MINI_PREVIEW_WIDTH,
-    height: MINI_PREVIEW_HEIGHT,
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 10,
   },
   preview: {
     width: PREVIEW_WIDTH,
