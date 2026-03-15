@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated as RNAnimated, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { Fonts, Spacing } from '../../../lib/theme';
+import { useTheme } from '../../../lib/ThemeContext';
 import { useTodoStore } from '../store';
 import { getLogicalDate } from '../../../lib/date-utils';
 import { calculateStreak } from '../../../lib/streak';
@@ -11,6 +12,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MORNING_BRIEF_KEY = 'untodo-morning-brief-last-shown';
 
 export default function MorningBrief({ onDismiss }: { onDismiss: () => void }) {
+  const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const opacity = useRef(new RNAnimated.Value(0)).current;
   const cardTranslate = useRef(new RNAnimated.Value(40)).current;
@@ -81,16 +83,94 @@ export default function MorningBrief({ onDismiss }: { onDismiss: () => void }) {
     });
   };
 
+  const styles = useMemo(() => StyleSheet.create({
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: Spacing.xl,
+      marginHorizontal: Spacing.xl,
+      width: '85%',
+      maxWidth: 360,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.6,
+      shadowRadius: 32,
+      elevation: 32,
+    },
+    greeting: {
+      color: colors.text,
+      fontFamily: Fonts.accentItalic,
+      fontSize: 32,
+      marginBottom: 4,
+    },
+    subtitle: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 15,
+      marginBottom: Spacing.xl,
+    },
+    statNumber: {
+      color: colors.text,
+      fontFamily: Fonts.heading,
+      fontSize: 28,
+      minWidth: 36,
+    },
+    statLabel: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.body,
+      fontSize: 15,
+      flex: 1,
+    },
+    carriedOver: {
+      color: colors.timer,
+      fontFamily: Fonts.body,
+      fontSize: 13,
+    },
+    topPriorityContainer: {
+      marginTop: Spacing.sm,
+      paddingTop: Spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    topPriorityLabel: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 6,
+    },
+    topPriorityTask: {
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 16,
+      lineHeight: 22,
+    },
+    button: {
+      backgroundColor: colors.accent,
+      paddingVertical: 14,
+      borderRadius: 14,
+      alignItems: 'center',
+    },
+    buttonText: {
+      color: colors.background,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 16,
+    },
+  }), [colors]);
+
   if (!visible) return null;
 
   return (
-    <RNAnimated.View style={[styles.overlay, { opacity }]}>
+    <RNAnimated.View style={[staticStyles.overlay, { opacity }]}>
       <RNAnimated.View style={[styles.card, { opacity: cardOpacity, transform: [{ translateY: cardTranslate }] }]}>
         <Text style={styles.greeting}>Good morning.</Text>
         <Text style={styles.subtitle}>Here's your day:</Text>
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statRow}>
+        <View style={staticStyles.statsContainer}>
+          <View style={staticStyles.statRow}>
             <Text style={styles.statNumber}>{briefData.total}</Text>
             <Text style={styles.statLabel}>
               task{briefData.total !== 1 ? 's' : ''} today
@@ -101,8 +181,8 @@ export default function MorningBrief({ onDismiss }: { onDismiss: () => void }) {
           </View>
 
           {briefData.streak > 0 && (
-            <View style={styles.statRow}>
-              <Text style={styles.streakIcon}>🔥</Text>
+            <View style={staticStyles.statRow}>
+              <Text style={staticStyles.streakIcon}>🔥</Text>
               <Text style={styles.statLabel}>
                 {briefData.streak} day streak
               </Text>
@@ -127,40 +207,14 @@ export default function MorningBrief({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+// Static styles that don't depend on theme
+const staticStyles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.85)',
     zIndex: 200,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  card: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    padding: Spacing.xl,
-    marginHorizontal: Spacing.xl,
-    width: '85%',
-    maxWidth: 360,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.6,
-    shadowRadius: 32,
-    elevation: 32,
-  },
-  greeting: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 32,
-    marginBottom: 4,
-  },
-  subtitle: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    marginBottom: Spacing.xl,
   },
   statsContainer: {
     gap: Spacing.md,
@@ -171,57 +225,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  statNumber: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.heading,
-    fontSize: 28,
-    minWidth: 36,
-  },
-  statLabel: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    flex: 1,
-  },
-  carriedOver: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-  },
   streakIcon: {
     fontSize: 22,
     minWidth: 36,
     textAlign: 'center',
-  },
-  topPriorityContainer: {
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.dark.border,
-  },
-  topPriorityLabel: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 6,
-  },
-  topPriorityTask: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  button: {
-    backgroundColor: Colors.dark.accent,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 16,
   },
 });

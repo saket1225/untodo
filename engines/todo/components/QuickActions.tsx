@@ -2,7 +2,8 @@ import { useState, memo, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView, LayoutAnimation } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { format, addDays } from 'date-fns';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { Fonts, Spacing } from '../../../lib/theme';
+import { useTheme } from '../../../lib/ThemeContext';
 import { Todo, Priority, Category, CATEGORIES, PRIORITY_CONFIG } from '../types';
 import { getLogicalDate } from '../../../lib/date-utils';
 import { useTodoStore } from '../store';
@@ -17,6 +18,7 @@ interface Props {
 }
 
 function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props) {
+  const { colors } = useTheme();
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(todo.title);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -85,6 +87,142 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
     onClose();
   };
 
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: Spacing.lg,
+      paddingBottom: Spacing.xxl,
+      maxHeight: '75%',
+      borderWidth: 1,
+      borderBottomWidth: 0,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.5,
+      shadowRadius: 16,
+      elevation: 24,
+    },
+    handle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      alignSelf: 'center',
+      marginBottom: Spacing.md,
+    },
+    taskTitle: {
+      color: colors.text,
+      fontFamily: Fonts.headingMedium,
+      fontSize: 16,
+      marginBottom: Spacing.md,
+    },
+    sectionLabel: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.headingMedium,
+      fontSize: 13,
+      letterSpacing: 1,
+      marginBottom: Spacing.sm,
+      marginTop: Spacing.md,
+    },
+    chip: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 16,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    chipActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    chipText: {
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    chipTextActive: {
+      color: colors.background,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
+      paddingVertical: Spacing.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    actionText: {
+      color: colors.text,
+      fontFamily: Fonts.body,
+      fontSize: 15,
+      flex: 1,
+    },
+    actionMeta: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 12,
+      maxWidth: '40%',
+    },
+    editInput: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 12,
+      color: colors.text,
+      fontFamily: Fonts.body,
+      fontSize: 15,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    saveBtn: {
+      backgroundColor: colors.accent,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    saveBtnText: {
+      color: colors.background,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 14,
+    },
+    dayChip: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    dayChipActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    dayChipText: {
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    dayChipTextActive: {
+      color: colors.background,
+    },
+    datePickerSection: {
+      paddingVertical: Spacing.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+  }), [colors]);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
@@ -95,7 +233,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
 
             {/* Edit title */}
             {editingTitle ? (
-              <View style={styles.editRow}>
+              <View style={staticStyles.editRow}>
                 <TextInput
                   style={styles.editInput}
                   value={title}
@@ -109,7 +247,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
               </View>
             ) : (
               <TouchableOpacity style={styles.actionRow} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setEditingTitle(true); }}>
-                <Text style={styles.actionIcon}>✏️</Text>
+                <Text style={staticStyles.actionIcon}>✏️</Text>
                 <Text style={styles.actionText}>Edit</Text>
                 <Text style={styles.actionMeta} numberOfLines={1}>{todo.title}</Text>
               </TouchableOpacity>
@@ -117,17 +255,17 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
 
             {/* Priority */}
             <Text style={styles.sectionLabel}>PRIORITY</Text>
-            <View style={styles.chipRow}>
+            <View style={staticStyles.chipRow}>
               {([null, 'low', 'medium', 'high'] as Priority[]).map(p => {
                 const isActive = todo.priority === p;
-                const color = p ? PRIORITY_CONFIG[p].color : Colors.dark.textTertiary;
+                const color = p ? PRIORITY_CONFIG[p].color : colors.textTertiary;
                 return (
                   <TouchableOpacity
                     key={String(p)}
                     style={[styles.chip, isActive && { backgroundColor: color, borderColor: color }]}
                     onPress={() => handlePriority(p)}
                   >
-                    <Text style={[styles.chipText, isActive && { color: Colors.dark.background }]}>
+                    <Text style={[styles.chipText, isActive && { color: colors.background }]}>
                       {p ? PRIORITY_CONFIG[p].label : 'None'}
                     </Text>
                   </TouchableOpacity>
@@ -137,8 +275,8 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
 
             {/* Category */}
             <Text style={styles.sectionLabel}>CATEGORY</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScrollOuter}>
-              <View style={styles.chipRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={staticStyles.catScrollOuter}>
+              <View style={staticStyles.chipRow}>
                 <TouchableOpacity
                   style={[styles.chip, !todo.category && styles.chipActive]}
                   onPress={() => handleCategory(null)}
@@ -151,7 +289,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
                     style={[styles.chip, todo.category === c.key && { backgroundColor: c.color, borderColor: c.color }]}
                     onPress={() => handleCategory(c.key)}
                   >
-                    <Text style={[styles.chipText, todo.category === c.key && { color: Colors.dark.background }]}>
+                    <Text style={[styles.chipText, todo.category === c.key && { color: colors.background }]}>
                       {c.label}
                     </Text>
                   </TouchableOpacity>
@@ -161,7 +299,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
 
             {/* Recurrence */}
             <Text style={styles.sectionLabel}>RECURRENCE</Text>
-            <View style={styles.chipRow}>
+            <View style={staticStyles.chipRow}>
               <TouchableOpacity
                 style={[styles.chip, !todo.recurrence && styles.chipActive]}
                 onPress={() => handleRecurrence('none')}
@@ -182,7 +320,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
               </TouchableOpacity>
             </View>
             {(todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && (
-              <View style={styles.dayPickerRow}>
+              <View style={staticStyles.dayPickerRow}>
                 {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, idx) => {
                   const isSelected = (todo.recurrence?.days || []).includes(idx);
                   return (
@@ -209,7 +347,7 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
 
             {/* Schedule for date */}
             <TouchableOpacity style={styles.actionRow} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowDatePicker(true); }}>
-              <Text style={styles.actionIcon}>📆</Text>
+              <Text style={staticStyles.actionIcon}>📆</Text>
               <Text style={styles.actionText}>Schedule for date</Text>
             </TouchableOpacity>
             {showDatePicker && (
@@ -226,14 +364,14 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
 
             {/* Move to tomorrow */}
             <TouchableOpacity style={styles.actionRow} onPress={handleMoveToTomorrow}>
-              <Text style={styles.actionIcon}>➡️</Text>
+              <Text style={staticStyles.actionIcon}>➡️</Text>
               <Text style={styles.actionText}>Move to tomorrow</Text>
             </TouchableOpacity>
 
             {/* Delete */}
-            <TouchableOpacity style={[styles.actionRow, styles.deleteRow]} onPress={handleDelete}>
-              <Text style={styles.actionIcon}>🗑️</Text>
-              <Text style={[styles.actionText, { color: Colors.dark.error }]}>Delete</Text>
+            <TouchableOpacity style={[styles.actionRow, staticStyles.deleteRow]} onPress={handleDelete}>
+              <Text style={staticStyles.actionIcon}>🗑️</Text>
+              <Text style={[styles.actionText, { color: colors.error }]}>Delete</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -242,102 +380,20 @@ function QuickActionsInner({ todo, visible, onClose, onUpdate, onDelete }: Props
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: Colors.dark.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: Spacing.lg,
-    paddingBottom: Spacing.xxl,
-    maxHeight: '75%',
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: Colors.dark.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 24,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.dark.border,
-    alignSelf: 'center',
-    marginBottom: Spacing.md,
-  },
-  taskTitle: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 16,
-    marginBottom: Spacing.md,
-  },
-  sectionLabel: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 13,
-    letterSpacing: 1,
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.md,
-  },
+// Static styles that don't depend on theme
+const staticStyles = StyleSheet.create({
   chipRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
     flexWrap: 'wrap',
   },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  chipActive: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
-  },
-  chipText: {
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 12,
-    color: Colors.dark.textSecondary,
-  },
-  chipTextActive: {
-    color: Colors.dark.background,
-  },
   catScrollOuter: {
     flexGrow: 0,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
   },
   actionIcon: {
     fontSize: 16,
     width: 24,
     textAlign: 'center',
-  },
-  actionText: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    flex: 1,
-  },
-  actionMeta: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    maxWidth: '40%',
   },
   deleteRow: {
     borderBottomWidth: 0,
@@ -349,63 +405,13 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingVertical: Spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
-  },
-  editInput: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  saveBtn: {
-    backgroundColor: Colors.dark.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  saveBtnText: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 14,
+    borderBottomColor: '#2A2A2A',
   },
   dayPickerRow: {
     flexDirection: 'row',
     gap: 6,
     marginTop: Spacing.sm,
     justifyContent: 'center',
-  },
-  dayChip: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dayChipActive: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
-  },
-  dayChipText: {
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 12,
-    color: Colors.dark.textSecondary,
-  },
-  dayChipTextActive: {
-    color: Colors.dark.background,
-  },
-  datePickerSection: {
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
   },
 });
 

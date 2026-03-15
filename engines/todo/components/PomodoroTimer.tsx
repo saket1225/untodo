@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, Vibration, StatusBar, Dimensions } from 'react-native';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { useTheme } from '../../../lib/ThemeContext';
 import { Todo } from '../types';
 import { sendPomodoroEndNotification } from '../../notifications/service';
 import { useTodoStore } from '../store';
@@ -58,7 +59,11 @@ interface Props {
 
 type Phase = 'work' | 'short-break' | 'long-break';
 
+// Immersive mode always uses dark colors
+const darkColors = Colors.dark;
+
 export default function PomodoroTimer({ todo, visible, onClose }: Props) {
+  const { colors, isDark } = useTheme();
   const initialPresetName = todo.pomodoroPreset || 'classic';
   const initialPreset = PRESETS.find(p => p.name === initialPresetName) || PRESETS[1];
 
@@ -267,66 +272,268 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
     ? (preset.isFlowtime ? 'Flow' : 'Focus')
     : phase === 'long-break' ? 'Long Break' : 'Break';
 
-  const phaseColor = phase === 'work' ? Colors.dark.text : Colors.dark.timer;
+  const phaseColor = phase === 'work' ? darkColors.text : darkColors.timer;
 
-  // Fullscreen immersive view when timer is active
+  // Setup screen styles (themed)
+  const setupStyles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.lg,
+    },
+    taskTitle: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.body,
+      fontSize: 16,
+      textAlign: 'center',
+      marginBottom: Spacing.lg,
+      paddingHorizontal: Spacing.xl,
+    },
+    presetChip: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 20,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    presetChipActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    presetChipText: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 13,
+    },
+    presetChipTextActive: {
+      color: colors.background,
+    },
+    presetChipSub: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 10,
+      marginTop: 2,
+    },
+    presetChipSubActive: {
+      color: colors.surfaceHover,
+    },
+    sessionsLabel: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.body,
+      fontSize: 14,
+      marginRight: Spacing.sm,
+    },
+    sessionsBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    sessionsBtnText: {
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 18,
+    },
+    sessionsInput: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 18,
+      width: 48,
+      height: 36,
+      borderRadius: 12,
+      textAlign: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    customLabel: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+      marginBottom: 4,
+    },
+    customInput: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 18,
+      width: 56,
+      height: 44,
+      borderRadius: 12,
+      textAlign: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    customUnit: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 10,
+      marginTop: 2,
+    },
+    phase: {
+      fontFamily: Fonts.headingMedium,
+      fontSize: 18,
+      marginBottom: Spacing.md,
+      textTransform: 'uppercase',
+      letterSpacing: 3,
+    },
+    timer: {
+      color: colors.text,
+      fontFamily: Fonts.heading,
+      fontSize: 72,
+      marginBottom: Spacing.md,
+      textAlign: 'center',
+      includeFontPadding: false,
+    },
+    timerEditInput: {
+      color: colors.text,
+      fontFamily: Fonts.heading,
+      fontSize: 60,
+      textAlign: 'center',
+      width: 100,
+      borderBottomWidth: 2,
+      borderBottomColor: colors.accent,
+      paddingVertical: 4,
+      includeFontPadding: false,
+    },
+    timerEditColon: {
+      color: colors.text,
+      fontFamily: Fonts.heading,
+      fontSize: 60,
+      includeFontPadding: false,
+    },
+    timerEditDone: {
+      marginLeft: 12,
+      backgroundColor: colors.accent,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 10,
+    },
+    timerEditDoneText: {
+      color: colors.background,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 15,
+    },
+    sessionCount: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 13,
+      marginBottom: Spacing.sm,
+    },
+    logPrompt: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.headingMedium,
+      fontSize: 16,
+      marginBottom: Spacing.sm,
+    },
+    logInput: {
+      backgroundColor: colors.surface,
+      color: colors.text,
+      fontFamily: Fonts.body,
+      fontSize: 15,
+      width: '100%',
+      height: 48,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: Spacing.md,
+    },
+    logButton: {
+      backgroundColor: colors.accent,
+      paddingHorizontal: Spacing.xl,
+      paddingVertical: Spacing.md,
+      borderRadius: 12,
+    },
+    logButtonText: {
+      color: colors.background,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 16,
+    },
+    button: {
+      backgroundColor: colors.accent,
+      paddingHorizontal: 32,
+      paddingVertical: 16,
+      borderRadius: 14,
+    },
+    buttonText: {
+      color: colors.background,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 16,
+    },
+    closeText: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 15,
+    },
+  }), [colors]);
+
+  // Fullscreen immersive view when timer is active (always dark)
   if (isActive && !showLog) {
     return (
       <Modal visible={visible} animationType="slide" transparent={false} statusBarTranslucent>
         <StatusBar hidden />
         <TouchableOpacity
-          style={styles.immersiveContainer}
+          style={immersiveStyles.container}
           activeOpacity={1}
           onPress={() => { if (isRunning) setIsRunning(false); }}
         >
           {/* Phase label */}
-          <Text style={[styles.immersivePhase, { color: phaseColor }]}>{phaseLabel}</Text>
+          <Text style={[immersiveStyles.phase, { color: phaseColor }]}>{phaseLabel}</Text>
 
           {/* Giant timer */}
-          <Text style={styles.immersiveTimer}>
+          <Text style={immersiveStyles.timer}>
             {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
           </Text>
 
           {/* Task title */}
-          <Text style={styles.immersiveTask} numberOfLines={1}>{todo.title}</Text>
+          <Text style={immersiveStyles.task} numberOfLines={1}>{todo.title}</Text>
 
           {/* Session counter */}
           {!preset.isFlowtime && (
-            <Text style={styles.immersiveSession}>
+            <Text style={immersiveStyles.session}>
               {session} / {totalSessions}
             </Text>
           )}
 
           {/* Break suggestion */}
           {phase !== 'work' && (
-            <Text style={styles.immersiveBreakSuggestion}>{breakSuggestion}</Text>
+            <Text style={immersiveStyles.breakSuggestion}>{breakSuggestion}</Text>
           )}
 
           {/* Controls - show when paused */}
           {!isRunning && (
-            <View style={styles.immersiveControls}>
-              <TouchableOpacity style={styles.button} onPress={() => setIsRunning(true)}>
-                <Text style={styles.buttonText}>Resume</Text>
+            <View style={immersiveStyles.controls}>
+              <TouchableOpacity style={immersiveStyles.button} onPress={() => setIsRunning(true)}>
+                <Text style={immersiveStyles.buttonText}>Resume</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.button, styles.buttonSecondary]} onPress={reset}>
-                <Text style={styles.buttonSecondaryText}>Reset</Text>
+              <TouchableOpacity style={[immersiveStyles.button, immersiveStyles.buttonSecondary]} onPress={reset}>
+                <Text style={immersiveStyles.buttonSecondaryText}>Reset</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.button, styles.buttonSecondary]} onPress={() => { clearTimer(); onClose(); }}>
-                <Text style={styles.buttonSecondaryText}>Exit</Text>
+              <TouchableOpacity style={[immersiveStyles.button, immersiveStyles.buttonSecondary]} onPress={() => { clearTimer(); onClose(); }}>
+                <Text style={immersiveStyles.buttonSecondaryText}>Exit</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* Flowtime: I lost focus button */}
           {preset.isFlowtime && phase === 'work' && isRunning && (
-            <TouchableOpacity style={styles.lostFocusButton} onPress={endFlowSession}>
-              <Text style={styles.lostFocusText}>I lost focus</Text>
+            <TouchableOpacity style={immersiveStyles.lostFocusButton} onPress={endFlowSession}>
+              <Text style={immersiveStyles.lostFocusText}>I lost focus</Text>
             </TouchableOpacity>
           )}
 
           {/* Tap to pause hint */}
           {isRunning && !preset.isFlowtime && (
-            <Text style={styles.immersiveHint}>tap to pause</Text>
+            <Text style={immersiveStyles.hint}>tap to pause</Text>
           )}
         </TouchableOpacity>
       </Modal>
@@ -335,29 +542,29 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false} statusBarTranslucent>
-      <StatusBar hidden={false} barStyle="light-content" />
-      <View style={styles.container}>
+      <StatusBar hidden={false} barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <View style={setupStyles.container}>
         {/* Task title */}
-        <Text style={styles.taskTitle} numberOfLines={2}>{todo.title}</Text>
+        <Text style={setupStyles.taskTitle} numberOfLines={2}>{todo.title}</Text>
 
         {/* Preset selector */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.presetScroll}
-          contentContainerStyle={styles.presetContainer}
+          style={staticStyles.presetScroll}
+          contentContainerStyle={staticStyles.presetContainer}
         >
           {PRESETS.map(p => (
             <TouchableOpacity
               key={p.name}
-              style={[styles.presetChip, preset.name === p.name && styles.presetChipActive]}
+              style={[setupStyles.presetChip, preset.name === p.name && setupStyles.presetChipActive]}
               onPress={() => selectPreset(p)}
             >
-              <Text style={[styles.presetChipText, preset.name === p.name && styles.presetChipTextActive]}>
+              <Text style={[setupStyles.presetChipText, preset.name === p.name && setupStyles.presetChipTextActive]}>
                 {p.label}
               </Text>
               {!p.isFlowtime && p.name !== 'custom' && (
-                <Text style={[styles.presetChipSub, preset.name === p.name && styles.presetChipSubActive]}>
+                <Text style={[setupStyles.presetChipSub, preset.name === p.name && setupStyles.presetChipSubActive]}>
                   {p.work}/{p.shortBreak}
                 </Text>
               )}
@@ -367,37 +574,37 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
 
         {/* Sessions editor */}
         {!preset.isFlowtime && (
-          <View style={styles.sessionsRow}>
-            <Text style={styles.sessionsLabel}>Sessions</Text>
+          <View style={staticStyles.sessionsRow}>
+            <Text style={setupStyles.sessionsLabel}>Sessions</Text>
             <TouchableOpacity
-              style={styles.sessionsBtn}
+              style={setupStyles.sessionsBtn}
               onPress={() => { const n = Math.max(1, totalSessions - 1); setTotalSessions(n); setCustomSessions(String(n)); }}
             >
-              <Text style={styles.sessionsBtnText}>-</Text>
+              <Text style={setupStyles.sessionsBtnText}>-</Text>
             </TouchableOpacity>
             <TextInput
-              style={styles.sessionsInput}
+              style={setupStyles.sessionsInput}
               value={customSessions}
               onChangeText={updateSessions}
               keyboardType="number-pad"
               maxLength={2}
             />
             <TouchableOpacity
-              style={styles.sessionsBtn}
+              style={setupStyles.sessionsBtn}
               onPress={() => { const n = totalSessions + 1; setTotalSessions(n); setCustomSessions(String(n)); }}
             >
-              <Text style={styles.sessionsBtnText}>+</Text>
+              <Text style={setupStyles.sessionsBtnText}>+</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Custom time inputs */}
         {preset.name === 'custom' && (
-          <View style={styles.customInputs}>
-            <View style={styles.customField}>
-              <Text style={styles.customLabel}>Work</Text>
+          <View style={staticStyles.customInputs}>
+            <View style={staticStyles.customField}>
+              <Text style={setupStyles.customLabel}>Work</Text>
               <TextInput
-                style={styles.customInput}
+                style={setupStyles.customInput}
                 value={customWork}
                 onChangeText={v => {
                   setCustomWork(v);
@@ -407,41 +614,41 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
                 keyboardType="number-pad"
                 maxLength={3}
               />
-              <Text style={styles.customUnit}>min</Text>
+              <Text style={setupStyles.customUnit}>min</Text>
             </View>
-            <View style={styles.customField}>
-              <Text style={styles.customLabel}>Break</Text>
+            <View style={staticStyles.customField}>
+              <Text style={setupStyles.customLabel}>Break</Text>
               <TextInput
-                style={styles.customInput}
+                style={setupStyles.customInput}
                 value={customBreak}
                 onChangeText={setCustomBreak}
                 keyboardType="number-pad"
                 maxLength={3}
               />
-              <Text style={styles.customUnit}>min</Text>
+              <Text style={setupStyles.customUnit}>min</Text>
             </View>
-            <View style={styles.customField}>
-              <Text style={styles.customLabel}>Long</Text>
+            <View style={staticStyles.customField}>
+              <Text style={setupStyles.customLabel}>Long</Text>
               <TextInput
-                style={styles.customInput}
+                style={setupStyles.customInput}
                 value={customLongBreak}
                 onChangeText={setCustomLongBreak}
                 keyboardType="number-pad"
                 maxLength={3}
               />
-              <Text style={styles.customUnit}>min</Text>
+              <Text style={setupStyles.customUnit}>min</Text>
             </View>
           </View>
         )}
 
         {/* Phase label */}
-        <Text style={[styles.phase, { color: phaseColor }]}>{phaseLabel}</Text>
+        <Text style={[setupStyles.phase, { color: phase === 'work' ? colors.text : colors.timer }]}>{phaseLabel}</Text>
 
         {/* Timer display - tap to edit */}
         {editingTime ? (
-          <View style={styles.timerEditRow}>
+          <View style={staticStyles.timerEditRow}>
             <TextInput
-              style={styles.timerEditInput}
+              style={setupStyles.timerEditInput}
               value={editMins}
               onChangeText={setEditMins}
               keyboardType="number-pad"
@@ -449,9 +656,9 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
               autoFocus
               selectTextOnFocus
             />
-            <Text style={styles.timerEditColon}>:</Text>
+            <Text style={setupStyles.timerEditColon}>:</Text>
             <TextInput
-              style={styles.timerEditInput}
+              style={setupStyles.timerEditInput}
               value={editSecs}
               onChangeText={setEditSecs}
               keyboardType="number-pad"
@@ -459,13 +666,13 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
               selectTextOnFocus
               onSubmitEditing={applyEditedTime}
             />
-            <TouchableOpacity style={styles.timerEditDone} onPress={applyEditedTime}>
-              <Text style={styles.timerEditDoneText}>Set</Text>
+            <TouchableOpacity style={setupStyles.timerEditDone} onPress={applyEditedTime}>
+              <Text style={setupStyles.timerEditDoneText}>Set</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity onPress={handleTimerTap} activeOpacity={0.7}>
-            <Text style={styles.timer}>
+            <Text style={setupStyles.timer}>
               {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
             </Text>
           </TouchableOpacity>
@@ -473,65 +680,50 @@ export default function PomodoroTimer({ todo, visible, onClose }: Props) {
 
         {/* Session counter */}
         {!preset.isFlowtime && (
-          <Text style={styles.sessionCount}>
+          <Text style={setupStyles.sessionCount}>
             Session {session} of {totalSessions}
           </Text>
         )}
 
         {/* Session log prompt */}
         {showLog && (
-          <View style={styles.logContainer}>
-            <Text style={styles.logPrompt}>What did you accomplish?</Text>
+          <View style={staticStyles.logContainer}>
+            <Text style={setupStyles.logPrompt}>What did you accomplish?</Text>
             <TextInput
-              style={styles.logInput}
+              style={setupStyles.logInput}
               value={sessionLog}
               onChangeText={setSessionLog}
               placeholder="One sentence..."
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               returnKeyType="done"
               onSubmitEditing={startBreak}
             />
-            <TouchableOpacity style={styles.logButton} onPress={startBreak}>
-              <Text style={styles.logButtonText}>Start Break</Text>
+            <TouchableOpacity style={setupStyles.logButton} onPress={startBreak}>
+              <Text style={setupStyles.logButtonText}>Start Break</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Controls */}
         {!showLog && (
-          <View style={styles.controls}>
-            <TouchableOpacity style={styles.button} onPress={() => setIsRunning(true)}>
-              <Text style={styles.buttonText}>Start</Text>
+          <View style={staticStyles.controls}>
+            <TouchableOpacity style={setupStyles.button} onPress={() => setIsRunning(true)}>
+              <Text style={setupStyles.buttonText}>Start</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Close */}
-        <TouchableOpacity style={styles.closeButton} onPress={() => { clearTimer(); onClose(); }}>
-          <Text style={styles.closeText}>Close</Text>
+        <TouchableOpacity style={staticStyles.closeButton} onPress={() => { clearTimer(); onClose(); }}>
+          <Text style={setupStyles.closeText}>Close</Text>
         </TouchableOpacity>
       </View>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
-  // Setup screen (before starting)
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-  },
-  taskTitle: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
-  },
+// Static styles that don't depend on theme
+const staticStyles = StyleSheet.create({
   presetScroll: {
     maxHeight: 64,
     marginBottom: Spacing.md,
@@ -540,74 +732,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     gap: Spacing.sm,
   },
-  presetChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    alignItems: 'center',
-  },
-  presetChipActive: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
-  },
-  presetChipText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 13,
-  },
-  presetChipTextActive: {
-    color: Colors.dark.background,
-  },
-  presetChipSub: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  presetChipSubActive: {
-    color: Colors.dark.surfaceHover,
-  },
   sessionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
     marginBottom: Spacing.lg,
-  },
-  sessionsLabel: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    marginRight: Spacing.sm,
-  },
-  sessionsBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sessionsBtnText: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 18,
-  },
-  sessionsInput: {
-    backgroundColor: Colors.dark.surface,
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 18,
-    width: 48,
-    height: 36,
-    borderRadius: 12,
-    textAlign: 'center',
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
   },
   customInputs: {
     flexDirection: 'row',
@@ -617,146 +746,21 @@ const styles = StyleSheet.create({
   customField: {
     alignItems: 'center',
   },
-  customLabel: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    marginBottom: 4,
-  },
-  customInput: {
-    backgroundColor: Colors.dark.surface,
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 18,
-    width: 56,
-    height: 44,
-    borderRadius: 12,
-    textAlign: 'center',
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  customUnit: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  phase: {
-    fontFamily: Fonts.headingMedium,
-    fontSize: 18,
-    marginBottom: Spacing.md,
-    textTransform: 'uppercase',
-    letterSpacing: 3,
-  },
-  timer: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.heading,
-    fontSize: 72,
-    marginBottom: Spacing.md,
-    textAlign: 'center',
-    includeFontPadding: false,
-  },
   timerEditRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginBottom: Spacing.md,
   },
-  timerEditInput: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.heading,
-    fontSize: 60,
-    textAlign: 'center',
-    width: 100,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.dark.accent,
-    paddingVertical: 4,
-    includeFontPadding: false,
-  },
-  timerEditColon: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.heading,
-    fontSize: 60,
-    includeFontPadding: false,
-  },
-  timerEditDone: {
-    marginLeft: 12,
-    backgroundColor: Colors.dark.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  timerEditDoneText: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
-  },
-  sessionCount: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    marginBottom: Spacing.sm,
-  },
   logContainer: {
     width: '100%',
     alignItems: 'center',
     marginBottom: Spacing.lg,
   },
-  logPrompt: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 16,
-    marginBottom: Spacing.sm,
-  },
-  logInput: {
-    backgroundColor: Colors.dark.surface,
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    width: '100%',
-    height: 48,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    marginBottom: Spacing.md,
-  },
-  logButton: {
-    backgroundColor: Colors.dark.accent,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: 12,
-  },
-  logButtonText: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 16,
-  },
   controls: {
     flexDirection: 'row',
     gap: Spacing.md,
     marginTop: Spacing.md,
-  },
-  button: {
-    backgroundColor: Colors.dark.accent,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 14,
-  },
-  buttonText: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 16,
-  },
-  buttonSecondary: {
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  buttonSecondaryText: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 16,
   },
   closeButton: {
     position: 'absolute',
@@ -765,63 +769,81 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
   },
-  closeText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-  },
+});
 
-  // Immersive fullscreen (when timer is active)
-  immersiveContainer: {
+// Immersive styles are always dark
+const immersiveStyles = StyleSheet.create({
+  container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: darkColors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  immersivePhase: {
+  phase: {
     fontFamily: Fonts.headingMedium,
     fontSize: 16,
     textTransform: 'uppercase',
     letterSpacing: 4,
     marginBottom: Spacing.lg,
   },
-  immersiveTimer: {
-    color: Colors.dark.text,
+  timer: {
+    color: darkColors.text,
     fontFamily: Fonts.heading,
     fontSize: 96,
     marginBottom: Spacing.md,
     textAlign: 'center',
     includeFontPadding: false,
   },
-  immersiveTask: {
-    color: Colors.dark.textTertiary,
+  task: {
+    color: darkColors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 14,
     marginBottom: Spacing.sm,
   },
-  immersiveSession: {
-    color: Colors.dark.textTertiary,
+  session: {
+    color: darkColors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 13,
     marginBottom: Spacing.md,
   },
-  immersiveBreakSuggestion: {
-    color: Colors.dark.timer,
+  breakSuggestion: {
+    color: darkColors.timer,
     fontFamily: Fonts.accentItalic,
     fontSize: 18,
     textAlign: 'center',
     paddingHorizontal: Spacing.xl,
     marginBottom: Spacing.lg,
   },
-  immersiveControls: {
+  controls: {
     flexDirection: 'row',
     gap: Spacing.md,
     marginTop: Spacing.xl,
   },
-  immersiveHint: {
+  button: {
+    backgroundColor: darkColors.accent,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 14,
+  },
+  buttonText: {
+    color: darkColors.background,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 16,
+  },
+  buttonSecondary: {
+    backgroundColor: darkColors.surface,
+    borderWidth: 1,
+    borderColor: darkColors.border,
+  },
+  buttonSecondaryText: {
+    color: darkColors.text,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 16,
+  },
+  hint: {
     position: 'absolute',
     bottom: 60,
-    color: Colors.dark.textTertiary,
+    color: darkColors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 12,
     opacity: 0.5,
@@ -832,10 +854,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: darkColors.border,
   },
   lostFocusText: {
-    color: Colors.dark.textSecondary,
+    color: darkColors.textSecondary,
     fontFamily: Fonts.bodyMedium,
     fontSize: 15,
   },

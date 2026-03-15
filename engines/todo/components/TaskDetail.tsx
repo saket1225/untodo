@@ -1,8 +1,9 @@
-import { useState, memo, useEffect } from 'react';
+import { useState, memo, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { format } from 'date-fns';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { Fonts, Spacing } from '../../../lib/theme';
+import { useTheme } from '../../../lib/ThemeContext';
 import { Todo, Priority, Category, CATEGORIES, PRIORITY_CONFIG } from '../types';
 import { useTodoStore } from '../store';
 
@@ -16,6 +17,7 @@ interface Props {
 }
 
 function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPomodoro }: Props) {
+  const { colors } = useTheme();
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(todo.title);
   const [noteText, setNoteText] = useState(todo.notes || '');
@@ -95,6 +97,223 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
     }
   })();
 
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: Spacing.lg,
+      paddingBottom: Spacing.xxl,
+      maxHeight: '85%',
+      borderWidth: 1,
+      borderBottomWidth: 0,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.5,
+      shadowRadius: 16,
+      elevation: 24,
+    },
+    handle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      alignSelf: 'center',
+      marginBottom: Spacing.md,
+    },
+    taskTitle: {
+      color: colors.text,
+      fontFamily: Fonts.headingMedium,
+      fontSize: 20,
+      marginBottom: Spacing.xs,
+    },
+    titleInput: {
+      color: colors.text,
+      fontFamily: Fonts.headingMedium,
+      fontSize: 20,
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    createdDate: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.accentItalic,
+      fontSize: 12,
+      marginBottom: Spacing.lg,
+    },
+    sectionLabel: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.headingMedium,
+      fontSize: 13,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: Spacing.sm,
+      marginTop: Spacing.md,
+    },
+    notesInput: {
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 12,
+      color: colors.text,
+      fontFamily: Fonts.body,
+      fontSize: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      minHeight: 80,
+    },
+    chip: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 16,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    chipText: {
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    chipActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    chipTextActive: {
+      color: colors.background,
+    },
+    dayChip: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    dayChipActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    dayChipText: {
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    dayChipTextActive: {
+      color: colors.background,
+    },
+    subtaskCheck: {
+      width: 18,
+      height: 18,
+      borderRadius: 4,
+      borderWidth: 1.5,
+      borderColor: colors.textTertiary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    subtaskCheckDone: {
+      backgroundColor: colors.success,
+      borderColor: colors.success,
+    },
+    subtaskCheckmark: {
+      color: colors.background,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    subtaskText: {
+      flex: 1,
+      color: colors.text,
+      fontFamily: Fonts.body,
+      fontSize: 14,
+    },
+    subtaskTextDone: {
+      textDecorationLine: 'line-through',
+      color: colors.textTertiary,
+    },
+    subtaskDelete: {
+      color: colors.textTertiary,
+      fontSize: 12,
+      padding: 4,
+    },
+    addSubtaskIcon: {
+      color: colors.textSecondary,
+      fontSize: 16,
+      width: 24,
+      textAlign: 'center',
+    },
+    addSubtaskText: {
+      color: colors.textSecondary,
+      fontFamily: Fonts.body,
+      fontSize: 14,
+    },
+    editInput: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 12,
+      color: colors.text,
+      fontFamily: Fonts.body,
+      fontSize: 15,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    saveBtn: {
+      backgroundColor: colors.accent,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    saveBtnText: {
+      color: colors.background,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 14,
+    },
+    pomodoroBtn: {
+      backgroundColor: colors.accent,
+      borderRadius: 12,
+      paddingVertical: Spacing.md,
+      alignItems: 'center',
+      marginTop: Spacing.lg,
+    },
+    pomodoroBtnText: {
+      color: colors.background,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 15,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
+      paddingVertical: Spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      marginTop: Spacing.sm,
+    },
+    actionIcon: {
+      color: colors.textSecondary,
+      fontSize: 16,
+      width: 24,
+      textAlign: 'center',
+    },
+    actionText: {
+      color: colors.text,
+      fontFamily: Fonts.body,
+      fontSize: 15,
+    },
+  }), [colors]);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
@@ -107,7 +326,7 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
           >
             {/* Title */}
             {editingTitle ? (
-              <View style={styles.titleEditRow}>
+              <View style={staticStyles.titleEditRow}>
                 <TextInput
                   style={styles.titleInput}
                   value={title}
@@ -145,24 +364,24 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
               onChangeText={setNoteText}
               onBlur={handleSaveNote}
               placeholder="Add notes..."
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               multiline
               textAlignVertical="top"
             />
 
             {/* Priority */}
             <Text style={styles.sectionLabel}>Priority</Text>
-            <View style={styles.chipRow}>
+            <View style={staticStyles.chipRow}>
               {([null, 'low', 'medium', 'high'] as Priority[]).map(p => {
                 const isActive = todo.priority === p;
-                const color = p ? PRIORITY_CONFIG[p].color : Colors.dark.textTertiary;
+                const color = p ? PRIORITY_CONFIG[p].color : colors.textTertiary;
                 return (
                   <TouchableOpacity
                     key={String(p)}
                     style={[styles.chip, isActive && { backgroundColor: color, borderColor: color }]}
                     onPress={() => handlePriority(p)}
                   >
-                    <Text style={[styles.chipText, isActive && { color: Colors.dark.background }]}>
+                    <Text style={[styles.chipText, isActive && { color: colors.background }]}>
                       {p ? PRIORITY_CONFIG[p].label : 'None'}
                     </Text>
                   </TouchableOpacity>
@@ -172,7 +391,7 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
 
             {/* Category */}
             <Text style={styles.sectionLabel}>Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={staticStyles.catScroll}>
               <TouchableOpacity
                 style={[styles.chip, !todo.category && styles.chipActive]}
                 onPress={() => handleCategory(null)}
@@ -185,7 +404,7 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
                   style={[styles.chip, todo.category === c.key && { backgroundColor: c.color, borderColor: c.color }, { marginLeft: Spacing.sm }]}
                   onPress={() => handleCategory(c.key)}
                 >
-                  <Text style={[styles.chipText, todo.category === c.key && { color: Colors.dark.background }]}>
+                  <Text style={[styles.chipText, todo.category === c.key && { color: colors.background }]}>
                     {c.label}
                   </Text>
                 </TouchableOpacity>
@@ -194,39 +413,39 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
 
             {/* Recurrence */}
             <Text style={styles.sectionLabel}>Recurring</Text>
-            <View style={styles.chipRow}>
+            <View style={staticStyles.chipRow}>
               <TouchableOpacity
-                style={[styles.chip, !todo.recurrence && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
+                style={[styles.chip, !todo.recurrence && { backgroundColor: colors.accent, borderColor: colors.accent }]}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   onUpdate(todo.id, { recurrence: undefined });
                 }}
               >
-                <Text style={[styles.chipText, !todo.recurrence && { color: Colors.dark.background }]}>None</Text>
+                <Text style={[styles.chipText, !todo.recurrence && { color: colors.background }]}>None</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.chip, todo.recurrence?.type === 'daily' && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
+                style={[styles.chip, todo.recurrence?.type === 'daily' && { backgroundColor: colors.accent, borderColor: colors.accent }]}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   onUpdate(todo.id, { recurrence: { type: 'daily' } });
                 }}
               >
-                <Text style={[styles.chipText, todo.recurrence?.type === 'daily' && { color: Colors.dark.background }]}>Daily</Text>
+                <Text style={[styles.chipText, todo.recurrence?.type === 'daily' && { color: colors.background }]}>Daily</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.chip, (todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent }]}
+                style={[styles.chip, (todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && { backgroundColor: colors.accent, borderColor: colors.accent }]}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   const dayOfWeek = new Date().getDay();
                   onUpdate(todo.id, { recurrence: { type: 'custom', days: todo.recurrence?.days || [dayOfWeek] } });
                 }}
               >
-                <Text style={[styles.chipText, (todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && { color: Colors.dark.background }]}>Custom</Text>
+                <Text style={[styles.chipText, (todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && { color: colors.background }]}>Custom</Text>
               </TouchableOpacity>
             </View>
             {/* Day picker for custom recurrence */}
             {(todo.recurrence?.type === 'weekly' || todo.recurrence?.type === 'custom') && (
-              <View style={styles.dayPickerRow}>
+              <View style={staticStyles.dayPickerRow}>
                 {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, idx) => {
                   const isSelected = (todo.recurrence?.days || []).includes(idx);
                   return (
@@ -256,9 +475,9 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
               Subtasks{subtasks.length > 0 ? ` (${subtasksDone}/${subtasks.length})` : ''}
             </Text>
             {subtasks.length > 0 && (
-              <View style={styles.subtaskList}>
+              <View style={staticStyles.subtaskList}>
                 {subtasks.map(s => (
-                  <View key={s.id} style={styles.subtaskRow}>
+                  <View key={s.id} style={staticStyles.subtaskRow}>
                     <TouchableOpacity
                       onPress={() => toggleSubtask(todo.id, s.id)}
                       accessibilityLabel={s.completed ? `Mark "${s.title}" incomplete` : `Complete "${s.title}"`}
@@ -283,13 +502,13 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
               </View>
             )}
             {addingSubtask ? (
-              <View style={styles.editRow}>
+              <View style={staticStyles.editRow}>
                 <TextInput
                   style={styles.editInput}
                   value={subtaskTitle}
                   onChangeText={setSubtaskTitle}
                   placeholder="Subtask title"
-                  placeholderTextColor={Colors.dark.textTertiary}
+                  placeholderTextColor={colors.textTertiary}
 
                   onSubmitEditing={handleAddSubtask}
                   returnKeyType="done"
@@ -300,7 +519,7 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
               </View>
             ) : (
               <TouchableOpacity
-                style={styles.addSubtaskBtn}
+                style={staticStyles.addSubtaskBtn}
                 onPress={() => setAddingSubtask(true)}
                 accessibilityLabel="Add subtask"
                 accessibilityRole="button"
@@ -336,13 +555,13 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
 
             {/* Delete */}
             <TouchableOpacity
-              style={[styles.actionRow, styles.deleteRow]}
+              style={[styles.actionRow, staticStyles.deleteRow]}
               onPress={handleDelete}
               accessibilityLabel="Delete task"
               accessibilityRole="button"
             >
-              <Text style={[styles.actionIcon, { color: Colors.dark.error }]}>✕</Text>
-              <Text style={[styles.actionText, { color: Colors.dark.error }]}>Delete</Text>
+              <Text style={[styles.actionIcon, { color: colors.error }]}>✕</Text>
+              <Text style={[styles.actionText, { color: colors.error }]}>Delete</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -351,106 +570,14 @@ function TaskDetailInner({ todo, visible, onClose, onUpdate, onDelete, onStartPo
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: Colors.dark.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: Spacing.lg,
-    paddingBottom: Spacing.xxl,
-    maxHeight: '85%',
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: Colors.dark.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 24,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.dark.border,
-    alignSelf: 'center',
-    marginBottom: Spacing.md,
-  },
-  taskTitle: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 20,
-    marginBottom: Spacing.xs,
-  },
+// Static styles that don't depend on theme
+const staticStyles = StyleSheet.create({
   titleEditRow: {
     marginBottom: Spacing.xs,
-  },
-  titleInput: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 20,
-    backgroundColor: Colors.dark.background,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  createdDate: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.accentItalic,
-    fontSize: 12,
-    marginBottom: Spacing.lg,
-  },
-  sectionLabel: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.headingMedium,
-    fontSize: 13,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.md,
-  },
-  notesInput: {
-    backgroundColor: Colors.dark.background,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    minHeight: 80,
   },
   chipRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  chipText: {
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 12,
-    color: Colors.dark.textSecondary,
-  },
-  chipActive: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
-  },
-  chipTextActive: {
-    color: Colors.dark.background,
   },
   catScroll: {
     flexGrow: 0,
@@ -460,28 +587,6 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: Spacing.sm,
     justifyContent: 'center',
-  },
-  dayChip: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.dark.background,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dayChipActive: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
-  },
-  dayChipText: {
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 12,
-    color: Colors.dark.textSecondary,
-  },
-  dayChipTextActive: {
-    color: Colors.dark.background,
   },
   subtaskList: {
     marginBottom: Spacing.xs,
@@ -493,116 +598,17 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     paddingLeft: 4,
   },
-  subtaskCheck: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: Colors.dark.textTertiary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  subtaskCheckDone: {
-    backgroundColor: Colors.dark.success,
-    borderColor: Colors.dark.success,
-  },
-  subtaskCheckmark: {
-    color: Colors.dark.background,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  subtaskText: {
-    flex: 1,
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-  },
-  subtaskTextDone: {
-    textDecorationLine: 'line-through',
-    color: Colors.dark.textTertiary,
-  },
-  subtaskDelete: {
-    color: Colors.dark.textTertiary,
-    fontSize: 12,
-    padding: 4,
-  },
   addSubtaskBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
     paddingVertical: 10,
   },
-  addSubtaskIcon: {
-    color: Colors.dark.textSecondary,
-    fontSize: 16,
-    width: 24,
-    textAlign: 'center',
-  },
-  addSubtaskText: {
-    color: Colors.dark.textSecondary,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-  },
   editRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
     paddingVertical: Spacing.sm,
-  },
-  editInput: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  saveBtn: {
-    backgroundColor: Colors.dark.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  saveBtnText: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 14,
-  },
-  pomodoroBtn: {
-    backgroundColor: Colors.dark.accent,
-    borderRadius: 12,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    marginTop: Spacing.lg,
-  },
-  pomodoroBtnText: {
-    color: Colors.dark.background,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 15,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
-    marginTop: Spacing.sm,
-  },
-  actionIcon: {
-    color: Colors.dark.textSecondary,
-    fontSize: 16,
-    width: 24,
-    textAlign: 'center',
-  },
-  actionText: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 15,
   },
   deleteRow: {
     borderTopWidth: 0,

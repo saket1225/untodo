@@ -1,10 +1,11 @@
-import { useRef, memo, useState, useEffect } from 'react';
+import { useRef, memo, useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Animated, Alert,
   LayoutAnimation, UIManager, Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { Fonts, Spacing } from '../../../lib/theme';
+import { useTheme } from '../../../lib/ThemeContext';
 import { Todo, CATEGORIES, PRIORITY_CONFIG } from '../types';
 import { useTodoStore } from '../store';
 
@@ -41,6 +42,7 @@ function formatTrackingTime(totalSeconds: number): string {
 
 function LiveTimer({ startedAt, baseSeconds }: { startedAt: string; baseSeconds: number }) {
   const [elapsed, setElapsed] = useState(0);
+  const { colors } = useTheme();
 
   useEffect(() => {
     const start = new Date(startedAt).getTime();
@@ -53,7 +55,7 @@ function LiveTimer({ startedAt, baseSeconds }: { startedAt: string; baseSeconds:
   }, [startedAt]);
 
   return (
-    <Text style={styles.trackingTime}>
+    <Text style={{ color: colors.timer, fontFamily: Fonts.bodyMedium, fontSize: 11 }}>
       {formatTrackingTime(baseSeconds + elapsed)}
     </Text>
   );
@@ -107,7 +109,7 @@ function CheckboxConfetti({ visible }: { visible: boolean }) {
   if (!visible) return null;
 
   return (
-    <View style={styles.confettiContainer} pointerEvents="none">
+    <View style={staticStyles.confettiContainer} pointerEvents="none">
       {particles.map((p, i) => (
         <Animated.View
           key={i}
@@ -136,6 +138,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
   const confettiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startTimeTracking = useTodoStore(s => s.startTimeTracking);
   const stopTimeTracking = useTodoStore(s => s.stopTimeTracking);
+  const { colors } = useTheme();
 
   // Cleanup confetti timer on unmount
   useEffect(() => {
@@ -194,6 +197,178 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
   const subtasksDone = subtasks.filter(s => s.completed).length;
   const subtaskProgress = subtasks.length > 0 ? subtasksDone / subtasks.length : 0;
 
+  const styles = useMemo(() => StyleSheet.create({
+    wrapper: {
+      position: 'relative',
+      marginHorizontal: Spacing.lg,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      paddingVertical: Spacing.md,
+      paddingHorizontal: Spacing.sm,
+      gap: Spacing.sm,
+    },
+    highPriorityContainer: {
+      backgroundColor: '#EF44440A',
+      borderLeftWidth: 3,
+      borderLeftColor: '#EF4444',
+    },
+    mediumPriorityContainer: {
+      backgroundColor: '#FBBF240A',
+    },
+    selectedContainer: {
+      backgroundColor: colors.accent + '12',
+    },
+    selectionCircle: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      borderColor: colors.textTertiary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    selectionCircleActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    selectionCheck: {
+      color: colors.background,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    checkboxInner: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      borderColor: colors.textTertiary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    checkboxChecked: {
+      backgroundColor: colors.success,
+      borderColor: colors.success,
+    },
+    checkmark: {
+      color: colors.background,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    content: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: Spacing.sm,
+    },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      gap: 6,
+    },
+    carriedOverBadge: {
+      backgroundColor: colors.timer + '22',
+      borderRadius: 4,
+      paddingHorizontal: 4,
+      paddingVertical: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+    },
+    carriedOverArrow: {
+      color: colors.timer,
+      fontSize: 11,
+    },
+    carriedOverText: {
+      color: colors.timer,
+      fontSize: 9,
+      fontFamily: Fonts.body,
+    },
+    title: {
+      color: colors.text,
+      fontFamily: Fonts.body,
+      fontSize: 15,
+      lineHeight: 21,
+      flex: 1,
+    },
+    titleCompleted: {
+      textDecorationLine: 'line-through',
+      color: colors.textTertiary,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flexShrink: 0,
+      minWidth: 40,
+    },
+    metaText: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+    },
+    subtaskProgressBar: {
+      width: 28,
+      height: 2,
+      backgroundColor: colors.border,
+      borderRadius: 1,
+      overflow: 'hidden',
+    },
+    subtaskProgressFill: {
+      height: '100%',
+      backgroundColor: colors.success,
+      borderRadius: 1,
+    },
+    estimate: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+    },
+    habitDotDone: {
+      backgroundColor: colors.success,
+    },
+    habitDotMissed: {
+      backgroundColor: colors.border,
+    },
+    habitDotToday: {
+      backgroundColor: colors.success,
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    },
+    trackingBtn: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    trackingBtnActive: {
+      backgroundColor: colors.timer + '22',
+      borderWidth: 1,
+      borderColor: colors.timer,
+    },
+    trackingBtnText: {
+      fontSize: 9,
+      color: colors.textTertiary,
+    },
+    trackingBtnTextActive: {
+      color: colors.timer,
+    },
+    trackingTimeIdle: {
+      color: colors.textTertiary,
+      fontFamily: Fonts.body,
+      fontSize: 11,
+    },
+  }), [colors]);
+
   return (
     <View style={styles.wrapper}>
       <Animated.View
@@ -203,7 +378,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
           priorityColor ? { borderLeftWidth: 3, borderLeftColor: priorityColor } : { borderLeftWidth: 3, borderLeftColor: 'transparent' },
           todo.priority === 'high' && !selectionMode && styles.highPriorityContainer,
           todo.priority === 'medium' && !selectionMode && styles.mediumPriorityContainer,
-          isTracking && !selectionMode && { borderColor: Colors.dark.timer, borderWidth: 1 },
+          isTracking && !selectionMode && { borderColor: colors.timer, borderWidth: 1 },
           todo.completed && !selectionMode && { opacity: 0.4 },
           selectionMode && isSelected && styles.selectedContainer,
         ]}
@@ -211,7 +386,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
         {/* Checkbox / Selection */}
         {selectionMode ? (
           <TouchableOpacity
-            style={styles.checkbox}
+            style={staticStyles.checkbox}
             onPress={onSelect}
             accessibilityLabel={isSelected ? 'Deselect task' : 'Select task'}
             accessibilityRole="checkbox"
@@ -223,7 +398,7 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={styles.checkbox}
+            style={staticStyles.checkbox}
             onPress={handleToggle}
             accessibilityLabel={todo.completed ? `Mark "${todo.title}" incomplete` : `Complete "${todo.title}"`}
             accessibilityRole="checkbox"
@@ -257,13 +432,13 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
               </View>
             )}
             {categoryInfo && (
-              <View style={[styles.categoryDot, { backgroundColor: categoryInfo.color }]} />
+              <View style={[staticStyles.categoryDot, { backgroundColor: categoryInfo.color }]} />
             )}
             <Text
               style={[
                 styles.title,
                 todo.completed && styles.titleCompleted,
-                !todo.completed && todo.priority === 'high' && styles.highPriorityTitle,
+                !todo.completed && todo.priority === 'high' && { fontFamily: Fonts.bodyMedium },
               ]}
               numberOfLines={2}
               ellipsizeMode="tail"
@@ -278,8 +453,8 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
               <Text style={styles.metaText}>↻</Text>
             )}
             {subtasks.length > 0 && (
-              <View style={styles.subtaskMeta}>
-                <Text style={[styles.metaText, subtasksDone === subtasks.length && { color: Colors.dark.success }]}>
+              <View style={staticStyles.subtaskMeta}>
+                <Text style={[styles.metaText, subtasksDone === subtasks.length && { color: colors.success }]}>
                   {subtasksDone}/{subtasks.length}
                 </Text>
                 <View style={styles.subtaskProgressBar}>
@@ -307,12 +482,12 @@ function TodoItemInner({ todo, onToggle, onDelete, onPress, onLongPress, onFocus
 
         {/* Habit tracking dots for recurring tasks */}
         {todo.recurrence && habitHistory && habitHistory.length > 0 && !selectionMode && (
-          <View style={styles.habitDots}>
+          <View style={staticStyles.habitDots}>
             {habitHistory.map((done, i) => (
               <View
                 key={i}
                 style={[
-                  styles.habitDot,
+                  staticStyles.habitDot,
                   done ? styles.habitDotDone : styles.habitDotMissed,
                   i === habitHistory.length - 1 && done && styles.habitDotToday,
                 ]}
@@ -365,35 +540,8 @@ const TodoItem = memo(TodoItemInner, (prev, next) => {
 
 export default TodoItem;
 
-const styles = StyleSheet.create({
-  wrapper: {
-    position: 'relative',
-    marginHorizontal: Spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
-  },
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.dark.background,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.sm,
-    gap: Spacing.sm,
-  },
-  highPriorityContainer: {
-    backgroundColor: '#EF44440A',
-    borderLeftWidth: 3,
-    borderLeftColor: '#EF4444',
-  },
-  mediumPriorityContainer: {
-    backgroundColor: '#FBBF240A',
-  },
-  selectedContainer: {
-    backgroundColor: Colors.dark.accent + '12',
-  },
-  highPriorityTitle: {
-    fontFamily: Fonts.bodyMedium,
-  },
+// Static styles that don't depend on theme
+const staticStyles = StyleSheet.create({
   checkbox: {
     width: 44,
     height: 44,
@@ -410,126 +558,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  selectionCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: Colors.dark.textTertiary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectionCircleActive: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
-  },
-  selectionCheck: {
-    color: Colors.dark.background,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  checkboxInner: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: Colors.dark.textTertiary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: Colors.dark.success,
-    borderColor: Colors.dark.success,
-  },
-  checkmark: {
-    color: Colors.dark.background,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  content: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.sm,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 6,
-  },
-  carriedOverBadge: {
-    backgroundColor: Colors.dark.timer + '22',
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  carriedOverArrow: {
-    color: Colors.dark.timer,
-    fontSize: 11,
-  },
-  carriedOverText: {
-    color: Colors.dark.timer,
-    fontSize: 9,
-    fontFamily: Fonts.body,
-  },
   categoryDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
   },
-  title: {
-    color: Colors.dark.text,
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    lineHeight: 21,
-    flex: 1,
-  },
-  titleCompleted: {
-    textDecorationLine: 'line-through',
-    color: Colors.dark.textTertiary,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0,
-    minWidth: 40,
-  },
-  metaText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-  },
   subtaskMeta: {
     alignItems: 'center',
     gap: 2,
-  },
-  subtaskProgressBar: {
-    width: 28,
-    height: 2,
-    backgroundColor: Colors.dark.border,
-    borderRadius: 1,
-    overflow: 'hidden',
-  },
-  subtaskProgressFill: {
-    height: '100%',
-    backgroundColor: Colors.dark.success,
-    borderRadius: 1,
-  },
-  pomodoroText: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-  },
-  estimate: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
   },
   habitDots: {
     flexDirection: 'row',
@@ -541,47 +577,5 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 3,
-  },
-  habitDotDone: {
-    backgroundColor: Colors.dark.success,
-  },
-  habitDotMissed: {
-    backgroundColor: Colors.dark.border,
-  },
-  habitDotToday: {
-    backgroundColor: Colors.dark.success,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  trackingBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: Colors.dark.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  trackingBtnActive: {
-    backgroundColor: Colors.dark.timer + '22',
-    borderWidth: 1,
-    borderColor: Colors.dark.timer,
-  },
-  trackingBtnText: {
-    fontSize: 9,
-    color: Colors.dark.textTertiary,
-  },
-  trackingBtnTextActive: {
-    color: Colors.dark.timer,
-  },
-  trackingTime: {
-    color: Colors.dark.timer,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 11,
-  },
-  trackingTimeIdle: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
-    fontSize: 11,
   },
 });

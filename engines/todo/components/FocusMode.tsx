@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Modal, Dimensions,
   Animated, StatusBar, PanResponder,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../../lib/theme';
+import { useTheme } from '../../../lib/ThemeContext';
 import { Todo } from '../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -36,6 +37,9 @@ function formatTime(seconds: number): string {
   if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
   return `${m}:${pad(s)}`;
 }
+
+// FocusMode is an immersive experience — always uses dark colors
+const darkColors = Colors.dark;
 
 // Focus mode completion celebration
 function FocusCelebration({ visible, message, focusTime }: { visible: boolean; message: string; focusTime: number }) {
@@ -87,12 +91,13 @@ function FocusCelebration({ visible, message, focusTime }: { visible: boolean; m
   );
 }
 
+// Celebration styles are always dark (immersive)
 const celebStyles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.dark.background,
+    backgroundColor: darkColors.background,
     zIndex: 10,
   },
   ring: {
@@ -101,7 +106,7 @@ const celebStyles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     borderWidth: 2,
-    borderColor: Colors.dark.success,
+    borderColor: darkColors.success,
   },
   content: {
     alignItems: 'center',
@@ -109,25 +114,25 @@ const celebStyles = StyleSheet.create({
   },
   checkmark: {
     fontSize: 64,
-    color: Colors.dark.success,
+    color: darkColors.success,
     marginBottom: Spacing.lg,
   },
   title: {
-    color: Colors.dark.text,
+    color: darkColors.text,
     fontFamily: Fonts.accentItalic,
     fontSize: 32,
     textAlign: 'center',
     marginBottom: Spacing.md,
   },
   message: {
-    color: Colors.dark.textSecondary,
+    color: darkColors.textSecondary,
     fontFamily: Fonts.accentItalic,
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
   },
   time: {
-    color: Colors.dark.textTertiary,
+    color: darkColors.textTertiary,
     fontFamily: Fonts.bodyMedium,
     fontSize: 14,
     marginTop: Spacing.lg,
@@ -221,6 +226,7 @@ export default function FocusMode({ todo, visible, onClose, onComplete }: Props)
 
   if (!visible) return null;
 
+  // FocusMode always uses dark theme (immersive experience)
   return (
     <Modal visible={visible} animationType="none" statusBarTranslucent>
       <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
@@ -299,10 +305,11 @@ export default function FocusMode({ todo, visible, onClose, onComplete }: Props)
   );
 }
 
+// FocusMode styles are always dark (immersive experience stays dark in both themes)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: darkColors.background,
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 60,
@@ -315,19 +322,19 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: darkColors.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeBtnText: {
-    color: Colors.dark.textTertiary,
+    color: darkColors.textTertiary,
     fontSize: 16,
   },
   swipeIndicator: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.dark.textTertiary,
+    backgroundColor: darkColors.textTertiary,
     opacity: 0.3,
     marginTop: 8,
   },
@@ -341,11 +348,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.dark.text,
+    backgroundColor: darkColors.text,
     marginBottom: Spacing.xxl,
   },
   taskTitle: {
-    color: Colors.dark.text,
+    color: darkColors.text,
     fontFamily: Fonts.accentItalic,
     fontSize: 28,
     textAlign: 'center',
@@ -353,14 +360,14 @@ const styles = StyleSheet.create({
     maxWidth: SCREEN_WIDTH * 0.85,
   },
   timer: {
-    color: Colors.dark.textTertiary,
+    color: darkColors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 48,
     marginTop: Spacing.xxl,
     letterSpacing: 2,
   },
   focusLabel: {
-    color: Colors.dark.textTertiary,
+    color: darkColors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 12,
     marginTop: Spacing.sm,
@@ -369,7 +376,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   prevTime: {
-    color: Colors.dark.textTertiary,
+    color: darkColors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 14,
     marginTop: Spacing.lg,
@@ -379,13 +386,13 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH * 0.85,
     paddingVertical: 18,
     borderRadius: 16,
-    backgroundColor: Colors.dark.text,
+    backgroundColor: darkColors.text,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
   },
   doneBtnText: {
-    color: Colors.dark.background,
+    color: darkColors.background,
     fontFamily: Fonts.bodyMedium,
     fontSize: 17,
     letterSpacing: 1,
