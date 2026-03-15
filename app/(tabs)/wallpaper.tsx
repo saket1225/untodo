@@ -1,5 +1,5 @@
 import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Switch, TextInput, StyleSheet, Dimensions, Alert, AppState, Platform, Share, ActivityIndicator, LayoutAnimation, UIManager, PixelRatio } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Switch, TextInput, StyleSheet, Dimensions, Alert, AppState, Platform, Share, ActivityIndicator, LayoutAnimation, UIManager, PixelRatio, Animated as RNAnimated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
@@ -1016,6 +1016,12 @@ function WallpaperScreenContent() {
   const [savedToast, setSavedToast] = useState(false);
   const [generating, setGenerating] = useState(false);
 
+  // Entrance fade animation
+  const entranceFade = useRef(new RNAnimated.Value(0)).current;
+  useEffect(() => {
+    RNAnimated.timing(entranceFade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
+  }, []);
+
   const activeStyle = WALLPAPER_STYLES[config.wallpaperStyle || 'minimal'];
   const startDate = new Date((config.startDate || '2026-03-10') + 'T00:00:00');
   const goalDate = config.goalDate || '2028-01-12';
@@ -1228,7 +1234,7 @@ function WallpaperScreenContent() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <RNAnimated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }} style={{ opacity: entranceFade }}>
         <Text style={styles.heading}>Wallpaper</Text>
 
         {/* ── Hidden full-res ViewShot for capture ── */}
@@ -1636,7 +1642,7 @@ function WallpaperScreenContent() {
         >
           <Text style={styles.resetBtnText}>Reset to Defaults</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </RNAnimated.ScrollView>
     </SafeAreaView>
   );
 }
@@ -1663,31 +1669,34 @@ const styles = StyleSheet.create({
     fontSize: 36,
     paddingTop: Spacing.lg,
     marginBottom: Spacing.lg,
+    letterSpacing: -0.5,
   },
 
-  // Phone frame — pixel-perfect preview
+  // Phone frame — premium preview
   phoneFrame: {
-    borderRadius: 28,
+    borderRadius: 32,
     overflow: 'hidden',
     borderWidth: PHONE_BORDER,
-    borderColor: '#2A2A2A',
+    borderColor: '#3A3A3A',
     marginBottom: Spacing.lg,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.7,
-    shadowRadius: 24,
-    elevation: 20,
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.8,
+    shadowRadius: 32,
+    elevation: 24,
     backgroundColor: '#111111',
   },
   phoneNotch: {
-    width: 80,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: '#2A2A2A',
+    width: 100,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#1A1A1A',
     alignSelf: 'center',
-    marginTop: 8,
+    marginTop: 10,
     marginBottom: 4,
     zIndex: 10,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
   },
   preview: {
     width: PREVIEW_WIDTH,
@@ -1776,11 +1785,12 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     alignItems: 'center',
     marginBottom: Spacing.sm,
+    marginTop: Spacing.xs,
     shadowColor: '#fff',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 10,
   },
   setWallpaperBtnText: {
     color: Colors.dark.background,

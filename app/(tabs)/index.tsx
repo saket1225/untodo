@@ -150,6 +150,12 @@ function TodayScreenContent() {
   const syncFromFirestore = useTodoStore(s => s.syncFromFirestore);
   const spawnRecurringTasks = useTodoStore(s => s.spawnRecurringTasks);
 
+  // Entrance fade animation
+  const entranceFade = useRef(new RNAnimated.Value(0)).current;
+  useEffect(() => {
+    RNAnimated.timing(entranceFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, []);
+
   // Swipe gesture for day navigation
   const swipeAnim = useRef(new RNAnimated.Value(0)).current;
   const swipePanResponder = useRef(
@@ -562,7 +568,7 @@ function TodayScreenContent() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <RNAnimated.View style={[styles.header, { opacity: entranceFade }]}>
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
             {isToday && (
@@ -638,7 +644,7 @@ function TodayScreenContent() {
             )}
           </View>
         </View>
-      </View>
+      </RNAnimated.View>
 
       {/* Search bar (collapsible) */}
       {searchExpanded && (
@@ -1105,8 +1111,8 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xs,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.sm,
   },
   headerTop: {
     flexDirection: 'row',
@@ -1117,17 +1123,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   greetingText: {
-    color: Colors.dark.textTertiary,
-    fontFamily: Fonts.body,
+    color: Colors.dark.textSecondary,
+    fontFamily: Fonts.headingMedium,
     fontSize: 13,
+    letterSpacing: 0.5,
     marginBottom: 2,
   },
   greetingSubText: {
     color: Colors.dark.textTertiary,
     fontFamily: Fonts.accentItalic,
-    fontSize: 12,
-    opacity: 0.7,
-    marginBottom: 2,
+    fontSize: 13,
+    marginBottom: 4,
   },
   dateRow: {
     flexDirection: 'row',
@@ -1148,10 +1154,10 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   navArrowText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 28,
+    color: Colors.dark.textTertiary,
+    fontSize: 30,
     fontFamily: Fonts.body,
-    lineHeight: 32,
+    lineHeight: 34,
   },
   syncIcon: {
     fontSize: 14,
@@ -1160,8 +1166,9 @@ const styles = StyleSheet.create({
   dateText: {
     color: Colors.dark.text,
     fontFamily: Fonts.accentItalic,
-    fontSize: 22,
+    fontSize: 28,
     flexShrink: 1,
+    letterSpacing: -0.5,
   },
   completedSectionHeader: {
     flexDirection: 'row',
@@ -1228,6 +1235,7 @@ const styles = StyleSheet.create({
     height: 3,
     backgroundColor: Colors.dark.border,
     marginHorizontal: Spacing.lg,
+    marginTop: Spacing.xs,
     borderRadius: 2,
     overflow: 'hidden',
   },
@@ -1323,7 +1331,9 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     backgroundColor: Colors.dark.success + '12',
     borderRadius: 12,
-    marginTop: Spacing.xs,
+    borderWidth: 1,
+    borderColor: Colors.dark.success + '20',
+    marginTop: Spacing.sm,
   },
   allDoneCheck: {
     color: Colors.dark.success,
@@ -1459,12 +1469,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: Spacing.lg,
     marginHorizontal: Spacing.lg,
-    backgroundColor: Colors.dark.timer + '15',
+    backgroundColor: Colors.dark.timer + '12',
     borderRadius: 12,
-    marginTop: Spacing.xs,
+    borderWidth: 1,
+    borderColor: Colors.dark.timer + '20',
+    marginTop: Spacing.sm,
   },
   encourageText: {
     color: Colors.dark.timer,

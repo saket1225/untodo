@@ -635,6 +635,12 @@ function ProgressEmptyHero() {
 function ProgressScreenContent() {
   const [refreshing, setRefreshing] = useState(false);
   const todos = useTodoStore(s => s.todos);
+
+  // Entrance fade animation
+  const entranceFade = useRef(new RNAnimated.Value(0)).current;
+  useEffect(() => {
+    RNAnimated.timing(entranceFade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
+  }, []);
   const hasAnyTasks = todos.length > 0;
   const analytics = useMemo(() => computeAnalytics(todos), [todos]);
   const checkAchievements = useAchievementStore(s => s.checkAchievements);
@@ -661,8 +667,9 @@ function ProgressScreenContent() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <AchievementCelebration />
-      <ScrollView
+      <RNAnimated.ScrollView
         showsVerticalScrollIndicator={false}
+        style={{ opacity: entranceFade }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -729,7 +736,7 @@ function ProgressScreenContent() {
           </>
         )}
         <View style={{ height: 120 }} />
-      </ScrollView>
+      </RNAnimated.ScrollView>
     </SafeAreaView>
   );
 }
@@ -753,7 +760,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.accentItalic,
     fontSize: 36,
     paddingTop: Spacing.lg,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
+    letterSpacing: -0.5,
   },
 
   // --- 1. Ring ---

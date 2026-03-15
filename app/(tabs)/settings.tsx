@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Switch, StyleSheet, Alert, Animated as RNAnimated, Linking, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -86,6 +86,12 @@ function PulsingRing() {
 function SettingsScreenContent() {
   const router = useRouter();
   const [resetHour, setResetHour] = useState(5);
+
+  // Entrance fade animation
+  const entranceFade = useRef(new RNAnimated.Value(0)).current;
+  useEffect(() => {
+    RNAnimated.timing(entranceFade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
+  }, []);
   const [silicon, setSilicon] = useState<SiliconConnection | null>(null);
   const [siliconLoading, setSiliconLoading] = useState(true);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
@@ -252,7 +258,7 @@ function SettingsScreenContent() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <RNAnimated.ScrollView showsVerticalScrollIndicator={false} style={{ opacity: entranceFade }}>
         <Text style={styles.heading} accessibilityRole="header">Settings</Text>
 
         {/* Account */}
@@ -580,7 +586,7 @@ function SettingsScreenContent() {
         </TouchableOpacity>
 
         <View style={{ height: 120 }} />
-      </ScrollView>
+      </RNAnimated.ScrollView>
     </SafeAreaView>
   );
 }
@@ -605,6 +611,7 @@ const styles = StyleSheet.create({
     fontSize: 36,
     paddingTop: Spacing.lg,
     marginBottom: Spacing.lg,
+    letterSpacing: -0.5,
   },
   sectionHeaderText: {
     color: Colors.dark.textSecondary,
