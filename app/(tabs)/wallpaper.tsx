@@ -276,6 +276,81 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     glowCompleted: true,
     todayGlowSize: 3.5,
   },
+  sunrise: {
+    label: 'Sunrise',
+    desc: 'Warm amber',
+    bg: '#0C0804',
+    dotCompleted: (rate) => {
+      const r = Math.round(60 + 195 * rate);
+      const g = Math.round(40 + 130 * rate);
+      const b = Math.round(20 + 50 * rate);
+      return `rgb(${r}, ${g}, ${b})`;
+    },
+    dotToday: '#FFB347',
+    dotTodayGlow: 'rgba(255, 179, 71, 0.5)',
+    dotFuture: '#0E0A06',
+    dotEmpty: '#2A1F10',
+    textPrimary: '#FFB347',
+    textSecondary: '#AA7732',
+    textTertiary: '#664820',
+    todayGlowSize: 3,
+  },
+  ocean: {
+    label: 'Ocean',
+    desc: 'Deep blue',
+    bg: '#040810',
+    dotCompleted: (rate) => {
+      const r = Math.round(10 + 40 * rate);
+      const g = Math.round(50 + 160 * rate);
+      const b = Math.round(70 + 185 * rate);
+      return `rgb(${r}, ${g}, ${b})`;
+    },
+    dotToday: '#00D4FF',
+    dotTodayGlow: 'rgba(0, 212, 255, 0.5)',
+    dotFuture: '#060A14',
+    dotEmpty: '#0A1E35',
+    textPrimary: '#00D4FF',
+    textSecondary: '#0088AA',
+    textTertiary: '#004466',
+    todayGlowSize: 3,
+  },
+  blood: {
+    label: 'Blood',
+    desc: 'Deep crimson',
+    bg: '#0A0404',
+    dotCompleted: (rate) => {
+      const r = Math.round(60 + 195 * rate);
+      const g = Math.round(15 + 35 * rate);
+      const b = Math.round(15 + 35 * rate);
+      return `rgb(${r}, ${g}, ${b})`;
+    },
+    dotToday: '#FF3333',
+    dotTodayGlow: 'rgba(255, 51, 51, 0.5)',
+    dotFuture: '#0C0606',
+    dotEmpty: '#2A1010',
+    textPrimary: '#FF3333',
+    textSecondary: '#AA2222',
+    textTertiary: '#661515',
+    glowCompleted: true,
+    todayGlowSize: 3.2,
+  },
+  snow: {
+    label: 'Snow',
+    desc: 'Pure white',
+    bg: '#FFFFFF',
+    dotCompleted: (rate) => {
+      const v = Math.round(200 - 170 * rate);
+      return `rgb(${v}, ${v}, ${v})`;
+    },
+    dotToday: '#000000',
+    dotTodayGlow: 'rgba(0, 0, 0, 0.15)',
+    dotFuture: '#F8F8F8',
+    dotEmpty: '#D0D0D0',
+    textPrimary: '#000000',
+    textSecondary: '#888888',
+    textTertiary: '#BBBBBB',
+    todayGlowSize: 2.8,
+  },
 };
 
 // ─── Presets ─────────────────────────────────────────────────────────────────────
@@ -935,6 +1010,89 @@ function VibeOverlay({ style: vibeStyle }: { style: WallpaperStyle }) {
           <View style={{
             position: 'absolute', top: 0, right: 0, bottom: 0, width: '8%',
             backgroundColor: 'rgba(0, 0, 0, 0.15)',
+          }} />
+        </>
+      );
+
+    case 'sunrise':
+      return (
+        <>
+          {/* Warm horizon glow at bottom */}
+          <View style={{
+            position: 'absolute', bottom: '5%', left: '5%',
+            width: '90%', height: '30%',
+            borderRadius: 999,
+            backgroundColor: 'rgba(255, 179, 71, 0.04)',
+          }} />
+          {/* Upper warm tint */}
+          <View style={{
+            position: 'absolute', top: '15%', left: '20%',
+            width: '60%', height: '20%',
+            borderRadius: 999,
+            backgroundColor: 'rgba(255, 140, 40, 0.025)',
+          }} />
+        </>
+      );
+
+    case 'ocean':
+      return (
+        <>
+          {/* Deep water gradient at bottom */}
+          <View style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%',
+            backgroundColor: 'rgba(0, 80, 140, 0.06)',
+          }} />
+          {/* Surface shimmer */}
+          <View style={{
+            position: 'absolute', top: '20%', left: '10%',
+            width: '80%', height: '25%',
+            borderRadius: 999,
+            backgroundColor: 'rgba(0, 212, 255, 0.025)',
+          }} />
+        </>
+      );
+
+    case 'blood':
+      return (
+        <>
+          {/* Deep red vignette */}
+          <View style={{
+            position: 'absolute', top: '15%', left: '5%',
+            width: '90%', height: '50%',
+            borderRadius: 999,
+            backgroundColor: 'rgba(255, 30, 30, 0.04)',
+          }} />
+          {/* Top shadow */}
+          <View style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: '15%',
+            backgroundColor: 'rgba(40, 0, 0, 0.3)',
+          }} />
+          {/* Bottom shadow */}
+          <View style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '15%',
+            backgroundColor: 'rgba(40, 0, 0, 0.3)',
+          }} />
+        </>
+      );
+
+    case 'snow':
+      return (
+        <>
+          {/* Soft vignette edges */}
+          <View style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: '20%',
+            backgroundColor: 'rgba(0, 0, 0, 0.015)',
+          }} />
+          <View style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '20%',
+            backgroundColor: 'rgba(0, 0, 0, 0.015)',
+          }} />
+          {/* Subtle warm center */}
+          <View style={{
+            position: 'absolute', top: '30%', left: '15%',
+            width: '70%', height: '25%',
+            borderRadius: 999,
+            backgroundColor: 'rgba(0, 0, 0, 0.008)',
           }} />
         </>
       );
