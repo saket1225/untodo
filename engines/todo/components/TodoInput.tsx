@@ -455,7 +455,7 @@ function TodoInputInner({ onAdd, viewingDate }: Props) {
           ref={inputRef}
           style={[styles.input, isFocused && styles.inputFocused]}
           placeholder={isFocused ? "What needs doing?" : "Add a task..."}
-          placeholderTextColor={isFocused ? colors.textSecondary : colors.textTertiary}
+          placeholderTextColor={colors.text + '4D'}
           value={text}
           onChangeText={setText}
           onSubmitEditing={handleAdd}
