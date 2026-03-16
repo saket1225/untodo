@@ -55,10 +55,6 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('screen');
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const WALLPAPER_W = SCREEN_W;
 const WALLPAPER_H = SCREEN_H;
-const PHONE_BORDER = 3;
-const PREVIEW_WIDTH = SCREEN_WIDTH * 0.7;
-const PREVIEW_SCALE = PREVIEW_WIDTH / SCREEN_W;
-const PREVIEW_HEIGHT = SCREEN_H * PREVIEW_SCALE;
 const MAX_DOTS = 1000;
 
 // Content renders at device logical resolution (SCREEN_W x SCREEN_H).
@@ -1253,24 +1249,6 @@ function WallpaperScreenContent() {
     RNAnimated.timing(entranceFade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
   }, []);
 
-  // Sticky mini preview
-  const miniPreviewOpacity = useRef(new RNAnimated.Value(0)).current;
-  const miniPreviewVisible = useRef(false);
-  const PREVIEW_THRESHOLD = PREVIEW_HEIGHT + 120; // when main preview scrolls out
-
-  const handleScroll = useCallback((event: any) => {
-    const y = event.nativeEvent.contentOffset.y;
-    const shouldShow = y > PREVIEW_THRESHOLD;
-    if (shouldShow !== miniPreviewVisible.current) {
-      miniPreviewVisible.current = shouldShow;
-      RNAnimated.timing(miniPreviewOpacity, {
-        toValue: shouldShow ? 1 : 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, []);
-
   const activeStyle = WALLPAPER_STYLES[config.wallpaperStyle || 'minimal'];
   const startDate = new Date((config.startDate || '2026-03-10') + 'T00:00:00');
   const goalDate = config.goalDate || '2028-01-12';
@@ -1469,9 +1447,7 @@ function WallpaperScreenContent() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <RNAnimated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }} style={{ opacity: entranceFade }} onScroll={handleScroll} scrollEventThrottle={16}>
-        <Text style={styles.heading}>Wallpaper</Text>
-
+      <RNAnimated.View style={{ flex: 1, opacity: entranceFade }}>
         {/* ── Hidden full-res ViewShot for capture ── */}
         <View style={{ position: 'absolute', left: -9999, top: -9999 }} pointerEvents="none">
           <ViewShot
@@ -1502,28 +1478,30 @@ function WallpaperScreenContent() {
           </ViewShot>
         </View>
 
-        {/* ── Live Preview — phone frame ── */}
-        <View style={[styles.phoneFrame, { width: PREVIEW_WIDTH + PHONE_BORDER * 2, alignSelf: 'center', backgroundColor: activeStyle.bg }]}>
-          <View style={{ width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT, overflow: 'hidden' }}>
-            <WallpaperContent
-              containerWidth={PREVIEW_WIDTH}
-              containerHeight={PREVIEW_HEIGHT}
-              config={config}
-              activeStyle={activeStyle}
-              fontFamily={fontFamily}
-              isTerminal={isTerminal}
-              isStats={isStats}
-              displayNumber={displayNumber}
-              displayLabel={displayLabel}
-              displaySubLabel={displaySubLabel}
-              weekRate={weekRate}
-              streak={streak}
-              days={days}
-              quote={quote}
-              dayNumber={dayNumber}
-            />
-          </View>
+        {/* ── Top Half: Fixed Wallpaper Preview ── */}
+        <View style={styles.previewHalf}>
+          <WallpaperContent
+            containerWidth={SCREEN_WIDTH}
+            containerHeight={SCREEN_H / 2}
+            config={config}
+            activeStyle={activeStyle}
+            fontFamily={fontFamily}
+            isTerminal={isTerminal}
+            isStats={isStats}
+            displayNumber={displayNumber}
+            displayLabel={displayLabel}
+            displaySubLabel={displaySubLabel}
+            weekRate={weekRate}
+            streak={streak}
+            days={days}
+            quote={quote}
+            dayNumber={dayNumber}
+          />
         </View>
+
+        {/* ── Bottom Half: Scrollable Controls ── */}
+        <View style={styles.controlsHalf}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: Spacing.lg, paddingTop: Spacing.md }}>
 
         {/* Toast */}
         {savedToast && (
@@ -1913,45 +1891,7 @@ function WallpaperScreenContent() {
         >
           <Text style={styles.resetBtnText}>Reset to Defaults</Text>
         </TouchableOpacity>
-      </RNAnimated.ScrollView>
-
-      {/* ── Sticky Mini Preview ── */}
-      <RNAnimated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          top: 12,
-          right: 12,
-          opacity: miniPreviewOpacity,
-          borderRadius: 16,
-          overflow: 'hidden',
-          borderWidth: 1.5,
-          borderColor: colors.border,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.5,
-          shadowRadius: 16,
-          elevation: 16,
-        }}
-      >
-        <View style={{ width: SCREEN_WIDTH * 0.4, height: SCREEN_WIDTH * 0.4 * (SCREEN_H / SCREEN_W), overflow: 'hidden' }}>
-          <WallpaperContent
-            containerWidth={SCREEN_WIDTH * 0.4}
-            containerHeight={SCREEN_WIDTH * 0.4 * (SCREEN_H / SCREEN_W)}
-            config={config}
-            activeStyle={activeStyle}
-            fontFamily={fontFamily}
-            isTerminal={isTerminal}
-            isStats={isStats}
-            displayNumber={displayNumber}
-            displayLabel={displayLabel}
-            displaySubLabel={displaySubLabel}
-            weekRate={weekRate}
-            streak={streak}
-            days={days}
-            quote={quote}
-            dayNumber={dayNumber}
-          />
+          </ScrollView>
         </View>
       </RNAnimated.View>
     </SafeAreaView>
@@ -1973,106 +1913,16 @@ function createStyles(colors: ColorPalette) {
     container: {
       flex: 1,
       backgroundColor: colors.background,
-      paddingHorizontal: Spacing.lg,
     },
-    heading: {
-      color: colors.text,
-      fontFamily: Fonts.accentItalic,
-      fontSize: 36,
-      paddingTop: Spacing.lg,
-      marginBottom: Spacing.lg,
-      letterSpacing: -0.5,
-    },
-
-    // Phone frame — premium preview
-    phoneFrame: {
-      borderRadius: 32,
-      overflow: 'hidden',
-      borderWidth: PHONE_BORDER,
-      borderColor: colors.border,
-      marginBottom: Spacing.lg,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 20 },
-      shadowOpacity: 0.8,
-      shadowRadius: 32,
-      elevation: 24,
-      backgroundColor: colors.surface,
-    },
-    phoneNotch: {
-      width: 100,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: colors.surface,
-      alignSelf: 'center',
-      marginTop: 10,
-      marginBottom: 4,
-      zIndex: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    preview: {
-      width: PREVIEW_WIDTH,
-      height: PREVIEW_HEIGHT,
-      backgroundColor: '#080808',
-    },
-    previewContent: {
+    previewHalf: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: Spacing.md,
+      overflow: 'hidden',
     },
-
-    // Preview typography
-    previewDayCount: {
-      fontFamily: Fonts.accent,
-      fontSize: 100,
-      marginBottom: -6,
-      letterSpacing: -1,
-    },
-    previewDayLabel: {
-      fontFamily: Fonts.headingMedium,
-      fontSize: 12,
-      letterSpacing: 2,
-      textTransform: 'uppercase',
-      marginBottom: Spacing.lg,
-    },
-    previewSubLabel: {
-      fontFamily: Fonts.body,
-      fontSize: 10,
-      letterSpacing: 0.5,
-      marginBottom: Spacing.sm,
-      opacity: 0.8,
-    },
-    previewQuote: {
-      fontFamily: Fonts.accentItalic,
-      fontSize: 12,
-      textAlign: 'center',
-      marginTop: Spacing.lg,
-      paddingHorizontal: Spacing.xl,
-      lineHeight: 18,
-      opacity: 0.9,
-    },
-    previewStreak: {
-      fontFamily: Fonts.body,
-      fontSize: 10,
-      marginTop: Spacing.sm,
-      letterSpacing: 0.5,
-    },
-
-    // Stats row
-    statsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: Spacing.md,
-      gap: Spacing.sm,
-    },
-    statItem: {
-      fontFamily: Fonts.bodyMedium,
-      fontSize: 11,
-      letterSpacing: 0.5,
-    },
-    statDivider: {
-      fontSize: 11,
+    controlsHalf: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
     },
 
     // Toast
