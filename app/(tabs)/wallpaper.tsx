@@ -525,6 +525,108 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
 
   const justifyRow = gridAlign === 'left' ? 'flex-start' : gridAlign === 'right' ? 'flex-end' : 'center';
 
+  // Find today's position for the glow overlay (rendered separately to avoid Android overflow clipping)
+  let todayRowIdx = -1;
+  let todayColIdx = -1;
+  for (let i = 0; i < days.length; i++) {
+    if (days[i].isToday) {
+      todayRowIdx = Math.floor(i / cols);
+      todayColIdx = i % cols;
+      break;
+    }
+  }
+
+  // Calculate today glow position within the grid
+  const todayCx = todayColIdx >= 0 ? todayColIdx * (finalDot + finalSpacing) + finalDot / 2 : 0;
+  const todayCy = todayRowIdx >= 0 ? todayRowIdx * (finalDot + finalSpacing) + finalDot / 2 : 0;
+
+  const renderTodayGlowOverlay = () => {
+    if (todayRowIdx < 0) return null;
+    const gs = finalDot * glowSize;
+
+    if (todayMarkerStyle === 'glow') {
+      return (
+        <>
+          {todayGlowSoftness > 3 && (() => {
+            const sz = gs * (1 + todayGlowSoftness * 0.08);
+            return (
+              <View style={{
+                position: 'absolute',
+                left: todayCx - sz / 2,
+                top: todayCy - sz / 2,
+                width: sz, height: sz, borderRadius: sz,
+                backgroundColor: style.dotTodayGlow,
+                opacity: glowIntensity * 0.15,
+              }} />
+            );
+          })()}
+          {todayGlowSoftness > 6 && (() => {
+            const sz = gs * (1 + todayGlowSoftness * 0.05);
+            return (
+              <View style={{
+                position: 'absolute',
+                left: todayCx - sz / 2,
+                top: todayCy - sz / 2,
+                width: sz, height: sz, borderRadius: sz,
+                backgroundColor: style.dotTodayGlow,
+                opacity: glowIntensity * 0.25,
+              }} />
+            );
+          })()}
+          {/* Main glow circle */}
+          <View style={{
+            position: 'absolute',
+            left: todayCx - gs / 2,
+            top: todayCy - gs / 2,
+            width: gs, height: gs, borderRadius: gs,
+            backgroundColor: style.dotTodayGlow,
+            opacity: glowIntensity,
+          }} />
+        </>
+      );
+    }
+
+    if (todayMarkerStyle === 'ring') {
+      return (
+        <View style={{
+          position: 'absolute',
+          left: todayCx - gs / 2,
+          top: todayCy - gs / 2,
+          width: gs, height: gs, borderRadius: gs,
+          borderWidth: Math.max(1, finalDot * 0.15),
+          borderColor: style.dotTodayGlow,
+          backgroundColor: 'transparent',
+        }} />
+      );
+    }
+
+    if (todayMarkerStyle === 'pulse') {
+      const pulseSz = gs * 1.3;
+      return (
+        <>
+          <View style={{
+            position: 'absolute',
+            left: todayCx - pulseSz / 2,
+            top: todayCy - pulseSz / 2,
+            width: pulseSz, height: pulseSz, borderRadius: pulseSz,
+            backgroundColor: style.dotTodayGlow,
+            opacity: 0.15,
+          }} />
+          <View style={{
+            position: 'absolute',
+            left: todayCx - gs / 2,
+            top: todayCy - gs / 2,
+            width: gs, height: gs, borderRadius: gs,
+            backgroundColor: style.dotTodayGlow,
+            opacity: 0.4,
+          }} />
+        </>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <View style={{ alignItems: 'center', width: '100%' }}>
       {/* Blueprint grid overlay */}
@@ -539,6 +641,9 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
         }} />
       )}
       <View style={{ width: finalWidth }}>
+        {/* Today glow overlay - rendered behind dots, not clipped by dot cell */}
+        {renderTodayGlowOverlay()}
+
         {rows.map((row, rowIdx) => {
           const isIncompleteRow = row.length < cols;
           return (
@@ -569,74 +674,8 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
                       marginRight: colIdx < cols - 1 ? finalSpacing : 0,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      overflow: 'visible',
                     }}
                   >
-                    {todayMarkerStyle === 'glow' && (
-                      <>
-                        {/* Soft outer layers - controlled by todayGlowSoftness */}
-                        {todayGlowSoftness > 3 && (
-                          <View style={{
-                            position: 'absolute',
-                            width: finalDot * glowSize * (1 + todayGlowSoftness * 0.08),
-                            height: finalDot * glowSize * (1 + todayGlowSoftness * 0.08),
-                            borderRadius: finalDot * glowSize * (1 + todayGlowSoftness * 0.08),
-                            backgroundColor: style.dotTodayGlow,
-                            opacity: glowIntensity * 0.15,
-                          }} />
-                        )}
-                        {todayGlowSoftness > 6 && (
-                          <View style={{
-                            position: 'absolute',
-                            width: finalDot * glowSize * (1 + todayGlowSoftness * 0.05),
-                            height: finalDot * glowSize * (1 + todayGlowSoftness * 0.05),
-                            borderRadius: finalDot * glowSize * (1 + todayGlowSoftness * 0.05),
-                            backgroundColor: style.dotTodayGlow,
-                            opacity: glowIntensity * 0.25,
-                          }} />
-                        )}
-                        {/* Main glow circle */}
-                        <View style={{
-                          position: 'absolute',
-                          width: finalDot * glowSize,
-                          height: finalDot * glowSize,
-                          borderRadius: finalDot * glowSize,
-                          backgroundColor: style.dotTodayGlow,
-                          opacity: glowIntensity,
-                        }} />
-                      </>
-                    )}
-                    {todayMarkerStyle === 'ring' && (
-                      <View style={{
-                        position: 'absolute',
-                        width: finalDot * glowSize,
-                        height: finalDot * glowSize,
-                        borderRadius: finalDot * glowSize,
-                        borderWidth: Math.max(1, finalDot * 0.15),
-                        borderColor: style.dotTodayGlow,
-                        backgroundColor: 'transparent',
-                      }} />
-                    )}
-                    {todayMarkerStyle === 'pulse' && (
-                      <>
-                        <View style={{
-                          position: 'absolute',
-                          width: finalDot * glowSize * 1.3,
-                          height: finalDot * glowSize * 1.3,
-                          borderRadius: finalDot * glowSize * 1.3,
-                          backgroundColor: style.dotTodayGlow,
-                          opacity: 0.15,
-                        }} />
-                        <View style={{
-                          position: 'absolute',
-                          width: finalDot * glowSize,
-                          height: finalDot * glowSize,
-                          borderRadius: finalDot * glowSize,
-                          backgroundColor: style.dotTodayGlow,
-                          opacity: 0.4,
-                        }} />
-                      </>
-                    )}
                     {/* Today dot */}
                     <View style={{
                       width: finalDot * 1.2,
@@ -1198,12 +1237,15 @@ function WallpaperContent({
   const s = containerWidth / SCREEN_W;
 
   return (
-    <View style={{ width: containerWidth, height: containerHeight, backgroundColor: activeStyle.bg }}>
-      <View style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        opacity: (config.bgGlowIntensity ?? 0.5) * 2,
-        transform: [{ scale: config.bgGlowSoftness ?? 1 }],
-      }}>
+    <View style={{ width: containerWidth, height: containerHeight, backgroundColor: activeStyle.bg }} collapsable={false}>
+      <View
+        needsOffscreenAlphaCompositing={true}
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          opacity: (config.bgGlowIntensity ?? 0.5) * 2,
+          transform: [{ scale: config.bgGlowSoftness ?? 1 }],
+        }}
+      >
         <VibeOverlay style={config.wallpaperStyle || 'minimal'} />
       </View>
       <View style={{
@@ -1528,9 +1570,10 @@ function WallpaperScreenContent() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <RNAnimated.View style={{ flex: 1, opacity: entranceFade }}>
         {/* ── Hidden full-res ViewShot for capture ── */}
-        <View style={{ position: 'absolute', left: -9999, top: -9999 }} pointerEvents="none">
+        <View style={{ position: 'absolute', left: -9999, top: -9999 }} collapsable={false} pointerEvents="none">
           <ViewShot
             ref={viewShotRef}
+            style={{ backgroundColor: activeStyle.bg }}
             options={{
               format: 'png',
               quality: 1,
@@ -1694,7 +1737,7 @@ function WallpaperScreenContent() {
                 style={{ alignSelf: 'center', paddingVertical: 10 }}
                 activeOpacity={0.6}
               >
-                <Text style={{ color: colors.textSecondary, fontSize: 14, fontFamily: Fonts.regular }}>Discard</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 14, fontFamily: Fonts.body }}>Discard</Text>
               </TouchableOpacity>
             )}
             <View style={styles.secondaryActionRow}>
