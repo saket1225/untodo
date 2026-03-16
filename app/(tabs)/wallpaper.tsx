@@ -1242,6 +1242,7 @@ function WallpaperScreenContent() {
   const viewShotRef = useRef<ViewShot>(null);
   const [savedToast, setSavedToast] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 });
 
   // Entrance fade animation
   const entranceFade = useRef(new RNAnimated.Value(0)).current;
@@ -1481,24 +1482,44 @@ function WallpaperScreenContent() {
         {/* ── Top Half: Fixed Wallpaper Preview ── */}
         <View style={styles.previewHalf}>
           <View style={styles.phoneFrame}>
-            <View style={styles.phoneScreen}>
-              <WallpaperContent
-                containerWidth={SCREEN_WIDTH * 0.55}
-                containerHeight={SCREEN_WIDTH * 0.55 * (19.5 / 9)}
-                config={config}
-                activeStyle={activeStyle}
-                fontFamily={fontFamily}
-                isTerminal={isTerminal}
-                isStats={isStats}
-                displayNumber={displayNumber}
-                displayLabel={displayLabel}
-                displaySubLabel={displaySubLabel}
-                weekRate={weekRate}
-                streak={streak}
-                days={days}
-                quote={quote}
-                dayNumber={dayNumber}
-              />
+            <View style={styles.phoneScreen} onLayout={(e) => {
+              const { width, height } = e.nativeEvent.layout;
+              if (width !== previewSize.width || height !== previewSize.height) {
+                setPreviewSize({ width, height });
+              }
+            }}>
+              {previewSize.width > 0 && (() => {
+                const scaleFactor = previewSize.width / WALLPAPER_W;
+                return (
+                  <View style={{
+                    width: WALLPAPER_W,
+                    height: WALLPAPER_H,
+                    transform: [
+                      { scale: scaleFactor },
+                      { translateX: -(WALLPAPER_W * (1 - scaleFactor)) / 2 / scaleFactor },
+                      { translateY: -(WALLPAPER_H * (1 - scaleFactor)) / 2 / scaleFactor },
+                    ],
+                  }}>
+                    <WallpaperContent
+                      containerWidth={WALLPAPER_W}
+                      containerHeight={WALLPAPER_H}
+                      config={config}
+                      activeStyle={activeStyle}
+                      fontFamily={fontFamily}
+                      isTerminal={isTerminal}
+                      isStats={isStats}
+                      displayNumber={displayNumber}
+                      displayLabel={displayLabel}
+                      displaySubLabel={displaySubLabel}
+                      weekRate={weekRate}
+                      streak={streak}
+                      days={days}
+                      quote={quote}
+                      dayNumber={dayNumber}
+                    />
+                  </View>
+                );
+              })()}
             </View>
           </View>
         </View>
