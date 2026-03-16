@@ -1256,7 +1256,7 @@ function WallpaperScreenContent() {
   const scrollY = useRef(new RNAnimated.Value(0)).current;
   const animatedPreviewHeight = scrollY.interpolate({
     inputRange: [0, PREVIEW_SCROLL_THRESHOLD],
-    outputRange: [WINDOW_H * 0.8, WINDOW_H * 0.5],
+    outputRange: [WINDOW_H * 0.75, WINDOW_H * 0.4],
     extrapolate: 'clamp',
   });
 
@@ -1489,62 +1489,63 @@ function WallpaperScreenContent() {
           </ViewShot>
         </View>
 
-        {/* ── Top: Animated Wallpaper Preview ── */}
-        <RNAnimated.View style={[styles.previewHalf, { height: animatedPreviewHeight }]}>
-          <View style={styles.phoneFrame}>
-            <View style={styles.phoneScreen} onLayout={(e) => {
-              const { width, height } = e.nativeEvent.layout;
-              if (width !== previewSize.width || height !== previewSize.height) {
-                setPreviewSize({ width, height });
-              }
-            }}>
-              {previewSize.width > 0 && (() => {
-                const scaleFactor = previewSize.width / WALLPAPER_W;
-                return (
-                  <View style={{
-                    width: WALLPAPER_W,
-                    height: WALLPAPER_H,
-                    transform: [
-                      { scale: scaleFactor },
-                      { translateX: -(WALLPAPER_W * (1 - scaleFactor)) / 2 / scaleFactor },
-                      { translateY: -(WALLPAPER_H * (1 - scaleFactor)) / 2 / scaleFactor },
-                    ],
-                  }}>
-                    <WallpaperContent
-                      containerWidth={WALLPAPER_W}
-                      containerHeight={WALLPAPER_H}
-                      config={config}
-                      activeStyle={activeStyle}
-                      fontFamily={fontFamily}
-                      isTerminal={isTerminal}
-                      isStats={isStats}
-                      displayNumber={displayNumber}
-                      displayLabel={displayLabel}
-                      displaySubLabel={displaySubLabel}
-                      weekRate={weekRate}
-                      streak={streak}
-                      days={days}
-                      quote={quote}
-                      dayNumber={dayNumber}
-                    />
-                  </View>
-                );
-              })()}
+        {/* ── Single ScrollView with everything ── */}
+        <RNAnimated.ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          onScroll={RNAnimated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: false }
+          )}
+          scrollEventThrottle={16}
+        >
+          {/* ── Wallpaper Preview (shrinks on scroll) ── */}
+          <RNAnimated.View style={[styles.previewSection, { height: animatedPreviewHeight }]}>
+            <View style={styles.phoneFrame}>
+              <View style={styles.phoneScreen} onLayout={(e) => {
+                const { width, height } = e.nativeEvent.layout;
+                if (width !== previewSize.width || height !== previewSize.height) {
+                  setPreviewSize({ width, height });
+                }
+              }}>
+                {previewSize.width > 0 && (() => {
+                  const scaleFactor = previewSize.width / WALLPAPER_W;
+                  return (
+                    <View style={{
+                      width: WALLPAPER_W,
+                      height: WALLPAPER_H,
+                      transform: [
+                        { scale: scaleFactor },
+                        { translateX: -(WALLPAPER_W * (1 - scaleFactor)) / 2 / scaleFactor },
+                        { translateY: -(WALLPAPER_H * (1 - scaleFactor)) / 2 / scaleFactor },
+                      ],
+                    }}>
+                      <WallpaperContent
+                        containerWidth={WALLPAPER_W}
+                        containerHeight={WALLPAPER_H}
+                        config={config}
+                        activeStyle={activeStyle}
+                        fontFamily={fontFamily}
+                        isTerminal={isTerminal}
+                        isStats={isStats}
+                        displayNumber={displayNumber}
+                        displayLabel={displayLabel}
+                        displaySubLabel={displaySubLabel}
+                        weekRate={weekRate}
+                        streak={streak}
+                        days={days}
+                        quote={quote}
+                        dayNumber={dayNumber}
+                      />
+                    </View>
+                  );
+                })()}
+              </View>
             </View>
-          </View>
-        </RNAnimated.View>
+          </RNAnimated.View>
 
-        {/* ── Bottom: Scrollable Controls ── */}
-        <View style={styles.controlsHalf}>
-          <RNAnimated.ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: Spacing.lg, paddingTop: Spacing.md }}
-            onScroll={RNAnimated.event(
-              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-              { useNativeDriver: false }
-            )}
-            scrollEventThrottle={16}
-          >
+          {/* ── Controls ── */}
+          <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.md }}>
 
         {/* Toast */}
         {savedToast && (
@@ -1934,8 +1935,9 @@ function WallpaperScreenContent() {
         >
           <Text style={styles.resetBtnText}>Reset to Defaults</Text>
         </TouchableOpacity>
-          </RNAnimated.ScrollView>
-        </View>
+
+          </View>
+        </RNAnimated.ScrollView>
       </RNAnimated.View>
     </SafeAreaView>
   );
@@ -1957,7 +1959,7 @@ function createStyles(colors: ColorPalette) {
       flex: 1,
       backgroundColor: colors.background,
     },
-    previewHalf: {
+    previewSection: {
       overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'center',
@@ -1974,12 +1976,6 @@ function createStyles(colors: ColorPalette) {
     phoneScreen: {
       flex: 1,
       overflow: 'hidden',
-    },
-    controlsHalf: {
-      flex: 1,
-      backgroundColor: colors.background,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
     },
 
     // Toast
