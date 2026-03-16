@@ -97,47 +97,74 @@ const THEME_OPTIONS: { label: string; value: ThemeMode }[] = [
   { label: 'Dark', value: 'dark' },
 ];
 
-function ThemeSegmentedControl({ mode, setTheme, colors }: { mode: ThemeMode; setTheme: (m: ThemeMode) => void; colors: ColorPalette }) {
+function ThemeDropdown({ mode, setTheme, colors }: { mode: ThemeMode; setTheme: (m: ThemeMode) => void; colors: ColorPalette }) {
+  const [expanded, setExpanded] = useState(false);
+  const currentLabel = THEME_OPTIONS.find(o => o.value === mode)?.label ?? 'System';
+
   return (
-    <View style={{
-      flexDirection: 'row',
-      backgroundColor: colors.background,
-      borderRadius: 10,
-      padding: 3,
-    }}>
-      {THEME_OPTIONS.map((opt) => {
-        const isActive = mode === opt.value;
-        return (
-          <TouchableOpacity
-            key={opt.value}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setTheme(opt.value);
-            }}
-            style={{
-              flex: 1,
-              paddingVertical: 7,
-              borderRadius: 8,
-              alignItems: 'center' as const,
-              backgroundColor: isActive ? colors.surface : 'transparent',
-              ...(isActive ? {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.12,
-                shadowRadius: 3,
-                elevation: 2,
-              } : {}),
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={{
-              fontFamily: isActive ? Fonts.bodyMedium : Fonts.body,
-              fontSize: 13,
-              color: isActive ? colors.text : colors.textSecondary,
-            }}>{opt.label}</Text>
-          </TouchableOpacity>
-        );
-      })}
+    <View>
+      <TouchableOpacity
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setExpanded(e => !e);
+        }}
+        activeOpacity={0.7}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+      >
+        <Text style={{
+          fontFamily: Fonts.body,
+          fontSize: 15,
+          color: colors.textSecondary,
+        }}>{currentLabel}</Text>
+        <Text style={{ color: colors.textTertiary, fontSize: 12 }}>{expanded ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+      {expanded && (
+        <View style={{
+          position: 'absolute',
+          top: 32,
+          right: 0,
+          backgroundColor: colors.surface,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 12,
+          elevation: 8,
+          zIndex: 10,
+          minWidth: 120,
+          overflow: 'hidden' as const,
+        }}>
+          {THEME_OPTIONS.map((opt, i) => {
+            const isActive = mode === opt.value;
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setTheme(opt.value);
+                  setExpanded(false);
+                }}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  backgroundColor: isActive ? colors.background : 'transparent',
+                  borderTopWidth: i > 0 ? StyleSheet.hairlineWidth : 0,
+                  borderTopColor: colors.border,
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={{
+                  fontFamily: isActive ? Fonts.bodyMedium : Fonts.body,
+                  fontSize: 14,
+                  color: isActive ? colors.text : colors.textSecondary,
+                }}>{opt.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
@@ -374,7 +401,7 @@ function SettingsScreenContent() {
           marginTop: Spacing.md,
           paddingHorizontal: Spacing.xs,
         }}>PREFERENCES</Text>
-        <SectionCard colors={colors}>
+        <SectionCard colors={colors} style={{ overflow: 'visible' as const, zIndex: 10 }}>
           <View style={s.cardRow}>
             <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>Day resets at</Text>
             <View style={s.resetTimeRow}>
@@ -419,7 +446,7 @@ function SettingsScreenContent() {
           <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: Spacing.md }} />
           <View style={s.cardRow}>
             <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>Theme</Text>
-            <ThemeSegmentedControl mode={mode} setTheme={setTheme} colors={colors} />
+            <ThemeDropdown mode={mode} setTheme={setTheme} colors={colors} />
           </View>
         </SectionCard>
         </RNAnimated.View>
