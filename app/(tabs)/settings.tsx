@@ -102,7 +102,7 @@ function ThemeDropdown({ mode, setTheme, colors }: { mode: ThemeMode; setTheme: 
   const currentLabel = THEME_OPTIONS.find(o => o.value === mode)?.label ?? 'System';
 
   return (
-    <View>
+    <View style={{ zIndex: 1000 }}>
       <TouchableOpacity
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -131,8 +131,8 @@ function ThemeDropdown({ mode, setTheme, colors }: { mode: ThemeMode; setTheme: 
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.15,
           shadowRadius: 12,
-          elevation: 8,
-          zIndex: 10,
+          elevation: 20,
+          zIndex: 1000,
           minWidth: 120,
           overflow: 'hidden' as const,
         }}>
@@ -390,7 +390,7 @@ function SettingsScreenContent() {
         </SectionCard>
         </RNAnimated.View>
 
-        <RNAnimated.View style={{ opacity: sectionAnims[1].opacity, transform: [{ translateY: sectionAnims[1].translateY }] }}>
+        <RNAnimated.View style={{ opacity: sectionAnims[1].opacity, transform: [{ translateY: sectionAnims[1].translateY }], zIndex: 1000 }}>
         {/* Preferences */}
         <Text style={{
           color: colors.textSecondary,
@@ -401,7 +401,7 @@ function SettingsScreenContent() {
           marginTop: Spacing.md,
           paddingHorizontal: Spacing.xs,
         }}>PREFERENCES</Text>
-        <SectionCard colors={colors} style={{ overflow: 'visible' as const, zIndex: 10 }}>
+        <SectionCard colors={colors} style={{ overflow: 'visible' as const, zIndex: 1000 }}>
           <View style={s.cardRow}>
             <Text style={{ color: colors.text, fontFamily: Fonts.body, fontSize: 15 }}>Day resets at</Text>
             <View style={s.resetTimeRow}>
