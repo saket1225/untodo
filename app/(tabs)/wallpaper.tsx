@@ -571,9 +571,10 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
                         height: finalDot * glowSize,
                         borderRadius: finalDot * glowSize,
                         backgroundColor: style.dotTodayGlow,
+                        opacity: glowIntensity,
                         shadowColor: style.dotToday,
                         shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 0.6,
+                        shadowOpacity: glowIntensity,
                         shadowRadius: todayGlowSoftness,
                         elevation: todayGlowSoftness,
                       }} />
@@ -1786,6 +1787,35 @@ function WallpaperScreenContent() {
               min={15} max={35}
               onChange={v => updateConfig({ cols: v })}
             />
+          </View>
+          <Text style={styles.dotCountText}>
+            {days.length} dots{days.length >= MAX_DOTS ? ` (capped at ${MAX_DOTS})` : ''}
+          </Text>
+        </CollapsibleSection>
+
+        {/* ── EFFECTS section ── */}
+        <CollapsibleSection title="Effects" defaultOpen={false}>
+          <View style={styles.controls}>
+            {/* Today marker style */}
+            <View style={styles.controlRow}>
+              <Text style={styles.controlLabel}>Today Marker</Text>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {(['glow', 'ring', 'pulse'] as TodayMarkerStyle[]).map(ms => (
+                  <TouchableOpacity
+                    key={ms}
+                    style={[styles.headingToggleBtn, (config.todayMarkerStyle ?? 'glow') === ms && { backgroundColor: colors.accent, borderColor: colors.accent }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      updateConfig({ todayMarkerStyle: ms });
+                    }}
+                  >
+                    <Text style={[styles.headingToggleBtnText, (config.todayMarkerStyle ?? 'glow') === ms && { color: colors.background }]}>
+                      {ms.charAt(0).toUpperCase() + ms.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
             <NumericControl
               label="Glow Intensity"
               value={config.glowIntensity ?? 1}
@@ -1806,10 +1836,21 @@ function WallpaperScreenContent() {
               min={1} max={20} step={1}
               onChange={v => updateConfig({ todayGlowSoftness: v })}
             />
+            <NumericControl
+              label="BG Glow Softness"
+              value={config.bgGlowSoftness ?? 1}
+              min={0.5} max={2} step={0.1}
+              onChange={v => updateConfig({ bgGlowSoftness: v })}
+              format={v => v.toFixed(1)}
+            />
+            <NumericControl
+              label="BG Glow Intensity"
+              value={config.bgGlowIntensity ?? 0.5}
+              min={0} max={1} step={0.1}
+              onChange={v => updateConfig({ bgGlowIntensity: v })}
+              format={v => v.toFixed(1)}
+            />
           </View>
-          <Text style={styles.dotCountText}>
-            {days.length} dots{days.length >= MAX_DOTS ? ` (capped at ${MAX_DOTS})` : ''}
-          </Text>
         </CollapsibleSection>
 
         {/* ── DISPLAY section ── */}
@@ -1849,26 +1890,6 @@ function WallpaperScreenContent() {
                 </Text>
               </TouchableOpacity>
             </View>
-            {/* Today marker style */}
-            <View style={styles.controlRow}>
-              <Text style={styles.controlLabel}>Today Marker</Text>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                {(['glow', 'ring', 'pulse'] as TodayMarkerStyle[]).map(ms => (
-                  <TouchableOpacity
-                    key={ms}
-                    style={[styles.headingToggleBtn, (config.todayMarkerStyle ?? 'glow') === ms && { backgroundColor: colors.accent, borderColor: colors.accent }]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      updateConfig({ todayMarkerStyle: ms });
-                    }}
-                  >
-                    <Text style={[styles.headingToggleBtnText, (config.todayMarkerStyle ?? 'glow') === ms && { color: colors.background }]}>
-                      {ms.charAt(0).toUpperCase() + ms.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
             <ToggleControl
               label="Show Streak"
               value={config.showStreak}
@@ -1891,20 +1912,6 @@ function WallpaperScreenContent() {
               onChange={v => updateConfig({ wallpaperEnabled: v })}
             />
 
-            <NumericControl
-              label="BG Glow Softness"
-              value={config.bgGlowSoftness ?? 1}
-              min={0.5} max={2} step={0.1}
-              onChange={v => updateConfig({ bgGlowSoftness: v })}
-              format={v => v.toFixed(1)}
-            />
-            <NumericControl
-              label="BG Glow Intensity"
-              value={config.bgGlowIntensity ?? 0.5}
-              min={0} max={1} step={0.1}
-              onChange={v => updateConfig({ bgGlowIntensity: v })}
-              format={v => v.toFixed(1)}
-            />
 
             <View style={styles.divider} />
 
