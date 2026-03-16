@@ -10,7 +10,7 @@ import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useTheme } from '../../lib/ThemeContext';
 import { useWallpaperStore } from '../../engines/wallpaper/store';
 import { useTodoStore } from '../../engines/todo/store';
-import { DayData, WallpaperPreset, WallpaperStyle, GridPosition, TodayMarkerStyle } from '../../engines/wallpaper/types';
+import { DayData, WallpaperPreset, WallpaperStyle, GridPosition, TodayMarkerStyle, GridAlignment } from '../../engines/wallpaper/types';
 import { getLogicalDate } from '../../lib/date-utils';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { registerWallpaperTask, unregisterWallpaperTask, cacheWallpaperForBackground } from '../../engines/wallpaper/background-task';
@@ -137,7 +137,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     },
     dotToday: '#FFFFFF',
     dotTodayGlow: 'rgba(255, 255, 255, 0.4)',
-    dotFuture: '#0E0E0E',
+    dotFuture: '#1A1A1A',
     dotEmpty: '#383838',
     textPrimary: '#FFFFFF',
     textSecondary: '#666666',
@@ -154,7 +154,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     },
     dotToday: '#00FF41',
     dotTodayGlow: 'rgba(0, 255, 65, 0.65)',
-    dotFuture: '#0C100D',
+    dotFuture: '#182018',
     dotEmpty: '#003314',
     textPrimary: '#00FF41',
     textSecondary: '#00CC33',
@@ -175,7 +175,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     },
     dotToday: '#9BABFF',
     dotTodayGlow: 'rgba(155, 171, 255, 0.55)',
-    dotFuture: '#0E0E1A',
+    dotFuture: '#1A1A2A',
     dotEmpty: '#282840',
     textPrimary: '#D0D8FF',
     textSecondary: '#6B73AA',
@@ -192,7 +192,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     },
     dotToday: '#FF33FF',
     dotTodayGlow: 'rgba(255, 51, 255, 0.7)',
-    dotFuture: '#080612',
+    dotFuture: '#151020',
     dotEmpty: '#2A1838',
     textPrimary: '#FF55FF',
     textSecondary: '#AA33AA',
@@ -227,7 +227,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     },
     dotToday: '#5CACEE',
     dotTodayGlow: 'rgba(92, 172, 238, 0.55)',
-    dotFuture: '#0A1A28',
+    dotFuture: '#152838',
     dotEmpty: '#1A3548',
     textPrimary: '#5CACEE',
     textSecondary: '#3A7AB0',
@@ -246,7 +246,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     },
     dotToday: '#FFFFFF',
     dotTodayGlow: 'rgba(255, 255, 255, 0.6)',
-    dotFuture: '#080808',
+    dotFuture: '#151515',
     dotEmpty: '#303030',
     textPrimary: '#FFFFFF',
     textSecondary: '#4A4A4A',
@@ -265,7 +265,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     },
     dotToday: '#E8DEFF',
     dotTodayGlow: 'rgba(180, 140, 255, 0.8)',
-    dotFuture: '#08061C',
+    dotFuture: '#15102A',
     dotEmpty: '#1E1838',
     textPrimary: '#E8DEFF',
     textSecondary: '#8B6EBB',
@@ -286,7 +286,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     },
     dotToday: '#FFB347',
     dotTodayGlow: 'rgba(255, 179, 71, 0.5)',
-    dotFuture: '#0E0A06',
+    dotFuture: '#1A1510',
     dotEmpty: '#2A1F10',
     textPrimary: '#FFB347',
     textSecondary: '#AA7732',
@@ -305,7 +305,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     },
     dotToday: '#00D4FF',
     dotTodayGlow: 'rgba(0, 212, 255, 0.5)',
-    dotFuture: '#060A14',
+    dotFuture: '#101A28',
     dotEmpty: '#0A1E35',
     textPrimary: '#00D4FF',
     textSecondary: '#0088AA',
@@ -324,7 +324,7 @@ const WALLPAPER_STYLES: Record<WallpaperStyle, StyleTheme> = {
     },
     dotToday: '#FF3333',
     dotTodayGlow: 'rgba(255, 51, 51, 0.5)',
-    dotFuture: '#0C0606',
+    dotFuture: '#1A1010',
     dotEmpty: '#2A1010',
     textPrimary: '#FF3333',
     textSecondary: '#AA2222',
@@ -520,8 +520,11 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
     rows.push(days.slice(i, i + cols));
   }
 
+  const gridAlign = config.gridAlignment ?? 'center';
+  const alignItemsValue = gridAlign === 'left' ? 'flex-start' : gridAlign === 'right' ? 'flex-end' : 'center';
+
   return (
-    <View style={{ alignItems: 'center' }}>
+    <View style={{ alignItems: alignItemsValue }}>
       {/* Blueprint grid overlay */}
       {style.gridLines && (
         <View style={{
@@ -1281,7 +1284,7 @@ function WallpaperScreenContent() {
   // Track last saved config for Update/Discard buttons
   const TRACKED_KEYS = [
     'wallpaperStyle', 'dotSize', 'spacing', 'opacity', 'showQuote', 'showDayCount',
-    'showStreak', 'cols', 'goalTitle', 'goalDate', 'showDaysLeft', 'gridPosition',
+    'showStreak', 'cols', 'goalTitle', 'goalDate', 'showDaysLeft', 'gridPosition', 'gridAlignment',
     'topPadding', 'bottomPadding', 'sidePadding', 'glowIntensity', 'todayGlowSize',
     'todayMarkerStyle', 'todayGlowSoftness', 'bgGlowSoftness', 'bgGlowIntensity',
     'headingMode', 'customQuote', 'colorTheme', 'preset',
@@ -1842,6 +1845,26 @@ function WallpaperScreenContent() {
               min={15} max={35}
               onChange={v => updateConfig({ cols: v })}
             />
+            <View style={styles.controlRow}>
+              <Text style={styles.controlLabel}>Grid Alignment</Text>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {(['left', 'center', 'right'] as GridAlignment[]).map(ga => (
+                  <TouchableOpacity
+                    key={ga}
+                    style={[styles.headingToggleBtn, (config.gridAlignment ?? 'center') === ga && { backgroundColor: colors.accent, borderColor: colors.accent }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      LayoutAnimation.configureNext(ANIM_CONFIG);
+                      updateConfig({ gridAlignment: ga });
+                    }}
+                  >
+                    <Text style={[styles.headingToggleBtnText, (config.gridAlignment ?? 'center') === ga && { color: colors.background }]}>
+                      {ga.charAt(0).toUpperCase() + ga.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           </View>
           <Text style={styles.dotCountText}>
             {days.length} dots{days.length >= MAX_DOTS ? ` (capped at ${MAX_DOTS})` : ''}
@@ -2029,6 +2052,7 @@ function WallpaperScreenContent() {
                     headingMode: 'remaining_first',
                     topPadding: 60, bottomPadding: 210, sidePadding: 16,
                     gridPosition: 'center',
+                    gridAlignment: 'center',
                     glowIntensity: 1,
                     todayGlowSize: 2.8,
                     todayMarkerStyle: 'glow',

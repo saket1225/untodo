@@ -10,6 +10,8 @@ export type GridPosition = 'center' | 'top';
 
 export type TodayMarkerStyle = 'glow' | 'ring' | 'pulse';
 
+export type GridAlignment = 'left' | 'center' | 'right';
+
 export interface WallpaperConfig {
   enabled: boolean;
   dotSize: number;
@@ -42,6 +44,7 @@ export interface WallpaperConfig {
   todayGlowSoftness: number;
   bgGlowSoftness: number;
   bgGlowIntensity: number;
+  gridAlignment: GridAlignment;
 }
 
 export interface DayData {
