@@ -1278,6 +1278,31 @@ function WallpaperScreenContent() {
   const [generating, setGenerating] = useState(false);
   const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 });
 
+  // Track last saved config for Update/Discard buttons
+  const TRACKED_KEYS = [
+    'wallpaperStyle', 'dotSize', 'spacing', 'opacity', 'showQuote', 'showDayCount',
+    'showStreak', 'cols', 'goalTitle', 'goalDate', 'showDaysLeft', 'gridPosition',
+    'topPadding', 'bottomPadding', 'sidePadding', 'glowIntensity', 'todayGlowSize',
+    'todayMarkerStyle', 'todayGlowSoftness', 'bgGlowSoftness', 'bgGlowIntensity',
+    'headingMode', 'customQuote', 'colorTheme', 'preset',
+  ] as const;
+  const pickTracked = (c: typeof config) => {
+    const o: Record<string, any> = {};
+    for (const k of TRACKED_KEYS) o[k] = c[k];
+    return o;
+  };
+  const savedConfigRef = useRef(pickTracked(config));
+  const hasChanges = useMemo(() => {
+    const current = pickTracked(config);
+    const saved = savedConfigRef.current;
+    return TRACKED_KEYS.some(k => current[k] !== saved[k]);
+  }, [config]);
+  const snapshotConfig = () => { savedConfigRef.current = pickTracked(config); };
+  const handleDiscard = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    updateConfig(savedConfigRef.current as Partial<typeof config>);
+  };
+
   // Entrance fade animation
   const entranceFade = useRef(new RNAnimated.Value(0)).current;
   useEffect(() => {
@@ -1442,6 +1467,7 @@ function WallpaperScreenContent() {
             updateConfig({ wallpaperAutoUpdate: true, wallpaperEnabled: true });
 
             setGenerating(false);
+            snapshotConfig();
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch (err: any) {
             console.error('setWallpaper failed:', err);
@@ -1450,6 +1476,7 @@ function WallpaperScreenContent() {
           }
         } else {
           setGenerating(false);
+          snapshotConfig();
           Alert.alert('Wallpaper Saved', 'Image saved. Set it as wallpaper from your device settings.');
         }
       } else {
@@ -1648,10 +1675,19 @@ function WallpaperScreenContent() {
               activeOpacity={0.8}
             >
               <Text style={styles.setWallpaperBtnText}>
-                {generating ? 'Setting Wallpaper...' : 'Set as Wallpaper'}
+                {generating ? 'Setting Wallpaper...' : hasChanges ? 'Update Wallpaper' : 'Set as Wallpaper'}
               </Text>
               <Text style={styles.setWallpaperSubtext}>Home & Lock screen</Text>
             </TouchableOpacity>
+            {hasChanges && (
+              <TouchableOpacity
+                onPress={handleDiscard}
+                style={{ alignSelf: 'center', paddingVertical: 10 }}
+                activeOpacity={0.6}
+              >
+                <Text style={{ color: colors.textSecondary, fontSize: 14, fontFamily: Fonts.regular }}>Discard</Text>
+              </TouchableOpacity>
+            )}
             <View style={styles.secondaryActionRow}>
               <TouchableOpacity
                 style={styles.secondaryBtn}
