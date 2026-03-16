@@ -192,7 +192,7 @@ const calStyles = StyleSheet.create({
   },
   dayCell: {
     width: `${100 / 7}%`,
-    aspectRatio: 1,
+    paddingVertical: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
