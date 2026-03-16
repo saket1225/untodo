@@ -565,19 +565,38 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
                     }}
                   >
                     {todayMarkerStyle === 'glow' && (
-                      <View style={{
-                        position: 'absolute',
-                        width: finalDot * glowSize,
-                        height: finalDot * glowSize,
-                        borderRadius: finalDot * glowSize,
-                        backgroundColor: style.dotTodayGlow,
-                        opacity: glowIntensity,
-                        shadowColor: style.dotToday,
-                        shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: glowIntensity,
-                        shadowRadius: todayGlowSoftness,
-                        elevation: todayGlowSoftness,
-                      }} />
+                      <>
+                        {/* Soft outer layers - controlled by todayGlowSoftness */}
+                        {todayGlowSoftness > 3 && (
+                          <View style={{
+                            position: 'absolute',
+                            width: finalDot * glowSize * (1 + todayGlowSoftness * 0.08),
+                            height: finalDot * glowSize * (1 + todayGlowSoftness * 0.08),
+                            borderRadius: finalDot * glowSize * (1 + todayGlowSoftness * 0.08),
+                            backgroundColor: style.dotTodayGlow,
+                            opacity: glowIntensity * 0.15,
+                          }} />
+                        )}
+                        {todayGlowSoftness > 6 && (
+                          <View style={{
+                            position: 'absolute',
+                            width: finalDot * glowSize * (1 + todayGlowSoftness * 0.05),
+                            height: finalDot * glowSize * (1 + todayGlowSoftness * 0.05),
+                            borderRadius: finalDot * glowSize * (1 + todayGlowSoftness * 0.05),
+                            backgroundColor: style.dotTodayGlow,
+                            opacity: glowIntensity * 0.25,
+                          }} />
+                        )}
+                        {/* Main glow circle */}
+                        <View style={{
+                          position: 'absolute',
+                          width: finalDot * glowSize,
+                          height: finalDot * glowSize,
+                          borderRadius: finalDot * glowSize,
+                          backgroundColor: style.dotTodayGlow,
+                          opacity: glowIntensity,
+                        }} />
+                      </>
                     )}
                     {todayMarkerStyle === 'ring' && (
                       <View style={{
