@@ -524,7 +524,7 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
   const alignItemsValue = gridAlign === 'left' ? 'flex-start' : gridAlign === 'right' ? 'flex-end' : 'center';
 
   return (
-    <View style={{ alignItems: alignItemsValue }}>
+    <View style={{ alignItems: alignItemsValue, width: '100%' }}>
       {/* Blueprint grid overlay */}
       {style.gridLines && (
         <View style={{
