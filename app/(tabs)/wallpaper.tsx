@@ -1480,23 +1480,27 @@ function WallpaperScreenContent() {
 
         {/* ── Top Half: Fixed Wallpaper Preview ── */}
         <View style={styles.previewHalf}>
-          <WallpaperContent
-            containerWidth={SCREEN_WIDTH}
-            containerHeight={SCREEN_H / 2}
-            config={config}
-            activeStyle={activeStyle}
-            fontFamily={fontFamily}
-            isTerminal={isTerminal}
-            isStats={isStats}
-            displayNumber={displayNumber}
-            displayLabel={displayLabel}
-            displaySubLabel={displaySubLabel}
-            weekRate={weekRate}
-            streak={streak}
-            days={days}
-            quote={quote}
-            dayNumber={dayNumber}
-          />
+          <View style={styles.phoneFrame}>
+            <View style={styles.phoneScreen}>
+              <WallpaperContent
+                containerWidth={SCREEN_WIDTH * 0.55}
+                containerHeight={SCREEN_WIDTH * 0.55 * (19.5 / 9)}
+                config={config}
+                activeStyle={activeStyle}
+                fontFamily={fontFamily}
+                isTerminal={isTerminal}
+                isStats={isStats}
+                displayNumber={displayNumber}
+                displayLabel={displayLabel}
+                displaySubLabel={displaySubLabel}
+                weekRate={weekRate}
+                streak={streak}
+                days={days}
+                quote={quote}
+                dayNumber={dayNumber}
+              />
+            </View>
+          </View>
         </View>
 
         {/* ── Bottom Half: Scrollable Controls ── */}
@@ -1915,6 +1919,21 @@ function createStyles(colors: ColorPalette) {
       backgroundColor: colors.background,
     },
     previewHalf: {
+      flex: 1,
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+    },
+    phoneFrame: {
+      aspectRatio: 9 / 19.5,
+      height: '90%',
+      borderRadius: 28,
+      borderWidth: 2,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    phoneScreen: {
       flex: 1,
       overflow: 'hidden',
     },
