@@ -523,8 +523,10 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
   const gridAlign = config.gridAlignment ?? 'center';
   const alignItemsValue = gridAlign === 'left' ? 'flex-start' : gridAlign === 'right' ? 'flex-end' : 'center';
 
+  const justifyRow = gridAlign === 'left' ? 'flex-start' : gridAlign === 'right' ? 'flex-end' : 'center';
+
   return (
-    <View style={{ alignItems: alignItemsValue, width: '100%' }}>
+    <View style={{ alignItems: 'center', width: '100%' }}>
       {/* Blueprint grid overlay */}
       {style.gridLines && (
         <View style={{
@@ -537,7 +539,9 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
         }} />
       )}
       <View style={{ width: finalWidth }}>
-        {rows.map((row, rowIdx) => (
+        {rows.map((row, rowIdx) => {
+          const isIncompleteRow = row.length < cols;
+          return (
           <View
             key={rowIdx}
             style={{
@@ -545,6 +549,7 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
               height: finalDot,
               marginBottom: rowIdx < rows.length - 1 ? finalSpacing : 0,
               alignItems: 'center',
+              justifyContent: isIncompleteRow ? justifyRow : 'flex-start',
             }}
           >
             {row.map((day, colIdx) => {
@@ -665,7 +670,8 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
               );
             })}
           </View>
-        ))}
+          );
+        })}
       </View>
     </View>
   );
