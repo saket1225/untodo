@@ -10,7 +10,7 @@ import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useTheme } from '../../lib/ThemeContext';
 import { useWallpaperStore } from '../../engines/wallpaper/store';
 import { useTodoStore } from '../../engines/todo/store';
-import { DayData, WallpaperPreset, WallpaperStyle, GridPosition } from '../../engines/wallpaper/types';
+import { DayData, WallpaperPreset, WallpaperStyle, GridPosition, TodayMarkerStyle } from '../../engines/wallpaper/types';
 import { getLogicalDate } from '../../lib/date-utils';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { registerWallpaperTask, unregisterWallpaperTask, cacheWallpaperForBackground } from '../../engines/wallpaper/background-task';
@@ -512,7 +512,9 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
   const finalSpacing = Math.round(sSpacing * scale * 100) / 100;
   const finalWidth = cols * finalDot + (cols - 1) * finalSpacing;
   const hasGlowEffect = style.glowCompleted || false;
-  const glowSize = style.todayGlowSize || 2.8;
+  const glowIntensity = config.glowIntensity ?? 1;
+  const glowSize = config.todayGlowSize ?? (style.todayGlowSize || 2.8);
+  const todayMarkerStyle = config.todayMarkerStyle ?? 'glow';
 
   const rows: DayData[][] = [];
   for (let i = 0; i < days.length; i += cols) {
@@ -563,14 +565,46 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
                       overflow: 'visible',
                     }}
                   >
-                    {/* Outer glow */}
-                    <View style={{
-                      position: 'absolute',
-                      width: finalDot * glowSize,
-                      height: finalDot * glowSize,
-                      borderRadius: finalDot * glowSize,
-                      backgroundColor: style.dotTodayGlow,
-                    }} />
+                    {todayMarkerStyle === 'glow' && (
+                      <View style={{
+                        position: 'absolute',
+                        width: finalDot * glowSize,
+                        height: finalDot * glowSize,
+                        borderRadius: finalDot * glowSize,
+                        backgroundColor: style.dotTodayGlow,
+                      }} />
+                    )}
+                    {todayMarkerStyle === 'ring' && (
+                      <View style={{
+                        position: 'absolute',
+                        width: finalDot * glowSize,
+                        height: finalDot * glowSize,
+                        borderRadius: finalDot * glowSize,
+                        borderWidth: Math.max(1, finalDot * 0.15),
+                        borderColor: style.dotTodayGlow,
+                        backgroundColor: 'transparent',
+                      }} />
+                    )}
+                    {todayMarkerStyle === 'pulse' && (
+                      <>
+                        <View style={{
+                          position: 'absolute',
+                          width: finalDot * glowSize * 1.3,
+                          height: finalDot * glowSize * 1.3,
+                          borderRadius: finalDot * glowSize * 1.3,
+                          backgroundColor: style.dotTodayGlow,
+                          opacity: 0.15,
+                        }} />
+                        <View style={{
+                          position: 'absolute',
+                          width: finalDot * glowSize,
+                          height: finalDot * glowSize,
+                          borderRadius: finalDot * glowSize,
+                          backgroundColor: style.dotTodayGlow,
+                          opacity: 0.4,
+                        }} />
+                      </>
+                    )}
                     {/* Today dot */}
                     <View style={{
                       width: finalDot * 1.2,
@@ -595,7 +629,7 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
                     ...(shouldGlow ? {
                       shadowColor: color,
                       shadowOffset: { width: 0, height: 0 },
-                      shadowOpacity: 0.5 + day.completionRate * 0.3,
+                      shadowOpacity: (0.5 + day.completionRate * 0.3) * glowIntensity,
                       shadowRadius: finalDot * 0.6,
                       elevation: 3 * scaleFactor,
                     } : {}),
@@ -1219,6 +1253,24 @@ function WallpaperScreenContent() {
     RNAnimated.timing(entranceFade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
   }, []);
 
+  // Sticky mini preview
+  const miniPreviewOpacity = useRef(new RNAnimated.Value(0)).current;
+  const miniPreviewVisible = useRef(false);
+  const PREVIEW_THRESHOLD = PREVIEW_HEIGHT + 120; // when main preview scrolls out
+
+  const handleScroll = useCallback((event: any) => {
+    const y = event.nativeEvent.contentOffset.y;
+    const shouldShow = y > PREVIEW_THRESHOLD;
+    if (shouldShow !== miniPreviewVisible.current) {
+      miniPreviewVisible.current = shouldShow;
+      RNAnimated.timing(miniPreviewOpacity, {
+        toValue: shouldShow ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, []);
+
   const activeStyle = WALLPAPER_STYLES[config.wallpaperStyle || 'minimal'];
   const startDate = new Date((config.startDate || '2026-03-10') + 'T00:00:00');
   const goalDate = config.goalDate || '2028-01-12';
@@ -1417,7 +1469,7 @@ function WallpaperScreenContent() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <RNAnimated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }} style={{ opacity: entranceFade }}>
+      <RNAnimated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }} style={{ opacity: entranceFade }} onScroll={handleScroll} scrollEventThrottle={16}>
         <Text style={styles.heading}>Wallpaper</Text>
 
         {/* ── Hidden full-res ViewShot for capture ── */}
@@ -1451,8 +1503,7 @@ function WallpaperScreenContent() {
         </View>
 
         {/* ── Live Preview — phone frame ── */}
-        <View style={[styles.phoneFrame, { width: PREVIEW_WIDTH + PHONE_BORDER * 2, alignSelf: 'center' }]}>
-          <View style={styles.phoneNotch} />
+        <View style={[styles.phoneFrame, { width: PREVIEW_WIDTH + PHONE_BORDER * 2, alignSelf: 'center', backgroundColor: activeStyle.bg }]}>
           <View style={{ width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT, overflow: 'hidden' }}>
             <WallpaperContent
               containerWidth={PREVIEW_WIDTH}
@@ -1691,6 +1742,20 @@ function WallpaperScreenContent() {
               min={15} max={35}
               onChange={v => updateConfig({ cols: v })}
             />
+            <NumericControl
+              label="Glow Intensity"
+              value={config.glowIntensity ?? 1}
+              min={0} max={1} step={0.1}
+              onChange={v => updateConfig({ glowIntensity: v })}
+              format={v => v.toFixed(1)}
+            />
+            <NumericControl
+              label="Today Glow Size"
+              value={config.todayGlowSize ?? 2.8}
+              min={1.5} max={5} step={0.1}
+              onChange={v => updateConfig({ todayGlowSize: v })}
+              format={v => v.toFixed(1)}
+            />
           </View>
           <Text style={styles.dotCountText}>
             {days.length} dots{days.length >= MAX_DOTS ? ` (capped at ${MAX_DOTS})` : ''}
@@ -1733,6 +1798,26 @@ function WallpaperScreenContent() {
                   {(config.headingMode || 'remaining_first') === 'day_first' ? `Day ${dayNumber}` : `${daysLeft} days left`}
                 </Text>
               </TouchableOpacity>
+            </View>
+            {/* Today marker style */}
+            <View style={styles.controlRow}>
+              <Text style={styles.controlLabel}>Today Marker</Text>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {(['glow', 'ring', 'pulse'] as TodayMarkerStyle[]).map(ms => (
+                  <TouchableOpacity
+                    key={ms}
+                    style={[styles.headingToggleBtn, (config.todayMarkerStyle ?? 'glow') === ms && { backgroundColor: colors.accent, borderColor: colors.accent }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      updateConfig({ todayMarkerStyle: ms });
+                    }}
+                  >
+                    <Text style={[styles.headingToggleBtnText, (config.todayMarkerStyle ?? 'glow') === ms && { color: colors.background }]}>
+                      {ms.charAt(0).toUpperCase() + ms.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
             <ToggleControl
               label="Show Streak"
@@ -1817,6 +1902,9 @@ function WallpaperScreenContent() {
                     headingMode: 'remaining_first',
                     topPadding: 60, bottomPadding: 210, sidePadding: 16,
                     gridPosition: 'center',
+                    glowIntensity: 1,
+                    todayGlowSize: 2.8,
+                    todayMarkerStyle: 'glow',
                   });
                 },
               },
@@ -1826,6 +1914,46 @@ function WallpaperScreenContent() {
           <Text style={styles.resetBtnText}>Reset to Defaults</Text>
         </TouchableOpacity>
       </RNAnimated.ScrollView>
+
+      {/* ── Sticky Mini Preview ── */}
+      <RNAnimated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          opacity: miniPreviewOpacity,
+          borderRadius: 16,
+          overflow: 'hidden',
+          borderWidth: 1.5,
+          borderColor: colors.border,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.5,
+          shadowRadius: 16,
+          elevation: 16,
+        }}
+      >
+        <View style={{ width: SCREEN_WIDTH * 0.4, height: SCREEN_WIDTH * 0.4 * (SCREEN_H / SCREEN_W), overflow: 'hidden' }}>
+          <WallpaperContent
+            containerWidth={SCREEN_WIDTH * 0.4}
+            containerHeight={SCREEN_WIDTH * 0.4 * (SCREEN_H / SCREEN_W)}
+            config={config}
+            activeStyle={activeStyle}
+            fontFamily={fontFamily}
+            isTerminal={isTerminal}
+            isStats={isStats}
+            displayNumber={displayNumber}
+            displayLabel={displayLabel}
+            displaySubLabel={displaySubLabel}
+            weekRate={weekRate}
+            streak={streak}
+            days={days}
+            quote={quote}
+            dayNumber={dayNumber}
+          />
+        </View>
+      </RNAnimated.View>
     </SafeAreaView>
   );
 }

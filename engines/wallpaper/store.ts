@@ -36,6 +36,9 @@ const DEFAULT_CONFIG: WallpaperConfig = {
   bottomPadding: 210,
   sidePadding: 16,
   gridPosition: 'center',
+  glowIntensity: 1,
+  todayGlowSize: 2.8,
+  todayMarkerStyle: 'glow',
 };
 
 export const useWallpaperStore = create<WallpaperStore>()(
@@ -53,7 +56,7 @@ export const useWallpaperStore = create<WallpaperStore>()(
     {
       name: 'untodo-wallpaper',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 6,
+      version: 7,
       migrate: (persisted: any, version: number) => {
         try {
           const state = (persisted || {}) as { config?: any };
@@ -75,6 +78,9 @@ export const useWallpaperStore = create<WallpaperStore>()(
               bottomPadding: config.bottomPadding ?? 210,
               sidePadding: config.sidePadding ?? 16,
               gridPosition: config.gridPosition ?? 'center',
+              glowIntensity: config.glowIntensity ?? 1,
+              todayGlowSize: config.todayGlowSize ?? 2.8,
+              todayMarkerStyle: config.todayMarkerStyle ?? 'glow',
             },
           };
         } catch {

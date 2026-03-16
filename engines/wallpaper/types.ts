@@ -8,6 +8,8 @@ export type HeadingMode = 'day_first' | 'remaining_first';
 
 export type GridPosition = 'center' | 'top';
 
+export type TodayMarkerStyle = 'glow' | 'ring' | 'pulse';
+
 export interface WallpaperConfig {
   enabled: boolean;
   dotSize: number;
@@ -34,6 +36,9 @@ export interface WallpaperConfig {
   bottomPadding: number;
   sidePadding: number;
   gridPosition: GridPosition;
+  glowIntensity: number;
+  todayGlowSize: number;
+  todayMarkerStyle: TodayMarkerStyle;
 }
 
 export interface DayData {
