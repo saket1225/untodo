@@ -563,6 +563,15 @@ function TodayScreenContent() {
       <RNAnimated.View style={[styles.header, { opacity: entranceFade }]}>
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
+            {isToday && (
+              <View>
+                <Text style={styles.greetingText}>{getGreeting()}</Text>
+                {(() => {
+                  const sub = getGreetingSub(completed, total);
+                  return sub ? <Text style={styles.greetingSubText}>{sub}</Text> : null;
+                })()}
+              </View>
+            )}
             <View style={styles.dateRow}>
               <TouchableOpacity
                 onPress={goToPrevDay}
@@ -595,15 +604,6 @@ function TodayScreenContent() {
                 <RNAnimated.Text style={[styles.syncIcon, { opacity: syncPulse }]} accessibilityLabel="Syncing">☁</RNAnimated.Text>
               )}
             </View>
-            {isToday && (
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.greetingText}>{getGreeting()}</Text>
-                {(() => {
-                  const sub = getGreetingSub(completed, total);
-                  return sub ? <Text style={styles.greetingSubText}>{sub}</Text> : null;
-                })()}
-              </View>
-            )}
           </View>
           <View style={styles.headerRight}>
             {activeCats.length > 0 && (
@@ -1090,9 +1090,6 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   },
   headerLeft: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
   },
   headerSeparator: {
     height: StyleSheet.hairlineWidth,
@@ -1112,6 +1109,7 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     color: colors.textTertiary,
     fontFamily: Fonts.accentItalic,
     fontSize: 13,
+    marginBottom: 8,
   },
   dateRow: {
     flexDirection: 'row',
