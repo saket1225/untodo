@@ -39,6 +39,9 @@ export interface WallpaperConfig {
   glowIntensity: number;
   todayGlowSize: number;
   todayMarkerStyle: TodayMarkerStyle;
+  todayGlowSoftness: number;
+  bgGlowSoftness: number;
+  bgGlowIntensity: number;
 }
 
 export interface DayData {

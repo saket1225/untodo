@@ -512,6 +512,7 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
   const hasGlowEffect = style.glowCompleted || false;
   const glowIntensity = config.glowIntensity ?? 1;
   const glowSize = config.todayGlowSize ?? (style.todayGlowSize || 2.8);
+  const todayGlowSoftness = config.todayGlowSoftness ?? 8;
   const todayMarkerStyle = config.todayMarkerStyle ?? 'glow';
 
   const rows: DayData[][] = [];
@@ -570,6 +571,11 @@ function DotGrid({ config, days, style, scaleFactor = 1 }: { config: import('../
                         height: finalDot * glowSize,
                         borderRadius: finalDot * glowSize,
                         backgroundColor: style.dotTodayGlow,
+                        shadowColor: style.dotToday,
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.6,
+                        shadowRadius: todayGlowSoftness,
+                        elevation: todayGlowSoftness,
                       }} />
                     )}
                     {todayMarkerStyle === 'ring' && (
@@ -1164,7 +1170,13 @@ function WallpaperContent({
 
   return (
     <View style={{ width: containerWidth, height: containerHeight, backgroundColor: activeStyle.bg }}>
-      <VibeOverlay style={config.wallpaperStyle || 'minimal'} />
+      <View style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        opacity: (config.bgGlowIntensity ?? 0.5) * 2,
+        transform: [{ scale: config.bgGlowSoftness ?? 1 }],
+      }}>
+        <VibeOverlay style={config.wallpaperStyle || 'minimal'} />
+      </View>
       <View style={{
         flex: 1,
         paddingTop: (config.topPadding ?? DEFAULT_TOP_PADDING) * s,
@@ -1788,6 +1800,12 @@ function WallpaperScreenContent() {
               onChange={v => updateConfig({ todayGlowSize: v })}
               format={v => v.toFixed(1)}
             />
+            <NumericControl
+              label="Today Glow Softness"
+              value={config.todayGlowSoftness ?? 8}
+              min={1} max={20} step={1}
+              onChange={v => updateConfig({ todayGlowSoftness: v })}
+            />
           </View>
           <Text style={styles.dotCountText}>
             {days.length} dots{days.length >= MAX_DOTS ? ` (capped at ${MAX_DOTS})` : ''}
@@ -1873,6 +1891,21 @@ function WallpaperScreenContent() {
               onChange={v => updateConfig({ wallpaperEnabled: v })}
             />
 
+            <NumericControl
+              label="BG Glow Softness"
+              value={config.bgGlowSoftness ?? 1}
+              min={0.5} max={2} step={0.1}
+              onChange={v => updateConfig({ bgGlowSoftness: v })}
+              format={v => v.toFixed(1)}
+            />
+            <NumericControl
+              label="BG Glow Intensity"
+              value={config.bgGlowIntensity ?? 0.5}
+              min={0} max={1} step={0.1}
+              onChange={v => updateConfig({ bgGlowIntensity: v })}
+              format={v => v.toFixed(1)}
+            />
+
             <View style={styles.divider} />
 
             <Text style={styles.inputLabel}>Custom Quote</Text>
@@ -1937,6 +1970,9 @@ function WallpaperScreenContent() {
                     glowIntensity: 1,
                     todayGlowSize: 2.8,
                     todayMarkerStyle: 'glow',
+                    todayGlowSoftness: 8,
+                    bgGlowSoftness: 1,
+                    bgGlowIntensity: 0.5,
                   });
                 },
               },

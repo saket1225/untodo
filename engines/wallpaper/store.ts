@@ -39,6 +39,9 @@ const DEFAULT_CONFIG: WallpaperConfig = {
   glowIntensity: 1,
   todayGlowSize: 2.8,
   todayMarkerStyle: 'glow',
+  todayGlowSoftness: 8,
+  bgGlowSoftness: 1,
+  bgGlowIntensity: 0.5,
 };
 
 export const useWallpaperStore = create<WallpaperStore>()(
@@ -56,7 +59,7 @@ export const useWallpaperStore = create<WallpaperStore>()(
     {
       name: 'untodo-wallpaper',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 7,
+      version: 8,
       migrate: (persisted: any, version: number) => {
         try {
           const state = (persisted || {}) as { config?: any };
@@ -81,6 +84,9 @@ export const useWallpaperStore = create<WallpaperStore>()(
               glowIntensity: config.glowIntensity ?? 1,
               todayGlowSize: config.todayGlowSize ?? 2.8,
               todayMarkerStyle: config.todayMarkerStyle ?? 'glow',
+              todayGlowSoftness: config.todayGlowSoftness ?? 8,
+              bgGlowSoftness: config.bgGlowSoftness ?? 1,
+              bgGlowIntensity: config.bgGlowIntensity ?? 0.5,
             },
           };
         } catch {
