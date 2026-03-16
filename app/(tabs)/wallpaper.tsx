@@ -1489,18 +1489,17 @@ function WallpaperScreenContent() {
           </ViewShot>
         </View>
 
-        {/* ── Single ScrollView with everything ── */}
-        <RNAnimated.ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 120 }}
-          onScroll={RNAnimated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: false }
-          )}
-          scrollEventThrottle={16}
-        >
-          {/* ── Wallpaper Preview (shrinks on scroll) ── */}
-          <RNAnimated.View style={[styles.previewSection, { height: animatedPreviewHeight }]}>
+        {/* ── Fixed preview overlay ── */}
+        <RNAnimated.View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: animatedPreviewHeight,
+          zIndex: 10,
+          backgroundColor: colors.background,
+        }} pointerEvents="box-none">
+          <View style={[styles.previewSection, { flex: 1 }]} pointerEvents="none">
             <View style={styles.phoneFrame}>
               <View style={styles.phoneScreen} onLayout={(e) => {
                 const { width, height } = e.nativeEvent.layout;
@@ -1542,8 +1541,19 @@ function WallpaperScreenContent() {
                 })()}
               </View>
             </View>
-          </RNAnimated.View>
+          </View>
+        </RNAnimated.View>
 
+        {/* ── Scrollable controls ── */}
+        <RNAnimated.ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: WINDOW_H * 0.75, paddingBottom: 120 }}
+          onScroll={RNAnimated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: false }
+          )}
+          scrollEventThrottle={16}
+        >
           {/* ── Controls ── */}
           <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.md }}>
 
