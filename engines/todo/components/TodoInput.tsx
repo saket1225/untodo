@@ -1,5 +1,5 @@
-import { useState, useRef, memo, useMemo } from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, ScrollView, Animated, Modal, Alert } from 'react-native';
+import { useState, useRef, memo, useMemo, useEffect } from 'react';
+import { View, TextInput, TouchableOpacity, Text, StyleSheet, ScrollView, Animated, Modal, Alert, Keyboard } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { format, addDays } from 'date-fns';
 import { Fonts, Spacing } from '../../../lib/theme';
@@ -34,6 +34,13 @@ function TodoInputInner({ onAdd, viewingDate }: Props) {
   const addCustomTemplate = useTemplateStore(s => s.addCustomTemplate);
   const deleteTemplate = useTemplateStore(s => s.deleteTemplate);
   const allTodos = useTodoStore(s => s.todos);
+
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidHide', () => {
+      inputRef.current?.blur();
+    });
+    return () => sub.remove();
+  }, []);
 
   const today = useMemo(() => getLogicalDate(), []);
   const dateLabel = useMemo(() => {

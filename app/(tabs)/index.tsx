@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, StyleSheet, Modal, TouchableOpacity, ScrollView,
   Animated as RNAnimated, RefreshControl, TextInput, Dimensions, PanResponder,
-  LayoutAnimation, UIManager, Platform, StatusBar,
+  LayoutAnimation, UIManager, Platform, StatusBar, Keyboard,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -784,7 +784,9 @@ function TodayScreenContent() {
         data={todos}
         keyExtractor={item => item.id}
         renderItem={renderItem}
-
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={Keyboard.dismiss}
         windowSize={5}
         maxToRenderPerBatch={10}
         initialNumToRender={10}
