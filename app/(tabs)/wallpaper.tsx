@@ -53,6 +53,8 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('screen');
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const WINDOW_H = Dimensions.get('window').height;
+const PREVIEW_SCROLL_THRESHOLD = 200;
 const WALLPAPER_W = SCREEN_W;
 const WALLPAPER_H = SCREEN_H;
 const MAX_DOTS = 1000;
@@ -1250,6 +1252,14 @@ function WallpaperScreenContent() {
     RNAnimated.timing(entranceFade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
   }, []);
 
+  // Scroll-driven preview scaling
+  const scrollY = useRef(new RNAnimated.Value(0)).current;
+  const animatedPreviewHeight = scrollY.interpolate({
+    inputRange: [0, PREVIEW_SCROLL_THRESHOLD],
+    outputRange: [WINDOW_H * 0.8, WINDOW_H * 0.5],
+    extrapolate: 'clamp',
+  });
+
   const activeStyle = WALLPAPER_STYLES[config.wallpaperStyle || 'minimal'];
   const startDate = new Date((config.startDate || '2026-03-10') + 'T00:00:00');
   const goalDate = config.goalDate || '2028-01-12';
@@ -1479,8 +1489,8 @@ function WallpaperScreenContent() {
           </ViewShot>
         </View>
 
-        {/* ── Top Half: Fixed Wallpaper Preview ── */}
-        <View style={styles.previewHalf}>
+        {/* ── Top: Animated Wallpaper Preview ── */}
+        <RNAnimated.View style={[styles.previewHalf, { height: animatedPreviewHeight }]}>
           <View style={styles.phoneFrame}>
             <View style={styles.phoneScreen} onLayout={(e) => {
               const { width, height } = e.nativeEvent.layout;
@@ -1522,11 +1532,19 @@ function WallpaperScreenContent() {
               })()}
             </View>
           </View>
-        </View>
+        </RNAnimated.View>
 
-        {/* ── Bottom Half: Scrollable Controls ── */}
+        {/* ── Bottom: Scrollable Controls ── */}
         <View style={styles.controlsHalf}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: Spacing.lg, paddingTop: Spacing.md }}>
+          <RNAnimated.ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: Spacing.lg, paddingTop: Spacing.md }}
+            onScroll={RNAnimated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+              { useNativeDriver: false }
+            )}
+            scrollEventThrottle={16}
+          >
 
         {/* Toast */}
         {savedToast && (
@@ -1916,7 +1934,7 @@ function WallpaperScreenContent() {
         >
           <Text style={styles.resetBtnText}>Reset to Defaults</Text>
         </TouchableOpacity>
-          </ScrollView>
+          </RNAnimated.ScrollView>
         </View>
       </RNAnimated.View>
     </SafeAreaView>
@@ -1940,7 +1958,6 @@ function createStyles(colors: ColorPalette) {
       backgroundColor: colors.background,
     },
     previewHalf: {
-      flex: 1,
       overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'center',
