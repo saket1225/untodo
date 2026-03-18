@@ -12,6 +12,8 @@ export type TodayMarkerStyle = 'glow' | 'ring' | 'pulse';
 
 export type GridAlignment = 'left' | 'center' | 'right';
 
+export type WallpaperTarget = 'lockscreen' | 'homescreen' | 'both';
+
 export interface WallpaperConfig {
   enabled: boolean;
   dotSize: number;
@@ -45,6 +47,7 @@ export interface WallpaperConfig {
   bgGlowSoftness: number;
   bgGlowIntensity: number;
   gridAlignment: GridAlignment;
+  wallpaperTarget: WallpaperTarget;
 }
 
 export interface DayData {

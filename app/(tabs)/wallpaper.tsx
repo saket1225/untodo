@@ -4,13 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
-import { setWallpaper, FLAG_BOTH } from '../../modules/wallpaper-setter';
+import { setWallpaper, FLAG_BOTH, FLAG_SYSTEM, FLAG_LOCK } from '../../modules/wallpaper-setter';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing } from '../../lib/theme';
 import { useTheme } from '../../lib/ThemeContext';
 import { useWallpaperStore } from '../../engines/wallpaper/store';
 import { useTodoStore } from '../../engines/todo/store';
-import { DayData, WallpaperPreset, WallpaperStyle, GridPosition, TodayMarkerStyle, GridAlignment } from '../../engines/wallpaper/types';
+import { DayData, WallpaperPreset, WallpaperStyle, GridPosition, TodayMarkerStyle, GridAlignment, WallpaperTarget } from '../../engines/wallpaper/types';
 import { getLogicalDate } from '../../lib/date-utils';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { registerWallpaperTask, unregisterWallpaperTask, cacheWallpaperForBackground } from '../../engines/wallpaper/background-task';
@@ -1335,7 +1335,7 @@ function WallpaperScreenContent() {
     'showStreak', 'cols', 'goalTitle', 'goalDate', 'showDaysLeft', 'gridPosition', 'gridAlignment',
     'topPadding', 'bottomPadding', 'sidePadding', 'glowIntensity', 'todayGlowSize',
     'todayMarkerStyle', 'todayGlowSoftness', 'bgGlowSoftness', 'bgGlowIntensity',
-    'headingMode', 'customQuote', 'colorTheme', 'preset',
+    'headingMode', 'customQuote', 'colorTheme', 'preset', 'wallpaperTarget',
   ] as const;
   const pickTracked = (c: typeof config) => {
     const o: Record<string, any> = {};
@@ -1453,6 +1453,8 @@ function WallpaperScreenContent() {
     return () => sub.remove();
   }, [config.wallpaperEnabled, config.wallpaperAutoUpdate, config.lastWallpaperDate]);
 
+  const wallpaperFlag = config.wallpaperTarget === 'homescreen' ? FLAG_SYSTEM : config.wallpaperTarget === 'lockscreen' ? FLAG_LOCK : FLAG_BOTH;
+
   const handleSaveWallpaper = useCallback(async (silent = false) => {
     try {
       if (!silent) setGenerating(true);
@@ -1467,7 +1469,7 @@ function WallpaperScreenContent() {
         if (Platform.OS === 'android') {
           try {
             const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
-            await setWallpaper(fileUri, FLAG_BOTH);
+            await setWallpaper(fileUri, wallpaperFlag);
           } catch (err) {
             console.error('Auto-set wallpaper failed:', err);
           }
@@ -1493,7 +1495,7 @@ function WallpaperScreenContent() {
         Alert.alert('Error', 'Failed to save wallpaper.');
       }
     }
-  }, [updateConfig, config.wallpaperAutoUpdate]);
+  }, [updateConfig, config.wallpaperAutoUpdate, wallpaperFlag]);
 
   const handleSetWallpaper = useCallback(async () => {
     try {
@@ -1509,7 +1511,7 @@ function WallpaperScreenContent() {
         if (Platform.OS === 'android') {
           try {
             const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
-            await setWallpaper(fileUri, FLAG_BOTH);
+            await setWallpaper(fileUri, wallpaperFlag);
 
             const cachedPath = await cacheWallpaperForBackground(uri);
             if (cachedPath) updateConfig({ cachedWallpaperPath: cachedPath });
@@ -1537,7 +1539,7 @@ function WallpaperScreenContent() {
       setGenerating(false);
       Alert.alert('Error', 'Failed to set wallpaper.');
     }
-  }, [updateConfig]);
+  }, [updateConfig, wallpaperFlag]);
 
   const handleDisableAutoUpdate = useCallback(async () => {
     await unregisterWallpaperTask();
@@ -1683,6 +1685,27 @@ function WallpaperScreenContent() {
           </View>
         )}
 
+        {/* ── Wallpaper Target ── */}
+        <Text style={styles.inputLabel}>APPLY TO</Text>
+        <View style={styles.targetSelector}>
+          {([['lockscreen', 'Lock Screen'], ['homescreen', 'Home Screen'], ['both', 'Both']] as const).map(([value, label]) => {
+            const active = (config.wallpaperTarget ?? 'both') === value;
+            return (
+              <TouchableOpacity
+                key={value}
+                style={[styles.targetBtn, active && { backgroundColor: colors.accent, borderColor: colors.accent }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateConfig({ wallpaperTarget: value });
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.targetBtnText, active && { color: colors.background }]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         {/* ── Action Buttons ── */}
         {config.wallpaperAutoUpdate ? (
           <>
@@ -1729,7 +1752,9 @@ function WallpaperScreenContent() {
               <Text style={styles.setWallpaperBtnText}>
                 {generating ? 'Setting Wallpaper...' : hasChanges ? 'Update Wallpaper' : 'Set as Wallpaper'}
               </Text>
-              <Text style={styles.setWallpaperSubtext}>Home & Lock screen</Text>
+              <Text style={styles.setWallpaperSubtext}>
+                {config.wallpaperTarget === 'homescreen' ? 'Home screen' : config.wallpaperTarget === 'lockscreen' ? 'Lock screen' : 'Home & Lock screen'}
+              </Text>
             </TouchableOpacity>
             {hasChanges && (
               <TouchableOpacity
@@ -2423,6 +2448,28 @@ function createStyles(colors: ColorPalette) {
       fontSize: 20,
       minWidth: 40,
       textAlign: 'center',
+    },
+    targetSelector: {
+      flexDirection: 'row',
+      gap: 0,
+      marginBottom: Spacing.lg,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    targetBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderRightWidth: 1,
+      borderRightColor: colors.border,
+    },
+    targetBtnText: {
+      color: colors.text,
+      fontFamily: Fonts.bodyMedium,
+      fontSize: 13,
     },
     headingToggleBtn: {
       backgroundColor: colors.background,

@@ -43,6 +43,7 @@ const DEFAULT_CONFIG: WallpaperConfig = {
   bgGlowSoftness: 1,
   bgGlowIntensity: 0.5,
   gridAlignment: 'center',
+  wallpaperTarget: 'both',
 };
 
 export const useWallpaperStore = create<WallpaperStore>()(
@@ -60,7 +61,7 @@ export const useWallpaperStore = create<WallpaperStore>()(
     {
       name: 'untodo-wallpaper',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 9,
+      version: 10,
       migrate: (persisted: any, version: number) => {
         try {
           const state = (persisted || {}) as { config?: any };
@@ -89,6 +90,7 @@ export const useWallpaperStore = create<WallpaperStore>()(
               bgGlowSoftness: config.bgGlowSoftness ?? 1,
               bgGlowIntensity: config.bgGlowIntensity ?? 0.5,
               gridAlignment: config.gridAlignment ?? 'center',
+              wallpaperTarget: config.wallpaperTarget ?? 'both',
             },
           };
         } catch {
