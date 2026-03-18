@@ -225,7 +225,7 @@ function SettingsScreenContent() {
 
   useEffect(() => {
     if (!silicon?.connected && !pairingCode) {
-      setPairingCode(generatePairingCode());
+      generatePairingCode().then(code => setPairingCode(code));
     }
   }, [silicon]);
 
@@ -252,7 +252,7 @@ function SettingsScreenContent() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             await disconnectSilicon();
             setSilicon(null);
-            const newCode = generatePairingCode();
+            const newCode = await generatePairingCode();
             setPairingCode(newCode);
             setShowCode(false);
           },

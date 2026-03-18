@@ -1,14 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, query, where, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, getDocs } from 'firebase/firestore';
 import * as Notifications from 'expo-notifications';
 import { db } from '../../lib/firebase';
-import { SiliconCommand, SiliconConnection } from './types';
+import { SiliconCommand, SiliconConnection, SiliconInstance } from './types';
 import { useTodoStore } from '../todo/store';
 import { useProgressStore } from '../progress/store';
 import { useWallpaperStore } from '../wallpaper/store';
+import { useUserStore } from '../user/store';
 import { getLogicalDate } from '../../lib/date-utils';
 
 const SILICON_KEY = 'untodo-silicon-connection';
+
+// Module-level username for Firestore operations
+let _username: string | null = null;
+
+export function setUsername(username: string): void {
+  _username = username;
+}
 
 // Track focus state for set_focus command
 let _focusCallback: ((taskId: string | null) => void) | null = null;
@@ -18,20 +26,35 @@ export function onSiliconFocus(cb: (taskId: string | null) => void) {
   return () => { _focusCallback = null; };
 }
 
-export function generatePairingCode(): string {
+export async function generatePairingCode(): Promise<string> {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
   for (let i = 0; i < 6; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
+
+  // Write pairing document to Firestore so Silicon instances can discover it
+  const username = _username || useUserStore.getState().username;
+  if (username) {
+    const pairRef = doc(db, 'silicon_pairs', code);
+    await setDoc(pairRef, {
+      username,
+      createdAt: Date.now(),
+      active: true,
+      connectedSilicons: [],
+    });
+  }
+
   return code;
 }
 
-export async function saveSiliconConnection(code: string): Promise<void> {
+export async function saveSiliconConnection(code: string, connectedSilicons?: SiliconInstance[]): Promise<void> {
+  const existing = await getSiliconConnection();
   await AsyncStorage.setItem(SILICON_KEY, JSON.stringify({
     connected: true,
     pairingCode: code,
     lastSync: Date.now(),
+    connectedSilicons: connectedSilicons ?? existing?.connectedSilicons ?? [],
   }));
 }
 
@@ -46,8 +69,26 @@ export async function getSiliconConnection(): Promise<SiliconConnection | null> 
   return null;
 }
 
-export async function disconnectSilicon(): Promise<void> {
-  await AsyncStorage.removeItem(SILICON_KEY);
+export async function disconnectSilicon(siliconId?: string): Promise<void> {
+  if (!siliconId) {
+    await AsyncStorage.removeItem(SILICON_KEY);
+    return;
+  }
+
+  const connection = await getSiliconConnection();
+  if (!connection) return;
+
+  const updated = (connection.connectedSilicons || []).filter(s => s.siliconId !== siliconId);
+  if (updated.length === 0) {
+    await AsyncStorage.removeItem(SILICON_KEY);
+  } else {
+    await saveSiliconConnection(connection.pairingCode, updated);
+  }
+}
+
+export async function getConnectedSilicons(): Promise<SiliconInstance[]> {
+  const connection = await getSiliconConnection();
+  return connection?.connectedSilicons ?? [];
 }
 
 function calculateStreak(): { streak: number; bestStreak: number } {
@@ -88,8 +129,22 @@ async function processCommand(command: SiliconCommand, username: string): Promis
     if (command.type === 'pair') {
       await updateDoc(cmdRef, { status: 'processing' });
       const code = command.payload.code;
-      await saveSiliconConnection(code || '');
-      result = { message: 'Paired successfully', connected: true };
+      const siliconId = command.payload.siliconId || 'unknown';
+
+      // Add this silicon instance to the connected list
+      const existing = await getConnectedSilicons();
+      const alreadyPaired = existing.find(s => s.siliconId === siliconId);
+      const newInstance: SiliconInstance = {
+        siliconId,
+        pairedAt: alreadyPaired?.pairedAt || Date.now(),
+        lastSeen: Date.now(),
+      };
+      const updatedSilicons = alreadyPaired
+        ? existing.map(s => s.siliconId === siliconId ? newInstance : s)
+        : [...existing, newInstance];
+
+      await saveSiliconConnection(code || '', updatedSilicons);
+      result = { message: 'Paired successfully', connected: true, siliconId };
       const responseRef = doc(db, 'users', username, 'silicon_responses', command.id);
       await setDoc(responseRef, { commandId: command.id, result, status: 'success', completedAt: Date.now() });
       await updateDoc(cmdRef, { status: 'done' });
@@ -303,11 +358,137 @@ async function processCommand(command: SiliconCommand, username: string): Promis
   }
 }
 
+// ---- Silicon task sync (users/{username}/tasks collection) ----
+
+// Track IDs we've already processed to avoid re-adding on snapshot updates
+let _knownSiliconTaskIds = new Set<string>();
+
+export async function syncTasksFromFirestore(username: string): Promise<void> {
+  try {
+    const tasksRef = collection(db, 'users', username, 'tasks');
+    const snapshot = await getDocs(tasksRef);
+    const store = useTodoStore.getState();
+
+    snapshot.docs.forEach((docSnap) => {
+      const data = docSnap.data();
+      const taskId = docSnap.id;
+      _knownSiliconTaskIds.add(taskId);
+
+      const existing = store.todos.find(t => t.id === taskId);
+      if (!existing) {
+        // New silicon task — add to local store
+        const title = data.title || data.text;
+        if (!title) return;
+        // Use restoreTodo to preserve the original ID
+        useTodoStore.getState().restoreTodo({
+          id: taskId,
+          title,
+          completed: data.completed || false,
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString(),
+          logicalDate: data.date || data.logicalDate || getLogicalDate(),
+          order: data.order || 0,
+          type: 'task',
+          priority: data.priority || null,
+          category: data.category || null,
+          pomodoroMinutesLogged: 0,
+          subtasks: [],
+          notes: data.notes || '',
+          syncStatus: 'synced',
+        });
+      } else if (data.source === 'silicon') {
+        // Existing task from silicon — sync completion status (Firestore wins)
+        if (existing.completed !== data.completed) {
+          useTodoStore.getState().updateTodo(taskId, { completed: data.completed });
+        }
+      }
+    });
+  } catch (e) {
+    console.warn('[Silicon] syncTasksFromFirestore failed:', e);
+  }
+}
+
+export async function syncTaskToFirestore(username: string, task: {
+  id: string; title: string; completed: boolean; logicalDate: string;
+  priority?: string | null; category?: string | null;
+}): Promise<void> {
+  try {
+    const taskRef = doc(db, 'users', username, 'tasks', task.id);
+    await setDoc(taskRef, {
+      title: task.title,
+      completed: task.completed,
+      date: task.logicalDate,
+      logicalDate: task.logicalDate,
+      priority: task.priority || null,
+      category: task.category || null,
+      updatedAt: new Date().toISOString(),
+      source: 'app',
+    }, { merge: true });
+  } catch (e) {
+    console.warn('[Silicon] syncTaskToFirestore failed:', e);
+  }
+}
+
+function startTasksListener(username: string): () => void {
+  const tasksRef = collection(db, 'users', username, 'tasks');
+
+  return onSnapshot(tasksRef, (snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      const data = change.doc.data();
+      const taskId = change.doc.id;
+
+      if (change.type === 'added' && !_knownSiliconTaskIds.has(taskId)) {
+        _knownSiliconTaskIds.add(taskId);
+        const store = useTodoStore.getState();
+        const existing = store.todos.find(t => t.id === taskId);
+        if (!existing) {
+          const title = data.title || data.text;
+          if (!title) return;
+          store.restoreTodo({
+            id: taskId,
+            title,
+            completed: data.completed || false,
+            createdAt: data.createdAt || new Date().toISOString(),
+            updatedAt: data.updatedAt || new Date().toISOString(),
+            logicalDate: data.date || data.logicalDate || getLogicalDate(),
+            order: data.order || 0,
+            type: 'task',
+            priority: data.priority || null,
+            category: data.category || null,
+            pomodoroMinutesLogged: 0,
+            subtasks: [],
+            notes: data.notes || '',
+            syncStatus: 'synced',
+          });
+        }
+      } else if (change.type === 'modified' && data.source === 'silicon') {
+        // Silicon updated a task — sync completion status
+        const existing = useTodoStore.getState().todos.find(t => t.id === taskId);
+        if (existing && existing.completed !== data.completed) {
+          useTodoStore.getState().updateTodo(taskId, { completed: data.completed });
+        }
+      } else if (change.type === 'removed') {
+        _knownSiliconTaskIds.delete(taskId);
+        // Only delete locally if it was a silicon-sourced task
+        if (data.source === 'silicon') {
+          const existing = useTodoStore.getState().todos.find(t => t.id === taskId);
+          if (existing) {
+            useTodoStore.getState().deleteTodo(taskId);
+          }
+        }
+      }
+    });
+  }, (error) => {
+    console.error('[Silicon] Tasks listener error:', error);
+  });
+}
+
 export function startSiliconListener(username: string): () => void {
+  _username = username; // Set username for pairing code generation
   const commandsRef = collection(db, 'users', username, 'silicon_commands');
   const q = query(commandsRef, where('status', '==', 'pending'));
 
-  const unsubscribe = onSnapshot(q, (snapshot) => {
+  const unsubCommands = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === 'added' || change.type === 'modified') {
         const data = change.doc.data();
@@ -327,5 +508,14 @@ export function startSiliconListener(username: string): () => void {
     console.error('[Silicon] Firestore listener error:', error);
   });
 
-  return unsubscribe;
+  // Sync existing silicon tasks and start real-time listener
+  syncTasksFromFirestore(username).catch((e) => {
+    console.warn('[Silicon] Initial task sync failed:', e);
+  });
+  const unsubTasks = startTasksListener(username);
+
+  return () => {
+    unsubCommands();
+    unsubTasks();
+  };
 }

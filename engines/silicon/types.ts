@@ -13,8 +13,15 @@ export interface SiliconResponse {
   completedAt: number;
 }
 
+export interface SiliconInstance {
+  siliconId: string;
+  pairedAt: number;
+  lastSeen: number;
+}
+
 export interface SiliconConnection {
   pairingCode: string;
   connected: boolean;
   lastSync: number | null;
+  connectedSilicons: SiliconInstance[];
 }
